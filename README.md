@@ -1,5 +1,5 @@
 # cell2location
-### Locating reference single cells and expression programmes to spatial sequencing data (aggregate across cells in a small tissue region)
+### Highthroughpuy mapping of single cell reference cell types and expression programmes to spatial sequencing data (aggregate across cells in a small tissue region)
 
 ## Installation
 
@@ -32,15 +32,15 @@ pip install tensorboard keras tensorflow-gpu
 
 Now install `cell2location` package:   
 ```
-pip install git+https://github.com/vitkl/cell2location.git
+pip install git+https://github.com/BayraktarLab/cell2location.git
 ```
 
 ## Usage
 
-See [cell2location short demo Jupyter notebook](https://github.com/vitkl/cell2location/blob/master/notebooks/cell2location_short_demo.ipynb) for usage example.   
+See [cell2location short demo Jupyter notebook](https://github.com/BayraktarLab/cell2location/blob/master/notebooks/cell2location_short_demo.ipynb) for usage example.   
 
 See `pyro` branch for pyro implementation of the model.  
 
 ## API details
 
-Models are implemented as dedicated python classes organised in an [inheritance hierarchy](https://github.com/vitkl/cell2location/blob/master/pycell2location/models/README.md) to enable reusing methods between pymc3 and pyro models as well as models that answer distinct questions.  
+Models are implemented as dedicated python classes organised in an [inheritance hierarchy](https://github.com/BayraktarLab/cell2location/blob/master/pycell2location/models/README.md) to enable reusing methods between pymc3 and pyro models as well as models that answer distinct questions.  
