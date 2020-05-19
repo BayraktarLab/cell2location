@@ -1,0 +1,4 @@
+/notebooks/*.ipynb linguist-detectable=false
+*.ipynb linguist-detectable=false
+/notebooks/*.html linguist-detectable=false
+*.py linguist-detectable=true
