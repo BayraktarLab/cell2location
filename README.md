@@ -1,5 +1,5 @@
 # cell2location
-### Highthroughpuy mapping of single cell reference cell types and expression programmes to spatial sequencing data (aggregate across cells in a small tissue region)
+### High throughput mapping of single cell reference cell types and expression programmes to spatial sequencing data (aggregate across cells in a small tissue region)
 
 ## Installation
 
