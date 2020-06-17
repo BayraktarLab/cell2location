@@ -1,21 +1,13 @@
 ### Make ST datasets from single-cell data
-import sys,os
-import pandas as pd
-import numpy as np
-import scanpy as sc
-import anndata 
-import random
-import collections
-import scipy
-import pickle
-import torch as t
-import torch.distributions as dists
-from sklearn.neighbors import KDTree
 import argparse
+import pickle
+import sys
+
+import numpy as np
+import pandas as pd
 
 sys.path.insert(1, '/nfs/team238/ed6/cell2location')
 from ST_simulation import *
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('lbl_gen_file', type=str,
@@ -54,12 +46,12 @@ cnt = cnt_generation
 
 ### GENERATE GENE-SPECIFIC SCALING FACTOR ###
 
-gene_level_alpha = np.random.gamma(5,5)
-gene_level_beta = np.random.gamma(1,5)
+gene_level_alpha = np.random.gamma(5, 5)
+gene_level_beta = np.random.gamma(1, 5)
 gene_level = np.random.gamma(gene_level_alpha, gene_level_beta, size=cnt.shape[1])
 
 # scale from 0 to 1 (to coincide to fractions)
-gene_level_scaled = (gene_level - min(gene_level))/(max(gene_level)- min(gene_level))
+gene_level_scaled = (gene_level - min(gene_level)) / (max(gene_level) - min(gene_level))
 
 design_df = pd.read_csv(design_file, index_col=0)
 
@@ -70,8 +62,9 @@ spots_members = assemble_ct_composition(design_df, tot_spots, ncells_scale=1)
 
 ### SAVE OUTPUTS ###
 
-synthetic_st = {"composition":spots_members, "design":design_df}
+synthetic_st = {"composition": spots_members, "design": design_df}
 
-for k,v in synthetic_st.items():
-    out_name = out_dir + "synthetic_ST_seed" + lbl_gen_file.split("_")[-1].rstrip(".p") + "_" + str(assemble_id) + "_" + k + ".csv"
+for k, v in synthetic_st.items():
+    out_name = out_dir + "synthetic_ST_seed" + lbl_gen_file.split("_")[-1].rstrip(".p") + "_" + str(
+        assemble_id) + "_" + k + ".csv"
     v.to_csv(out_name, sep=",", index=True, header=True)

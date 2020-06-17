@@ -1,13 +1,12 @@
 # +
-import numpy as np
-from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
-from pycell2location.models.base_model import BaseModel
-from sklearn.model_selection import train_test_split
-import torch
+import numpy as np
 import pandas as pd
-from torch import nn
+import torch
+from cell2location.models.base_model import BaseModel
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
+from tqdm.auto import tqdm
 
 
 class MiniBatchDataset(Dataset):
@@ -21,7 +20,6 @@ class MiniBatchDataset(Dataset):
 
     def __getitem__(self, idx):
         return (self.x_data[idx], *(data[idx] for data in self.extra_data.values()))
-
 
 
 class TorchModel(BaseModel):
@@ -49,8 +47,8 @@ class TorchModel(BaseModel):
 
         self.use_cuda = use_cuda
         self.device = 'cuda' if self.use_cuda else 'cpu'
-        self.extra_data = {} # if no extra data empty dictionary
-        
+        self.extra_data = {}  # if no extra data empty dictionary
+
         if self.use_cuda:
             if data_type == 'float32':
                 torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -71,14 +69,15 @@ class TorchModel(BaseModel):
                 raise ValueError('Only 32, 16 and 64-bit tensors can be used (data_type)')
 
     # =====================DATA likelihood loss functions======================= #
-    # define cost function 
-    def nb_log_prob(self, param, data, eps=1e-8):
+    # define cost function
+
+    @staticmethod
+    def nb_log_prob(param, data, eps=1e-8):
         """ Method that returns log probability / log likelihood for each data point.
         NB log prob - Copied over from scVI 
         https://github.com/YosefLab/scVI/blob/b20e34f02a87d16790dbacc95b2ae1714c08615c/scvi/models/log_likelihood.py#L249
         Note: All inputs should be torch Tensors
         log likelihood (scalar) of a minibatch according to a nb model.
-        Variables:
         :param param: list with [mu, theta]
         :param data: data (cells * genes)
         mu: mean of the negative binomial (has to be positive support) (shape: minibatch x genes)
@@ -91,24 +90,23 @@ class TorchModel(BaseModel):
         log_theta_mu_eps = torch.log(theta + mu + eps)
 
         res = (
-            theta * (torch.log(theta + eps) - log_theta_mu_eps)
-            + data * (torch.log(mu + eps) - log_theta_mu_eps)
-            + torch.lgamma(data + theta)
-            - torch.lgamma(theta)
-            - torch.lgamma(data + 1)
+                theta * (torch.log(theta + eps) - log_theta_mu_eps)
+                + data * (torch.log(mu + eps) - log_theta_mu_eps)
+                + torch.lgamma(data + theta)
+                - torch.lgamma(theta)
+                - torch.lgamma(data + 1)
         )
 
         return res
 
     # =====================Training functions======================= #
-    def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
+    def fit_advi_iterative(self, n=3, n_type='restart',
                            n_iter=None, learning_rate=None,
-                           progressbar=True, num_workers=2, train_proportion=None,
+                           num_workers=2, train_proportion=None,
                            l2_weight=False, sample_scaling_weight=0.5):
         r""" Find posterior using pm.ADVI() method directly (allows continuing training through `refine` method.
-        (maximising likehood of the data and minimising KL-divergence of posterior to prior)
+            (maximising likehood of the data and minimising KL-divergence of posterior to prior)
         :param n: number of independent initialisations
-        :param method: to allow for potential use of SVGD or MCMC (currently only ADVI implemented).
         :param n_type: type of repeated initialisation:
                                   'restart' to pick different initial value,
                                   'cv' for molecular cross-validation - splits counts into n datasets,
@@ -126,7 +124,6 @@ class TorchModel(BaseModel):
         self.training_hist = {}
         self.samples = {}
         self.node_samples = {}
-
 
         self.n_type = n_type
         self.l2_weight = l2_weight
@@ -161,7 +158,6 @@ class TorchModel(BaseModel):
             else:
                 x_data = torch.FloatTensor(self.X_data.astype(self.data_type))
 
-
             ################### Training / validation split ###################
             # split into training and validation
             if train_proportion is not None:
@@ -174,7 +170,6 @@ class TorchModel(BaseModel):
 
                 x_data_val = x_data[val_idx].to(self.device)
                 x_data = x_data[train_idx]
-
 
             ################### Move data to cuda - FULL data ###################
             # if not minibatch do this:
@@ -203,7 +198,7 @@ class TorchModel(BaseModel):
                                      sample_scaling_weight=sample_scaling_weight)
                     loss.backward()
                     optim.step()
-                    iter_loss=loss.item()
+                    iter_loss = loss.item()
 
                 else:
                     ################### Training MINIBATCH data ###################
@@ -214,12 +209,13 @@ class TorchModel(BaseModel):
                         x_data_batch, *extra_data_batch = batch
 
                         x_data_batch = x_data_batch.to(self.device)
-                        extra_data_batch = {k:v.to(self.device) for k, v in zip(extra_data_train.keys(), extra_data_batch)}
+                        extra_data_batch = {k: v.to(self.device) for k, v in
+                                            zip(extra_data_train.keys(), extra_data_batch)}
 
                         optim.zero_grad()
                         y_pred = self.model.forward(**extra_data_batch)
                         loss = self.loss(y_pred, x_data_batch, l2_weight=l2_weight,
-                                     sample_scaling_weight=sample_scaling_weight)
+                                         sample_scaling_weight=sample_scaling_weight)
                         aver_loss.append(loss.item())
                         loss.backward()
 
@@ -242,18 +238,17 @@ class TorchModel(BaseModel):
                     iter_loss_val = np.sum(aver_loss_val)
 
                     self.validation_hist[name].append(iter_loss_val)
-                    epochs_iterator.set_description(f'Loss: '+'{:.4e}'.format(iter_loss)
-                                                    +': Val loss: '+ '{:.4e}'.format(iter_loss_val))
+                    epochs_iterator.set_description(f'Loss: ' + '{:.4e}'.format(iter_loss)
+                                                    + ': Val loss: ' + '{:.4e}'.format(iter_loss_val))
                 else:
                     epochs_iterator.set_description('Loss: ' + '{:.4e}'.format(iter_loss))
-
 
             if train_proportion is not None:
                 # rescale loss
                 self.validation_hist[name] = [i / (1 - train_proportion)
                                               for i in self.validation_hist[name]]
                 self.hist[name] = [i / train_proportion for i in self.hist[name]]
-                # reassing the main loss to be displayed
+                # reassign the main loss to be displayed
                 self.training_hist[name] = self.hist[name]
                 self.hist[name] = self.validation_hist[name]
 
@@ -261,12 +256,13 @@ class TorchModel(BaseModel):
             self.mean_field[name] = self.model.state_dict()
 
             if self.verbose:
-                print(plt.plot(np.log10(self.hist[name][0:])));
+                print(plt.plot(np.log10(self.hist[name][0:])))
 
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
                          mean_field_slot='init_1'):
         r""" Sample posterior distribution of parameters - either all or single parameter
+
         :param node: torch parameter to sample (e.g. default "all", self.spot_factors)
         :param n_samples: number of posterior samples to generate (1000 is recommended, reduce if you get GPU memory error)
         :param save_samples: save samples in addition to sample mean, 5% quantile, SD.
@@ -289,7 +285,7 @@ class TorchModel(BaseModel):
 
         else:
             raise NotImplementedError
-            
+
         self.samples['post_sample_sds'] = None
         self.samples['post_sample_q05'] = None
         self.samples['post_sample_q95'] = None
@@ -298,8 +294,8 @@ class TorchModel(BaseModel):
             return self.samples
 
     def b_evaluate_stability(self, node_name, n_samples=1000, align=True, transpose=True):
-        r""" Evaluate stability of posterior samples between training initialisations
-        (takes samples and correlates the values of factors between training initialisations)
+        r"""Evaluate stability of posterior samples between training initialisations
+            (takes samples and correlates the values of factors between training initialisations)
         :param node: which pymc3 node to sample? Factors should be in columns.
         :param n_samples: the number of samples.
         :param align: boolean, match factors between training restarts using linear_sum_assignment?
@@ -324,6 +320,7 @@ class TorchModel(BaseModel):
 
     def sample2df(self, node_name='nUMI_factors'):
         r""" Export spot factors as Pandas data frames.
+
         :param node_name: name of the model parameter to be exported
         :return: a Pandas dataframe added to model object:
                  .spot_factors_df
@@ -333,13 +330,12 @@ class TorchModel(BaseModel):
             raise ValueError(
                 'Please run `.sample_posterior()` first to generate samples & summarise posterior of each parameter')
 
-        self.spot_factors_df = \
-            pd.DataFrame.from_records(self.samples['post_sample_means'][node_name],
-                                      index=self.obs_names,
-                                      columns=['mean_' + node_name + i for i in self.fact_names])
+        self.spot_factors_df = pd.DataFrame.from_records(self.samples['post_sample_means'][node_name],
+                                                         index=self.obs_names,
+                                                         columns=['mean_' + node_name + i for i in self.fact_names])
 
     def annotate_spot_adata(self, adata):
-        r""" Add spot factors to anndata.obs
+        r"""Add spot factors to anndata.obs
         :param adata: anndata object to annotate
         :return: updated anndata object
         """
@@ -350,4 +346,4 @@ class TorchModel(BaseModel):
         # add cell factors to adata
         adata.obs[self.spot_factors_df.columns] = self.spot_factors_df.loc[adata.obs.index, :]
 
-        return (adata)
+        return adata
