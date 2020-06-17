@@ -1,21 +1,15 @@
 ### Make ST datasets from single-cell data
-import sys,os
-import pandas as pd
-import numpy as np
-import scanpy as sc
-import anndata 
-import random
-import collections
-import scipy
-import pickle
-import torch as t
-import torch.distributions as dists
-from sklearn.neighbors import KDTree
 import argparse
+import pickle
+import random
+import sys
+
+import numpy as np
+import pandas as pd
+from sklearn.neighbors import KDTree
 
 sys.path.insert(1, '/home/jovyan/cellLocModel')
 from ST_simulation import *
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('lbl_gen_file', type=str,
@@ -53,10 +47,10 @@ cnt_generation = pickle.load(open(count_gen_file, "rb"))
 
 ## read spot locations and nuclei counts
 df_dot = pd.read_csv('/nfs/team283/ed6/visium_chips/data/visium_beta1_segmentation/dot_df_s144600_aligned.csv',
-                       header=0, index_col=0, sep=',')
+                     header=0, index_col=0, sep=',')
 
 df_nucl = pd.read_csv('/nfs/team283/ed6/visium_chips/data/visium_beta1_segmentation/cell_df_s144600.csv',
-                       header=0, index_col=0, sep=',')
+                      header=0, index_col=0, sep=',')
 
 radius = 70
 
@@ -67,26 +61,25 @@ df_dot['count'] = tree.query_radius(df_dot[['x', 'y']], radius, count_only=True)
 # Select spots with at least 3 cells
 cell_counts = df_dot["count"][df_dot["count"] > 2].tolist()
 
-
 ### EXTRACT LABEL FRACTION PARAMETER ###
 
 sc_lbl = lbl_generation
 label_counts_df = pd.DataFrame(sc_lbl["louvain"].value_counts())
 label_counts_df = label_counts_df.reset_index()
 label_counts_df.columns = ["louvain", "counts"]
-label_counts_df["props"] = label_counts_df["counts"]/np.sum(label_counts_df["counts"])
+label_counts_df["props"] = label_counts_df["counts"] / np.sum(label_counts_df["counts"])
 
 labels = lbl_generation
 cnt = cnt_generation
 
 ### GENERATE GENE-SPECIFIC SCALING FACTOR ###
 
-gene_level_alpha = np.random.gamma(5,5)
-gene_level_beta = np.random.gamma(1,5)
+gene_level_alpha = np.random.gamma(5, 5)
+gene_level_beta = np.random.gamma(1, 5)
 gene_level = np.random.gamma(gene_level_alpha, gene_level_beta, size=cnt.shape[1])
 
 # scale from 0 to 1 (to coincide to fractions)
-gene_level_scaled = (gene_level - min(gene_level))/(max(gene_level)- min(gene_level))
+gene_level_scaled = (gene_level - min(gene_level)) / (max(gene_level) - min(gene_level))
 
 ### BUILD ST DATA ###
 
@@ -97,17 +90,19 @@ alpha = np.array(label_df_alpha["props"]) + 1
 
 # get unique labels found in single cell data
 uni_labs, uni_counts = np.unique(labels,
-                                 return_counts = True)
+                                 return_counts=True)
 
-n_cells_tot = np.array(random.sample(cell_counts, k=tot_spots)) # from counts but sampling n spots
+n_cells_tot = np.array(random.sample(cell_counts, k=tot_spots))  # from counts but sampling n spots
 
-synthetic_st = assemble_st(cnt, labels, n_regions=tot_regions, n_cells_tot=n_cells_tot, alpha=alpha, fraction=gene_level_scaled)
+synthetic_st = assemble_st(cnt, labels, n_regions=tot_regions, n_cells_tot=n_cells_tot, alpha=alpha,
+                           fraction=gene_level_scaled)
 
-synthetic_st["regions"] = pd.DataFrame({"region":synthetic_st["regions"]}, index=synthetic_st["counts"].index)
-synthetic_st["geneLevel"] = pd.DataFrame({"gene_level_scaled":gene_level_scaled}, index=cnt.columns)
+synthetic_st["regions"] = pd.DataFrame({"region": synthetic_st["regions"]}, index=synthetic_st["counts"].index)
+synthetic_st["geneLevel"] = pd.DataFrame({"gene_level_scaled": gene_level_scaled}, index=cnt.columns)
 
 ### SAVE OUTPUTS ###
 
-for k,v in synthetic_st.items():
-    out_name = out_dir + "synthetic_ST_seed" + lbl_gen_file.split("_")[-1].rstrip(".p") + "_" + str(assemble_id) + "_" + k + ".csv"
+for k, v in synthetic_st.items():
+    out_name = out_dir + "synthetic_ST_seed" + lbl_gen_file.split("_")[-1].rstrip(".p") + "_" + str(
+        assemble_id) + "_" + k + ".csv"
     v.to_csv(out_name, sep=",", index=True, header=True)
