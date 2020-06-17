@@ -44,14 +44,15 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                       export_args={'path': "./results", 'save_model': False,
                                    'run_name_suffix': '', 'scanpy_coords_name': 'coords'}):
     
-    r""" Run cell2location model: train, sample prior and posterior, save, export results and save diagnostic plots
+    r""" Run cell2location model pipeline: train, sample prior and posterior, export results and save diagnostic plots
     Spatial expression of cell types (proxy for density) is exported as columns of adata.obs,
        named `'mean_nUMI_factors' + 'cluster name'` for posterior mean or 
              `'q05_nUMI_factors' + 'cluster name'` for 5% quantile of the posterior
     and as np.ndarray in `adata.uns['mod']['post_sample_means']['nUMI_factors']` (also post_sample_q05, post_sample_q95, post_sample_sd)
     Anndata object with exported results, W weights representing cell state densities, and the trained model object are saved to `export_args['path']`
+    
     :param sc_data: anndata object with single cell / nucleus data, 
-                        or pd.DataFrame with genes in rows and cell type signatures in columns.
+                        or pd.DataFrame with genes in rows and cell type signatures (factors) in columns.
     :param sp_data: anndata object with spatial data, variable names should match sc_data
     :param model: model name as a string
     :param summ_sc_data_args: arguments for summarising single cell data
