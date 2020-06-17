@@ -1,10 +1,9 @@
 # cell2location
 ### Highthroughput spatial mapping of cell types with single cell and spatial sequencing
 
-![Cell2location model for spatial mapping of comprehensive cell type references\n
-A. Overview  of the spatial mapping workflow that is enabled by cell2location. Spatial transcriptomics data are decomposed into cell type abundance estimates, using a scRNA-seq based cell type reference from the same tissue. \n
-B. Basic principles of the strategy employed by cell2location.
-](images/Fig1_v2.png)
+![Cell2location model for spatial mapping of comprehensive cell type references](images/Fig1_v2.png)   
+A. Overview  of the spatial mapping workflow that is enabled by cell2location. Spatial transcriptomics data are decomposed into cell type abundance estimates, using a scRNA-seq based cell type reference from the same tissue.    
+B. Basic principles of the strategy employed by cell2location.    
 
 ## Installation
 
