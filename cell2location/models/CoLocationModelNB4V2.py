@@ -49,19 +49,22 @@ class CoLocationModelNB4V2(Pymc3LocModel):
         self,
         cell_state_mat: np.ndarray,
         X_data: np.ndarray,
-        n_comb,
+        n_comb: int = 50,
         data_type: str = 'float32',
-        n_iter = 200000,
-        learning_rate = 0.001,
+        n_iter = 20000,
+        learning_rate = 0.005,
         total_grad_norm_constraint = 200,
         verbose = True,
         var_names=None, var_names_read=None,
         obs_names=None, fact_names=None, sample_id=None,
-        gene_level_prior={'mean': 1/2, 'sd': 1/8, 'mean_var_ratio': 1},
-        cell_number_prior={'cells_per_spot': 7, 'combs_per_spot': 2, 
-                           'factors_per_combs': 6,
-                           'cells_mean_var_ratio': 1, 'combs_mean_var_ratio': 1,
-                           'factors_mean_var_ratio': 1},
+        gene_level_prior={'mean': 1/2, 'sd': 1/4},
+        gene_level_var_prior={'mean_var_ratio': 1},
+        cell_number_prior={'cells_per_spot': 8,
+                           'factors_per_spot': 7, 
+                           'combs_per_spot': 2.5},
+        cell_number_var_prior={'cells_mean_var_ratio': 1,
+                               'factors_mean_var_ratio': 1,
+                               'combs_mean_var_ratio': 1},
         phi_hyp_prior={'mean': 3, 'sd': 1},
         spot_fact_mean_var_ratio=0.5
     ):
@@ -73,11 +76,19 @@ class CoLocationModelNB4V2(Pymc3LocModel):
                          verbose, var_names, var_names_read,
                          obs_names, fact_names, sample_id)
 
+        for k in gene_level_var_prior.keys():
+            gene_level_prior[k] = gene_level_var_prior[k]
+            
         self.gene_level_prior = gene_level_prior
-        self.cell_number_prior = cell_number_prior
         self.phi_hyp_prior = phi_hyp_prior
         self.n_comb = n_comb
         self.spot_fact_mean_var_ratio = spot_fact_mean_var_ratio
+        
+        cell_number_prior['factors_per_combs'] = cell_number_prior['factors_per_spot'] \
+        / cell_number_prior['combs_per_spot']
+        for k in cell_number_var_prior.keys():
+            cell_number_prior[k] = cell_number_var_prior[k]
+        self.cell_number_prior = cell_number_prior
         
         ############# Define the model ################
         self.model = pm.Model()
