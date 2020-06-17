@@ -19,7 +19,7 @@ import matplotlib
 import os
 
 from scipy.optimize import linear_sum_assignment
-from pycell2location.plt.plot_heatmap import clustermap
+from cell2location.plt.plot_heatmap import clustermap
 
 # base model class - defining shared methods but not the model itself
 class BaseModel():

@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import os
 
-from pycell2location.models.pymc3_loc_model import Pymc3LocModel 
+from cell2location.models.pymc3_loc_model import Pymc3LocModel 
 
 # defining the model itself
 class LocationModelNB4V7_V4_V4(Pymc3LocModel):

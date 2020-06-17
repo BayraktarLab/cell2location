@@ -19,9 +19,9 @@ import matplotlib
 import os
 
 
-from pycell2location.models.regression_torch_model import RegressionTorchModel
-from pycell2location.cluster_averages.cluster_averages import get_cluster_averages
-from pycell2location.cluster_averages.cluster_averages import get_cluster_variances
+from cell2location.models.regression_torch_model import RegressionTorchModel
+from cell2location.cluster_averages.cluster_averages import get_cluster_averages
+from cell2location.cluster_averages.cluster_averages import get_cluster_variances
 
 # defining the model itself
 class RegressionNBV4TorchModule(nn.Module):

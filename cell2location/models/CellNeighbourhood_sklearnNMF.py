@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""sklearn NMF Cell neighbourhood model - de-novo factorisation of cell type density using sklearn NMF."""
+"""Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF."""
 
 # +
 import sys, ast, os
@@ -9,11 +9,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 
-from pycell2location.models.base_model import BaseModel 
+from cell2location.models.base_model import BaseModel 
 
 # defining the model itself
-class CellNeighbourhood_sklearnNMF(BaseModel):
-    r""" sklearn NMF Cell neighbourhood model - de-novo factorisation of cell type density using sklearn NMF.
+class CoLocatedCombination_sklearnNMF(BaseModel):
+    r""" Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF.
     :param n_fact: Maximum number of cell circuits
     :param X_data: Numpy array of gene expression (cols) in cells (rows)
     :param learning_rate: ADAM learning rate for optimising Variational inference objective

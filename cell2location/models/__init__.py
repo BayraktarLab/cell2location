@@ -12,7 +12,7 @@ from .RegressionNBV2Torch import RegressionNBV2Torch
 
 # Co-located cell type combination model
 # Doesn't learn the number of factors but is fast
-from .CellNeighbourhood_sklearnNMF import CellNeighbourhood_sklearnNMF 
+from .CoLocatedCombination_sklearnNMF import CoLocatedCombination_sklearnNMF 
 
 # pick the default model
 LocationModel = CoLocationModelNB4V2
@@ -25,7 +25,7 @@ __all__ = [
     "RegressionNBV2Torch",
     "RegressionNBV4Torch",
     
-    "CellNeighbourhood_sklearnNMF",
+    "CoLocatedCombination_sklearnNMF",
     
     "LocationModel",
 ]
