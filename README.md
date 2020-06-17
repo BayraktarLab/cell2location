@@ -52,8 +52,8 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
 ## Usage
 
-See [cell2location short demo Jupyter notebook](https://github.com/vitkl/cell2location/blob/master/notebooks/cell2location_short_demo.ipynb) for usage example.
+See [cell2location short demo Jupyter notebook](https://github.com/BayraktarLab/cell2location/blob/master/notebooks/cell2location_short_demo.ipynb) for usage example.
 
 ## API details
 
-Models are implemented as dedicated python classes organised in an [inheritance hierarchy](https://github.com/vitkl/cell2location/blob/master/pycell2location/models/README.md) to enable reusing methods between models.  
+Models are implemented as dedicated python classes organised in an [inheritance hierarchy](https://github.com/BayraktarLab/cell2location/blob/master/cell2location/models/README.md) to enable reusing methods between models.  
