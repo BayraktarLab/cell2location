@@ -20,12 +20,12 @@ def plot_contours(spot_factors_df, coords, text=None,
                   max_color_quantile=0.95, 
                   show_img=True, img=None, img_alpha=1,
                   plot_contour=False,
-                  save_path=None, save_name='',
+                  save_path=None, save_name='', save_facecolor='black',
                   show_fig=True, lim=None,
                   fontsize=12, adjust_text=False,
                   plt_axis='off', axis_y_flipped=True, x_y_labels=['', ''],
                   crop_x=None, crop_y=None, text_box_alpha=0.9,
-                  reorder_cmap=range(7)):
+                  reorder_cmap=range(7), overwrite_color=None):
     r"""
     :param spot_factors_df: pd.DataFrame - spot locations of cell types, only 6 cell types allowed
     :param coords: np.ndarray - x and y coordinates (in columns) to be used for ploting spots
@@ -36,7 +36,7 @@ def plot_contours(spot_factors_df, coords, text=None,
     :param max_col: crops the colorscale maximum value for each column in spot_factors_df.
     :param max_color_quantile: crops the colorscale at x quantile of the data.
     :param show_img: show image?
-    :param img: numpy array representing a tissue image e.g [cv2.imread('./MUT2805_7_DAPI_50_mini.jpg'), ...]. 
+    :param img: numpy array representing a tissue image. 
                     If not provided a black background image is used.
     :param img_alpha: transparency of the image
     :param plot_contour: boolean, whether to plot contours (not implemented yet).
@@ -179,7 +179,12 @@ def plot_contours(spot_factors_df, coords, text=None,
             coords_s = coords
             
         color = rgb_function(weights[:, c])
+        
+        if overwrite_color is not None:
+            color=overwrite_color * alpha_scaling[c]
+            
         color[:, 3] = color[:, 3] * alpha_scaling[c]
+        
         plt.scatter(x=coords_s[:,0], y=coords_s[:,1],
                     c=color, s=circle_diameter**2
                     #cmap=cmaps[c],
@@ -244,13 +249,11 @@ def plot_contours(spot_factors_df, coords, text=None,
         plt.show()
 
     if save_path is not None:
-        plt.savefig(save_path + 'density_maps_{}.png'.format(save_name))
+        plt.savefig(save_path + 'density_maps_{}.png'.format(save_name),
+                    bbox_inches='tight', facecolor=save_facecolor)
             
     fig.clear()
     plt.close(fig)
-
-
-# -
 
 def interpolate_coord(start = 10, end = 5, steps = 100, accel_power=3,
                       accelerate=True, jitter=None):
@@ -281,9 +284,10 @@ def interpolate_coord(start = 10, end = 5, steps = 100, accel_power=3,
 
 def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                     sel_clust, sel_clust_col,
-                    sample_id='s144600', sc_img=None, sp_img=None,
+                    sample_id='s144600', sc_img=None, 
+                    sp_img=None, sp_img_scaling_fac=1,
                     adata_cluster_col='annotation_1', cell_fact_df=None,
-                    step_n=[20, 100, 45, 80, 30], step_quantile=[1, 1, 1, 0.95, 0.95],
+                    step_n=[20, 100, 15, 45, 80, 30], step_quantile=[1, 1, 1, 1, 0.95, 0.95],
                     sc_point_size=1, aver_point_size=20, sp_point_size=5,
                     fontsize=15, adjust_text=False,
                     sc_alpha=0.6, sp_alpha=0.8, img_alpha=0.8,
@@ -291,10 +295,11 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                     sc_accel_power=3, sp_accel_power=3,
                     sc_accel_decel=True, sp_accel_decel=False,
                     sc_jitter=None, sp_jitter=None,   
-                    save_path='./results/mouse_viseum_snrna/std_model/mapping_video/'):
+                    save_path='./results/mouse_viseum_snrna/std_model/mapping_video/',
+                    crop_x=None, crop_y=None):
     r"""Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
     We use linear interpolation of UMAP and spot coordinates to create movement.
-    :param adata_vis: anndata with Visium data (including X_spatial slot in `.obsm`)
+    :param adata_vis: anndata with Visium data (including spatial slot in `.obsm`)
     :param adata: anndata with single cell data (including X_umap slot in `.obsm`)
     :param sample_ids: pd.Series - sample ID for each spot
     :param spot_factors_df: output of the model showing spatial expression of cell types / factors.
@@ -320,7 +325,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     from tqdm.auto import tqdm
     
     # extract spot expression and coordinates
-    coords = adata_vis.obsm['X_spatial'].copy()
+    coords = adata_vis.obsm['spatial'].copy() * sp_img_scaling_fac
     
     s_ind = sample_ids.isin([sample_id])
     sel_clust_df = spot_factors_df.loc[s_ind, sel_clust_col]
@@ -329,28 +334,48 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
 
     if sc_img is None:
         # create a black background image
-        xy = sel_coords.max(0)
+        xy = sel_coords.max(0) + sel_coords.max(0) * 0.05
         sc_img = np.zeros((int(xy[1]), int(xy[0]), 3))
         
     if sp_img is None:
         # create a black background image
-        xy = sel_coords.max(0)
+        xy = sel_coords.max(0) + sel_coords.max(0) * 0.05
         sp_img = np.zeros((int(xy[1]), int(xy[0]), 3))
         img_alpha = 1
         img_alpha_seq = 1
     else:
-        img_alpha_seq = interpolate_coord(start = 0, end = img_alpha, steps = step_n[2]+1, 
+        img_alpha_seq = interpolate_coord(start = 0, end = img_alpha, steps = step_n[3]+1, 
                                           accel_power=sc_power, accelerate=True, jitter=None)
     
     # extract umap coordinates
     umap_coord = adata.obsm['X_umap'].copy()
     
     # make positive and rescale to fill the image
-    umap_coord[:, 0] = umap_coord[:, 0] * 4
-    umap_coord[:, 1] = umap_coord[:, 1] * 4
-
-    umap_coord[:, 0] = umap_coord[:, 0] + abs(umap_coord[:, 0].min()) + abs(umap_coord[:, 0].min())*0.05
-    umap_coord[:, 1] = umap_coord[:, 1] + abs(umap_coord[:, 1].min()) + abs(umap_coord[:, 1].min())*0.1
+    umap_coord[:, 0] = umap_coord[:, 0] + abs(umap_coord[:, 0].min()) + abs(umap_coord[:, 0].max())*0.01
+    umap_coord[:, 1] = -umap_coord[:, 1] # flip y axis
+    umap_coord[:, 1] = umap_coord[:, 1] + abs(umap_coord[:, 1].min()) + abs(umap_coord[:, 1].max())*0.01
+    
+    if crop_x is None:
+        img_width = sc_img.shape[0] * 0.99
+        x_offset = 0
+        umap_coord[:, 0] = umap_coord[:, 0] / umap_coord[:, 0].max() * img_width
+    else:
+        img_width = abs(crop_x[0] - crop_x[1]) * 0.99
+        x_offset = np.array(crop_x).min()
+        umap_coord[:, 0] = umap_coord[:, 0] / umap_coord[:, 0].max() * img_width
+        umap_coord[:, 0] = umap_coord[:, 0] + x_offset
+        
+    if crop_y is None:
+        img_height = sc_img.shape[1] * 0.99
+        y_offset = 0
+        y_offset2 = 0
+        umap_coord[:, 1] = umap_coord[:, 1] / umap_coord[:, 1].max() * img_height
+    else:
+        img_height = abs(crop_y[0] - crop_y[1]) * 0.99
+        y_offset = np.array(crop_y).min()
+        y_offset2 = sp_img.shape[1] - np.array(crop_y).max()
+        umap_coord[:, 1] = umap_coord[:, 1] / umap_coord[:, 1].max() * img_height
+        umap_coord[:, 1] = umap_coord[:, 1] + y_offset
 
     if cell_fact_df is None:
         cell_fact_df = pd.get_dummies(adata.obs[adata_cluster_col], columns=[adata_cluster_col])
@@ -389,7 +414,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # compute movement of spots from averages to locations
     moving_averages2 = [interpolate_coord(start = np.ones_like(sel_coords) \
                             * aver_coord.loc[i, ['x' ,'y']].values,
-                      end = sel_coords, steps = step_n[3]+1, 
+                      end = sel_coords, steps = step_n[4]+1, 
                       accel_power=sp_accel_power,
                       accelerate=sp_accel_decel, jitter=sp_jitter) 
                         for i in aver_coord.index]
@@ -397,7 +422,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     
     # (decreasing dot size) for averages -> locations
     circ_diam2 = interpolate_coord(start = aver_point_size,
-                      end = sp_point_size, steps = step_n[3]+1, 
+                      end = sp_point_size, steps = step_n[4]+1, 
                       accel_power=sp_power, accelerate=sp_accel_decel,
                       jitter=None)
     
@@ -410,8 +435,8 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                   img=sc_img, img_alpha=1, plot_contour=False,
                   # determine max color level using data quantiles
                   max_color_quantile=step_quantile[0], # set to 1 to pick max - essential for discrete scaling
-                  save_path=save_path, save_name=str(i0 + 1),
-                  show_fig=False)
+                  save_path=save_path, save_name=str(i0 + 1), #axis_y_flipped=False,
+                  show_fig=False, crop_x=crop_x, crop_y=crop_y)
     
     # plot evolving UMAP from cells to averages
     for i1 in tqdm(range(step_n[1])):
@@ -422,8 +447,8 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                   img=sc_img, img_alpha=1, plot_contour=False,
                   # determine max color level using data quantiles
                   max_color_quantile=step_quantile[1], # set to 1 to pick max - essential for discrete scaling
-                  save_path=save_path, save_name=str(i0 + i1 + 2),
-                  show_fig=False)
+                  save_path=save_path, save_name=str(i0 + i1 + 2), #axis_y_flipped=False,
+                  show_fig=False, crop_x=crop_x, crop_y=crop_y)
         
     # plot averages
     for i2 in range(step_n[2]):
@@ -435,42 +460,42 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                   img=sc_img, img_alpha=1, plot_contour=False,
                   # determine max color level using data quantiles
                   max_color_quantile=step_quantile[2], # set to 1 to pick max - essential for discrete scaling
-                  save_path=save_path, save_name=str(i0 + i1 + i2 + 2),
+                  save_path=save_path, save_name=str(i0 + i1 + i2 + 3), #axis_y_flipped=False,
                   show_fig=False, fontsize=fontsize,
-                      adjust_text=adjust_text)
+                  adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
         
     # plot averages & fade-in histology image
-    for i2 in range(step_n[2]):
+    for i22 in range(step_n[3]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         plot_contours(ann_no_other,
                   coords=moving_averages1[:,i1 + 1,:,:], 
                   text=aver_coord[['x' ,'y', 'column']],
                   circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                  img=sp_img, img_alpha=img_alpha_seq, plot_contour=False,
+                  img=sp_img, img_alpha=img_alpha_seq[i22], plot_contour=False,
                   # determine max color level using data quantiles
-                  max_color_quantile=step_quantile[2], # set to 1 to pick max - essential for discrete scaling
-                  save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + 2),
+                  max_color_quantile=step_quantile[3], # set to 1 to pick max - essential for discrete scaling
+                  save_path=save_path, save_name=str(i0 + i1 + i2 + i22 + 4), 
                   show_fig=False, fontsize=fontsize,
-                      adjust_text=adjust_text)
+                  adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
     
     # plot evolving UMAP from cells to averages
-    for i3 in tqdm(range(step_n[3])):
+    for i3 in tqdm(range(step_n[4])):
         plot_contours(sel_clust_df,
                   coords=moving_averages2[:,i3,:,:],
                   circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
                   img=sp_img, img_alpha=img_alpha, plot_contour=False,
-                  max_color_quantile=step_quantile[3],
-                  save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 3),
-                  show_fig=False)
+                  max_color_quantile=step_quantile[4],
+                  save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 5),
+                  show_fig=False, crop_x=crop_x, crop_y=crop_y)
     
     # plot a few final images
-    for i4 in range(step_n[4]):
+    for i4 in range(step_n[5]):
         plot_contours(sel_clust_df,
                   coords=moving_averages2[:,i3+1,:,:], 
                   circle_diameter=circ_diam2[i3+1],
                   alpha_scaling=sp_alpha,
                   img=sp_img, img_alpha=img_alpha, plot_contour=False,
-                  max_color_quantile=step_quantile[4],
-                  save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 4),
-                  show_fig=False)
+                  max_color_quantile=step_quantile[5],
+                  save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 6),
+                  show_fig=False, crop_x=crop_x, crop_y=crop_y)
 

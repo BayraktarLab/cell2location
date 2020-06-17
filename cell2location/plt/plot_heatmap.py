@@ -1,14 +1,16 @@
+# +
 from scipy.spatial import distance
 from scipy.cluster import hierarchy
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
-def heatmap(M, ticks=False, aspect=None, figsize=None, equal=False,
+def heatmap(M, ticks=False, log=False, figsize=None, equal=False,
             row_labels=None, col_labels=None, cbar=True, cmap='RdPu', title=''):
     r""" Plot heatmap with row and column labels using plt.imshow
     :param M: np.ndarray to be visualised, or an object that can be coerced to np.ndarray
     :param ticks: boolean, show x and y axis ticks?
-    :param aspect: x to y aspect ratio
+    :param log: boolean, color on logscale?
     :param figsize: figure size as a tuple (x, y)
     :param equal: boolean, each tile should be square (equal aspect)
     :param row_labels: names of rows (pd.Series, pd.Index or list)
@@ -20,14 +22,12 @@ def heatmap(M, ticks=False, aspect=None, figsize=None, equal=False,
     if figsize is not None:
         plt.figure(figsize=figsize)
     
-    plt.rcParams['xtick.bottom'] = plt.rcParams['xtick.labelbottom'] = False
-    plt.rcParams['xtick.top'] = plt.rcParams['xtick.labeltop'] = True
-    
     M = np.array(M)
-    if aspect is None:
-        plt.imshow(M, interpolation='nearest', cmap=cmap)
+    if log:
+        plt.imshow(M, interpolation='nearest', cmap=cmap,
+                   norm=matplotlib.colors.LogNorm())
     else:
-        plt.imshow(M, interpolation='nearest', aspect=1/3, cmap=cmap)
+        plt.imshow(M, interpolation='nearest', cmap=cmap)
     
     if cbar == True:
         plt.colorbar()
@@ -53,9 +53,8 @@ def heatmap(M, ticks=False, aspect=None, figsize=None, equal=False,
     
     plt.show()
 
-    
 def clustermap(df, cluster_rows=True, cluster_cols=True,
-                 figure_size=(5, 5), cmap="RdPu",
+                 figure_size=(5, 5), cmap="RdPu", log=False,
                  return_linkage=False, equal=True,
                  dendrogram_ratio=0.1, title=''):
     r"""Plot heatmap with hierarchically clustered rows and columns using `.heatmap`
@@ -64,6 +63,7 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
     :param cluster_cols: cluster columns or keep the same order as df?
     :param figure_size: tuple specifying figure dimensions, passed to .heatmap
     :param cmap: pyplot colormap, passed to .heatmap
+    :param log: boolean, color on logscale?
     :param return_linkage: retunt the plot or the plot + linkage for rows and columns? If true returns a dictionary with 'plot', 'row_linkage' and 'col_linkage' elements.
     :param equal: boolean, each tile should be square (equal aspect)
     """
@@ -91,11 +91,11 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
     df = df.iloc[row_ord,col_ord]
     
     # plot heatmap
-    heatmap(df.values, ticks=False, aspect=None, figsize=figure_size,
+    heatmap(df.values, ticks=False, log=log, figsize=figure_size,
             equal=equal, cmap=cmap,
             row_labels=df.index, col_labels=df.columns, cbar=True, title=title)
     
     if return_linkage:
         return {'row_linkage': row_linkage, 'col_linkage': col_linkage,
                 'row_ord': row_ord, 'col_ord': col_ord}
-    
+

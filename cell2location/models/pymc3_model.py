@@ -56,14 +56,13 @@ class Pymc3Model(BaseModel):
         self.x_data = theano.shared(X_data.astype(self.data_type))
         
         
-    def sample_prior(self):
-        r""" Take one sample from the prior 
-        (fails for >1 due to tensor dimensions problem - likely pymc3 bug) 
+    def sample_prior(self, samples=10):
+        r""" Take samples from the prior, see `pymc3.sample_prior_predictive` for details
         :return: self.prior_trace dictionary with an element for each parameter of the model. 
         """
         # Take one sample from the prior (fails for more due to tensor dimensions problem)
         with self.model:
-            self.prior_trace = pm.sample_prior_predictive(samples=1)
+            self.prior_trace = pm.sample_prior_predictive(samples=samples)
         
     def fit_advi(self, n=3, method='advi', n_type='restart'):
         r""" Find posterior using ADVI 
@@ -120,8 +119,10 @@ class Pymc3Model(BaseModel):
                     print(plt.plot(np.log10(self.mean_field[name].hist[15000:])));
                     
     def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
-                           n_iter=None, learning_rate=None,
-                           progressbar=True):
+                           n_iter=None, 
+                           learning_rate=None, reducing_lr=False,
+                           progressbar=True,
+                           scale_cost_to_minibatch=True):
         r""" Find posterior using pm.ADVI() method directly (allows continuing training through `refine` method.
         (maximising likehood of the data and minimising KL-divergence of posterior to prior)
         :param n: number of independent initialisations
@@ -142,12 +143,25 @@ class Pymc3Model(BaseModel):
         self.node_samples = {}
         
         self.n_type=n_type
+        self.scale_cost_to_minibatch = scale_cost_to_minibatch
         
         if n_iter is None:
             n_iter = self.n_iter
             
         if learning_rate is None:
             learning_rate = self.learning_rate
+            
+        ### Initialise optimiser ###
+        if reducing_lr:
+            # initialise the function for adaptive learning rate
+            s = theano.shared(np.array(learning_rate).astype(self.data_type))
+            def reduce_rate(a, h, i):
+                s.set_value(np.array(learning_rate/((i/self.n_cells)+1)**.7).astype(self.data_type))
+            optimiser = pm.adam(learning_rate=s)
+            callbacks = [reduce_rate, CheckParametersConvergence()]
+        else:
+            optimiser = pm.adam(learning_rate=learning_rate)
+            callbacks = [CheckParametersConvergence()]
         
         if np.isin(n_type, ['bootstrap']):
             if self.X_data_sample is None:
@@ -166,13 +180,61 @@ class Pymc3Model(BaseModel):
             # when type is molecular cross-validation or bootstrap, 
             # replace self.x_data tensor with new data
             if np.isin(n_type, ['cv', 'bootstrap']):
-                more_replacements={self.x_data: self.X_data_sample[i].astype(self.data_type)}
+                
+                # defining minibatch
+                if self.minibatch_size is not None:
+                    # minibatch main data - expression matrix
+                    self.x_data_minibatch = pm.Minibatch(self.X_data_sample[i].astype(self.data_type),
+                                                         batch_size=[self.minibatch_size, None],
+                                                         random_seed=self.minibatch_seed[i])
+                    more_replacements={self.x_data: self.x_data_minibatch}
+                    
+                    # if any other data inputs should be minibatched add them too
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            pm.Minibatch(self.extra_data[k].astype(self.data_type),
+                                         batch_size=[self.minibatch_size, None],
+                                         random_seed=self.minibatch_seed[i])
+                        
+                # or using all data
+                else:
+                    more_replacements={self.x_data: self.X_data_sample[i].astype(self.data_type)}
+                    # if any other data inputs should be added
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            self.extra_data[k].astype(self.data_type)
+                    
             else:
-                more_replacements={}
+                
+                # defining minibatch
+                if self.minibatch_size is not None:
+                    # minibatch main data - expression matrix
+                    self.x_data_minibatch = pm.Minibatch(self.X_data.astype(self.data_type),
+                                                         batch_size=[self.minibatch_size, None],
+                                                         random_seed=self.minibatch_seed[i])
+                    more_replacements={self.x_data: self.x_data_minibatch}
+                    
+                    # if any other data inputs should be minibatched add them too
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            pm.Minibatch(self.extra_data[k].astype(self.data_type),
+                                         batch_size=[self.minibatch_size, None],
+                                         random_seed=self.minibatch_seed[i])
+                    
+                else:
+                    more_replacements={}
+            
+            self.advi[name].scale_cost_to_minibatch = scale_cost_to_minibatch
             
             # train the model  
-            self.mean_field[name] = self.advi[name].fit(n_iter, callbacks=[CheckParametersConvergence()],
-                                obj_optimizer=pm.adam(learning_rate=learning_rate),
+            self.mean_field[name] = self.advi[name].fit(n_iter, callbacks=callbacks,
+                                obj_optimizer=optimiser,
                                 total_grad_norm_constraint=self.total_grad_norm_constraint,
                                 progressbar=progressbar, more_replacements=more_replacements)
                 
@@ -192,21 +254,78 @@ class Pymc3Model(BaseModel):
         
         if learning_rate is None:
             learning_rate = self.learning_rate
-
-        with self.model:
+            
+        ### Initialise optimiser ###
+        if reducing_lr:
+            # initialise the function for adaptive learning rate
+            s = theano.shared(np.array(learning_rate).astype(self.data_type))
+            def reduce_rate(a, h, i):
+                s.set_value(np.array(learning_rate/((i/self.n_cells)+1)**.7).astype(self.data_type))
+            optimiser = pm.adam(learning_rate=s)
+            callbacks = [reduce_rate, CheckParametersConvergence()]
+        else:
+            optimiser = pm.adam(learning_rate=learning_rate)
+            callbacks = [CheckParametersConvergence()]
         
-            for i, name in enumerate(self.advi.keys()):
+        for i, name in enumerate(self.advi.keys()):
                 
                 # when type is molecular cross-validation or bootstrap, 
-                # replace self.x_data tensor with new data
-                if np.isin(self.n_type, ['cv', 'bootstrap']):
+            # replace self.x_data tensor with new data
+            if np.isin(n_type, ['cv', 'bootstrap']):
+                
+                # defining minibatch
+                if self.minibatch_size is not None:
+                    # minibatch main data - expression matrix
+                    self.x_data_minibatch = pm.Minibatch(self.X_data_sample[i].astype(self.data_type),
+                                                         batch_size=[self.minibatch_size, None],
+                                                         random_seed=self.minibatch_seed[i])
+                    more_replacements={self.x_data: self.x_data_minibatch}
+                    
+                    # if any other data inputs should be minibatched add them too
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            pm.Minibatch(self.extra_data[k].astype(self.data_type),
+                                         batch_size=[self.minibatch_size, None],
+                                         random_seed=self.minibatch_seed[i])
+                        
+                # or using all data
+                else:
                     more_replacements={self.x_data: self.X_data_sample[i].astype(self.data_type)}
+                    # if any other data inputs should be added
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            self.extra_data[k].astype(self.data_type)
+                    
+            else:
+                
+                # defining minibatch
+                if self.minibatch_size is not None:
+                    # minibatch main data - expression matrix
+                    self.x_data_minibatch = pm.Minibatch(self.X_data.astype(self.data_type),
+                                                         batch_size=[self.minibatch_size, None],
+                                                         random_seed=self.minibatch_seed[i])
+                    more_replacements={self.x_data: self.x_data_minibatch}
+                    
+                    # if any other data inputs should be minibatched add them too
+                    if self.extra_data is not None:
+                        # for each parameter in the dictionary add it to more_replacements
+                        for k in self.extra_data.keys():
+                            more_replacements[self.extra_data_tt[k]] = \
+                            pm.Minibatch(self.extra_data[k].astype(self.data_type),
+                                         batch_size=[self.minibatch_size, None],
+                                         random_seed=self.minibatch_seed[i])
+                    
                 else:
                     more_replacements={}
-                
+                    
+            with self.model: 
                 # train for more iterations & export trained model by overwriting the initial mean field object
-                self.mean_field[name] = self.advi[name].fit(n_iter, callbacks=[CheckParametersConvergence()],
-                                obj_optimizer=pm.adam(learning_rate=learning_rate),
+                self.mean_field[name] = self.advi[name].fit(n_iter, callbacks=callbacks,
+                                obj_optimizer=optimiser,
                                 total_grad_norm_constraint=self.total_grad_norm_constraint,
                                 progressbar=progressbar, more_replacements=more_replacements)
                 

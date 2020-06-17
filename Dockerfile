@@ -34,9 +34,9 @@ ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 # add cellpymc kernel for jupyter environment
 RUN /bin/bash -c "python -m ipykernel install --user --name cellpymc"
 
-# install pycell2location
+# install cell2location
 WORKDIR /cell2location
-COPY pycell2location pycell2location
+COPY cell2location cell2location
 COPY setup.py .
 RUN /bin/bash -c "pip install -e /cell2location"
 

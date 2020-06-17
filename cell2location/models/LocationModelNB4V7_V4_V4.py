@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LocationModelNBV7_V4_V4 Cell location model with E_g overdispersion & NB likelihood 
+"""LocationModelNB4V7_V4_V4 Cell location model with E_g overdispersion & NB likelihood 
     - similar to LocationModelV7_V4_V4"""
 
 import sys, ast, os
@@ -22,9 +22,10 @@ import os
 from pycell2location.models.pymc3_loc_model import Pymc3LocModel 
 
 # defining the model itself
-class LocationModelNBV7_V4_V4(Pymc3LocModel):
-    r"""LocationModelV7_V4_V4 Cell location model with E_g overdispersion & NB likelihood
-         - similar to LocationModelV7_V4_V4
+class LocationModelNB4V7_V4_V4(Pymc3LocModel):
+    r"""LocationModelNB4V7_V4_V4 Cell location model with E_g overdispersion & NB likelihood
+         - similar to LocationModelNB2V7_V4_V4
+         pymc3 NB parametrisation but overdisp priors as described here https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/
     :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
     :param learning_rate: ADAM learning rate for optimising Variational inference objective
@@ -36,11 +37,12 @@ class LocationModelNBV7_V4_V4(Pymc3LocModel):
                                  - by default the variance in our prior of mean and sd is equal to the mean and sd
                                  descreasing this number means having higher uncertainty about your prior
     :param cell_number_prior: prior on cell density parameter:
-                                cells_per_spot - guess of the number of cells per location
-                                factors_per_spot - guess on the number of cell types 
-                                                        / number of factors expressed per locations
-                                cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in that guess
-                                                        measured as mean/var ratio, numbers < 1 mean high uncertainty
+                                cells_per_spot - what is the number of cells you expect per location?
+                                factors_per_spot - what is the number of cell types 
+                                                        / number of factors expressed per location?
+                                cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
+                                                        expressed as a mean/var ratio, numbers < 1 mean high uncertainty
+    :param phi_hyp_prior: prior on overdispersion parameter, rate of exponential distribution over phi / theta
     """
 
     def __init__(
@@ -56,7 +58,8 @@ class LocationModelNBV7_V4_V4(Pymc3LocModel):
         obs_names=None, fact_names=None, sample_id=None,
         gene_level_prior={'mean': 1/2, 'sd': 1/8, 'mean_var_ratio': 1},
         cell_number_prior={'cells_per_spot': 7, 'factors_per_spot': 6,
-                           'cells_mean_var_ratio': 1, 'factors_mean_var_ratio': 1}
+                           'cells_mean_var_ratio': 1, 'factors_mean_var_ratio': 1},
+        phi_hyp_prior={'mean': 3, 'sd': 1}
     ):
 
         ############# Initialise parameters ################
@@ -68,6 +71,7 @@ class LocationModelNBV7_V4_V4(Pymc3LocModel):
 
         self.gene_level_prior = gene_level_prior
         self.cell_number_prior = cell_number_prior
+        self.phi_hyp_prior = phi_hyp_prior
         
         ############# Define the model ################
         self.model = pm.Model()
@@ -131,19 +135,20 @@ class LocationModelNBV7_V4_V4(Pymc3LocModel):
                                      self.gene_add_hyp[1], shape=(self.n_genes, 1))
             
             # =====================Gene-specific overdispersion ======================= #
-            self.gene_E_hyp = pm.Gamma('gene_E_hyp', 1, 1, shape=2)
-            self.gene_E = pm.Gamma('gene_E', self.gene_E_hyp[0],
-                                     self.gene_E_hyp[1], shape=(self.n_genes, 1))
+            self.phi_hyp = pm.Gamma('phi_hyp', mu=phi_hyp_prior['mean'], 
+                                    sigma=phi_hyp_prior['sd'], shape=(1, 1))
+            self.gene_E = pm.Exponential('gene_E', self.phi_hyp, shape=(self.n_genes, 1))
     
             # =====================Expected expression ======================= #
             # expected expression
-            self.mu_biol = pm.math.dot(self.spot_factors, self.gene_factors.T) * self.gene_level.T + self.gene_add.T + self.spot_add
+            self.mu_biol = pm.math.dot(self.spot_factors, self.gene_factors.T) * self.gene_level.T \
+                                    + self.gene_add.T + self.spot_add
             #tt.printing.Print('mu_biol')(self.mu_biol.shape)
     
             # =====================DATA likelihood ======================= #
             # Likelihood (sampling distribution) of observations & add overdispersion via NegativeBinomial / Poisson
             self.data_target = pm.NegativeBinomial('data_target', mu=self.mu_biol,
-                                                   alpha=1/self.gene_E.T,
+                                                   alpha=1/(self.gene_E.T * self.gene_E.T),
                                           observed=self.x_data,
                                           total_size=self.X_data.shape)
                                           

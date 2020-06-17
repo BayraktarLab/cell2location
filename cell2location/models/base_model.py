@@ -64,6 +64,8 @@ class BaseModel():
         self.fact_filt = None
         self.gene_loadings = None
         self.minibatch_size = None
+        self.extra_data = None # input data
+        self.extra_data_tt = None # minibatch parameters
         
         # add essential annotations
         if var_names is None:
@@ -95,7 +97,8 @@ class BaseModel():
         else:
             self.sample_id = pd.Series(sample_id, index=self.obs_names)
         
-    def plot_prior_vs_data(self, data_target_name='data_target', data_node='X_data'):
+    def plot_prior_vs_data(self, data_target_name='data_target', data_node='X_data',
+                           log_transform=True):
         r""" Plot data vs a single sample from the prior in a 2D histogram
         Uses self.X_data and self.prior_trace['data_target'].
         :param data_node: name of the object slot containing data
@@ -106,9 +109,17 @@ class BaseModel():
             
         if type(data_target_name) is str:
             data_target_name = self.prior_trace[data_target_name]
-        
-        plt.hist2d(np.log10(data_node.flatten()+1),
-                   np.log10(data_target_name.flatten()+1),
+            
+        # If there are multiple prior samples, expand the data array
+        if len(data_target_name.shape) > 2:
+            data_node = np.array([data_node for _ in range(data_target_name.shape[0])])
+            
+        if log_transform:
+            data_node = np.log10(data_node + 1)
+            data_target_name = np.log10(data_target_name + 1)
+            
+        plt.hist2d(data_node.flatten(),
+                   data_target_name.flatten(),
                    bins = 50, norm=matplotlib.colors.LogNorm())
         plt.xlabel('Data, log10(nUMI)')
         plt.ylabel('Prior sample, log10(nUMI)')
@@ -130,6 +141,7 @@ class BaseModel():
         ind_top = np.arange(0, fac1.shape[1])
         ind_right = np.arange(0, fac1.shape[1]) + fac1.shape[1]
         corr12 = corr12[ind_top,:][:,ind_right]
+        corr12[np.isnan(corr12)] = -1
         
         if align:
             img=corr12[:, linear_sum_assignment(2 - corr12)[1]]
@@ -140,8 +152,8 @@ class BaseModel():
         im = ax.imshow(img);
         
         plt.title('Training initialisation ' + name1 + ' vs ' + name2);
-        plt.xlabel(name1);
-        plt.ylabel(name2);
+        plt.xlabel(name2);
+        plt.ylabel(name1);
 
         plt.tight_layout();
         
@@ -209,6 +221,41 @@ class BaseModel():
         plt.ylabel('Posterior sample, log10(nUMI)')
         plt.title('UMI counts (all cell, all genes)')
         plt.tight_layout()
+        
+    def plot_history(self, iter_start=0, iter_end=-1, log_y=True):
+        r""" Plot training history
+        :param iter_start: omit initial iterations from the plot
+        :param iter_end: omit last iterations from the plot
+        """
+        for i in self.hist.keys():
+            y = self.hist[i][iter_start:iter_end]
+            if log_y:
+                y = np.log10(y)
+                
+            plt.plot(y);
+            
+    def plot_validation_history(self, start_step=0, end_step=-1,
+                            mean_field_slot='init_1', log_y=True):
+        r""" Plot model loss (NB likelihood + penalty) using the model on training and validation data
+        """
+        
+        if end_step == -1:
+            end_step = np.array(self.training_hist[mean_field_slot]).flatten().shape[0]
+        
+        y = np.array(self.training_hist[mean_field_slot]).flatten()[start_step:end_step]
+        if log_y:
+            y = np.log10(y)
+        plt.plot(np.arange(start_step, end_step), y,
+                 label='model on training data')
+        
+        y = np.array(self.validation_hist[mean_field_slot]).flatten()[start_step:end_step]
+        if log_y:
+            y = np.log10(y)
+        plt.plot(np.arange(start_step, end_step), y,
+                 label='model on cross-validation data')
+        plt.xlabel('Training epochs');
+        plt.ylabel('Reconstruction accuracy (log10 NB + L2 loss)');
+        plt.legend();
         
     def plot_posterior_vs_data(self, gene_fact_name = 'gene_factors',
                                cell_fact_name = 'cell_factors'):
@@ -391,6 +438,7 @@ class BaseModel():
         # add factor filter and samples of all parameters to unstructured data
         adata.uns[slot_name] = {}
 
+        adata.uns[slot_name]['mod_name'] = str(self.__class__.__name__)
         adata.uns[slot_name]['fact_filt'] = self.fact_filt
         adata.uns[slot_name]['fact_names'] = self.fact_names.tolist()
         adata.uns[slot_name]['var_names'] = self.var_names.tolist()
