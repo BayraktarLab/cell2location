@@ -1,6 +1,10 @@
 # cell2location
 ### Highthroughput spatial mapping of cell types with single cell and spatial sequencing
 
+![Cell2location model for spatial mapping of comprehensive cell type references](images/Fig1_v2.png)   
+A. Overview  of the spatial mapping workflow that is enabled by cell2location. Spatial transcriptomics data are decomposed into cell type abundance estimates, using a scRNA-seq based cell type reference from the same tissue.    
+B. Basic principles of the strategy employed by cell2location.    
+
 ## Installation
 
 Prior to intalling cell2location package you need to install miniconda and create a conda environment containing pymc3 and theano ready for use on GPU. Follow the steps below:
