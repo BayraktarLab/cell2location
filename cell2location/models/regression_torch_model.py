@@ -17,9 +17,9 @@ import matplotlib
 import os
 
 
-from pycell2location.models.torch_model import TorchModel
-from pycell2location.cluster_averages.cluster_averages import get_cluster_averages
-from pycell2location.cluster_averages.cluster_averages import get_cluster_variances
+from cell2location.models.torch_model import TorchModel
+from cell2location.cluster_averages.cluster_averages import get_cluster_averages
+from cell2location.cluster_averages.cluster_averages import get_cluster_variances
 
 class RegressionTorchModel(TorchModel):
     r"""RegressionTorchModel Base class for model with no cell specific parameters

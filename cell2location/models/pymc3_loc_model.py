@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import os
 
-from pycell2location.models.pymc3_model import Pymc3Model 
-from pycell2location.plt.plot_factor_spatial import plot_factor_spatial
+from cell2location.models.pymc3_model import Pymc3Model 
+from cell2location.plt.plot_factor_spatial import plot_factor_spatial
 
 # base model class - defining shared methods but not the model itself
 class Pymc3LocModel(Pymc3Model):

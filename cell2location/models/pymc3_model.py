@@ -20,7 +20,7 @@ import matplotlib
 import os
 from pymc3.variational.callbacks import CheckParametersConvergence
 
-from pycell2location.models.base_model import BaseModel 
+from cell2location.models.base_model import BaseModel 
 
 # base model class - defining shared methods but not the model itself
 class Pymc3Model(BaseModel):
