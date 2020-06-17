@@ -33,15 +33,15 @@ def save_plot(path, filename, extension='png'):
     #fig.clear()
     plt.close()
     
-def run_cell2location(sc_data, sp_data, model_name='LocationModel',
+def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                       verbose=True, return_all=True,
                       summ_sc_data_args={'cluster_col': "annotation_1"},
-                      train_args={'n_iter': 15000, 'learning_rate': 0.005,
-                                  'sample_prior': False, 'readable_var_name_col': "SYMBOL",
-                                  'sample_name_col': "sample"},
+                      train_args={'n_iter': 20000, 'learning_rate': 0.005,
+                                  'sample_prior': False, 'readable_var_name_col': None,
+                                  'sample_name_col': None},
                       model_kwargs={},
                       posterior_args={'n_samples': 1000},
-                      export_args={'path': "./results", 'save_model': True,
+                      export_args={'path': "./results", 'save_model': False,
                                    'run_name_suffix': '', 'scanpy_coords_name': 'coords'}):
     
     r""" Run cell2location model: train, sample prior and posterior, save, export results and save diagnostic plots
@@ -99,9 +99,9 @@ def run_cell2location(sc_data, sp_data, model_name='LocationModel',
                        'selection': None, 'select_n': 5000, 'select_n_AutoGeneS': 1000}
     
     d_train_args={'mode': "normal", 'use_raw': True, 'data_type': "float32",
-                'n_iter': 100000, 'learning_rate': 0.001, 'total_grad_norm_constraint': 200,
+                'n_iter': 20000, 'learning_rate': 0.005, 'total_grad_norm_constraint': 200,
                 'method': 'advi',
-                'sample_prior': True, 'n_prior_samples': 10,
+                'sample_prior': False, 'n_prior_samples': 10,
                 'n_restarts': 2, 'n_type': "restart",
                 'tracking_every': 1000, 'tracking_n_samples': 50, 'readable_var_name_col': None,
                 'sample_name_col': None, 'fact_names': None}
@@ -109,7 +109,7 @@ def run_cell2location(sc_data, sp_data, model_name='LocationModel',
     d_posterior_args={'n_samples': 1000, 'evaluate_stability_align': False, 'mean_field_slot':"init_1"}
     
     d_export_args={'path': "./results", 'plot_extension':"png",
-                   'save_model': True, 'run_name_suffix': '', 'export_q05': True,
+                   'save_model': False, 'run_name_suffix': '', 'export_q05': True,
                    'scanpy_coords_name': 'spatial'}
     
     # replace defaults with parameters supplied
