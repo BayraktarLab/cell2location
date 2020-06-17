@@ -58,8 +58,7 @@ def heatmap(M, ticks=False, log=False, figsize=None, equal=False,
 
 def clustermap(df, cluster_rows=True, cluster_cols=True,
                figure_size=(5, 5), cmap="RdPu", log=False,
-               return_linkage=False, equal=True,
-               dendrogram_ratio=0.1, title=''):
+               return_linkage=False, equal=True, title=''):
     r"""Plot heatmap with hierarchically clustered rows and columns using `.heatmap`
 
     :param df: pandas.DataFrame to be visualised as a heatmap
@@ -70,6 +69,7 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
     :param log: boolean, color on logscale?
     :param return_linkage: return the plot or the plot + linkage for rows and columns? If true returns a dictionary with 'plot', 'row_linkage' and 'col_linkage' elements.
     :param equal: boolean, each tile should be square (equal aspect)
+    :param title: clustermap title
     """
 
     if cluster_rows:
@@ -77,7 +77,6 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
         cor_f1 = np.corrcoef(df)
         row_linkage = hierarchy.linkage(distance.pdist(cor_f1), method='average')
         row_ord = hierarchy.leaves_list(row_linkage)
-        cluster_rows = False
     else:
         row_linkage = None
         row_ord = np.arange(df.shape[0])
@@ -87,7 +86,6 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
         cor_f1 = np.corrcoef(df.T)
         col_linkage = hierarchy.linkage(distance.pdist(cor_f1), method='average')
         col_ord = hierarchy.leaves_list(col_linkage)
-        cluster_cols = False
     else:
         col_linkage = None
         col_ord = np.arange(df.shape[1])

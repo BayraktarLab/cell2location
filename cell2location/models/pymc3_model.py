@@ -237,7 +237,7 @@ class Pymc3Model(BaseModel):
                 print(plt.plot(np.log10(self.mean_field[name].hist[15000:])));
 
     def fit_advi_refine(self, n_iter=10000, learning_rate=None,
-                        progressbar=True):
+                        progressbar=True, reducing_lr=False):
         r""" Refine posterior using ADVI
 
         :param n_iter: number of additional iterations
@@ -268,7 +268,7 @@ class Pymc3Model(BaseModel):
 
             # when type is molecular cross-validation or bootstrap,
             # replace self.x_data tensor with new data
-            if np.isin(n_type, ['cv', 'bootstrap']):
+            if np.isin(self.n_type, ['cv', 'bootstrap']):
 
                 # defining minibatch
                 if self.minibatch_size is not None:
@@ -298,7 +298,6 @@ class Pymc3Model(BaseModel):
                                 self.extra_data[k].astype(self.data_type)
 
             else:
-
                 # defining minibatch
                 if self.minibatch_size is not None:
                     # minibatch main data - expression matrix
