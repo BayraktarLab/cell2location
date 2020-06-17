@@ -47,7 +47,7 @@ pip install plotnine pymc3 torch pyro-ppl
 ## Install `cell2location` package
 
 ```bash
-pip install git+https://github.com/vitkl/cell2location.git
+pip install git+https://github.com/BayraktarLab/cell2location.git
 ```
 
 ## Usage
