@@ -34,7 +34,7 @@ def save_plot(path, filename, extension='png'):
     plt.close()
     
 def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
-                      verbose=True, return_all=True,
+                      verbose=True, show_locations=False, return_all=True,
                       summ_sc_data_args={'cluster_col': "annotation_1"},
                       train_args={'n_iter': 20000, 'learning_rate': 0.005,
                                   'sample_prior': False, 'readable_var_name_col': None,
@@ -45,16 +45,19 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                    'run_name_suffix': '', 'scanpy_coords_name': 'coords'}):
     
     r""" Run cell2location model pipeline: train, sample prior and posterior, export results and save diagnostic plots
-    Spatial expression of cell types (proxy for density) is exported as columns of adata.obs,
-       named `'mean_nUMI_factors' + 'cluster name'` for posterior mean or 
-             `'q05_nUMI_factors' + 'cluster name'` for 5% quantile of the posterior
-    and as np.ndarray in `adata.uns['mod']['post_sample_means']['nUMI_factors']` (also post_sample_q05, post_sample_q95, post_sample_sd)
+    Spatial expression of cell types (proxy for density) is exported as columns of adata.obs, named `'mean_nUMI_factors' + 'cluster name'` for posterior mean 
+    or `'q05_nUMI_factors' + 'cluster name'` for 5% quantile of the posterior and as np.ndarray in `adata.uns['mod']['post_sample_means']['nUMI_factors']` 
+    (also post_sample_q05, post_sample_q95, post_sample_sd).
     Anndata object with exported results, W weights representing cell state densities, and the trained model object are saved to `export_args['path']`
     
     :param sc_data: anndata object with single cell / nucleus data, 
                         or pd.DataFrame with genes in rows and cell type signatures (factors) in columns.
     :param sp_data: anndata object with spatial data, variable names should match sc_data
     :param model: model name as a string
+    :param verbose: boolean, print diagnostic messages?
+    :param show_locations: boolean, print the plot of factor locations? If False the plots are saved but not shown. This reduces notebook size.
+    :param return_all: boolean, return the model and annotated `sp_data`. If True, both are saved but not returned?
+    
     :param summ_sc_data_args: arguments for summarising single cell data
                 'cluster_col' - name of sc_data.obs column containing cluster annotations
                 'which_genes' - select intersect or union genes between single cell and spatial?
@@ -87,9 +90,8 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     :param export_args: arguments for exporting results
                 'path' - path where to save results
                 'plot_extension' - file extention of saved plots
-                'save_model' - boolean, save trained model? Could be useful but also takes up GBs of disk.
+                'save_model' - boolean, save trained model? Could be useful but also takes up 10s of GB of disk space.
                 'export_q05' - boolean, save plots of 5% quantile of parameters.
-    :param return_all: return the model and annotated `sp_data` or just save both?
     :return: results as a dictionary {'mod','sp_data','sc_obs','model_name',
                                       'summ_sc_data_args', 'train_args','posterior_args', 'export_args',
                                       'run_name', 'run_time'}
@@ -109,7 +111,9 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     
     d_posterior_args={'n_samples': 1000, 'evaluate_stability_align': False, 'mean_field_slot':"init_1"}
     
-    d_export_args={'path': "./results", 'plot_extension':"png",
+    d_export_args={'path': "./results", 
+                   'plot_extension':"png", 
+                   'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                    'save_model': False, 'run_name_suffix': '', 'export_q05': True,
                    'scanpy_coords_name': 'spatial'}
     
@@ -393,35 +397,136 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         print('### Ploting posterior of W / cell locations ###')
         
     data_samples = sp_data.obs[train_args['sample_name_col']].unique()
-    cluster_plot_names = mod.spot_factors_df.columns
     cluster_plot_names = pd.Series([i[17:] for i in mod.spot_factors_df.columns])
     
     try:
         for i in data_samples:
-            p=c2lpl.plot_factor_spatial(adata=sp_data, 
-                            fact_ind = np.arange(mod.spot_factors_df.shape[1]),
-                            fact=mod.spot_factors_df,
-                            cluster_names=cluster_plot_names,
-                            n_columns=6, trans='log',
-                            sample_name=i, samples_col=train_args['sample_name_col'],
-                            obs_x='imagecol', obs_y='imagerow')
-            p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(i) + '.' + export_args['plot_extension'])
-        
-            if export_args['export_q05']:
+            # if slots needed to generate scanpy plots are present, scanpy:
+            sc_spatial_present = np.isin(list(adata.uns.keys()), ['spatial'])[0]
+            
+            if sc_spatial_present:
+                
+                sc.settings.figdir = fig_path + 'spatial/'
+                # Visualize cell type locations - mRNA_count = nUMI #####
+                # making copy to transform to log & assign nice names
+                adata_vis.obs = adata_vis.obs.loc[:,~adata_vis.obs.columns.duplicated()]
+                adata_vis_pl = adata_vis.copy()
+                clust_names_orig = ['q05_nUMI_factors' + i for i in adata_vis.uns['mod']['fact_names']]
+                clust_names = adata_vis.uns['mod']['fact_names']
+
+                adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+                sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                              color=clust_names, ncols=5,  library_id=s,
+                              size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=0,
+                              vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                              save=s + 'All_cell_types_nUMI_linear_p99.pdf',
+                              show=show_locations
+                             );
+                sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                              color=clust_names, ncols=5,  library_id=s,
+                              size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=1,
+                              vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                              save=s + 'All_cell_types_nUMI_linear_p99.pdf',
+                              show=show_locations
+                             );
+
+                # Visualize cell type locations #####
+                # making copy to transform to log & assign nice names
+                adata_vis_pl = adata_vis.copy()
+                clust_names_orig = ['q05_spot_factors' + i for i in adata_vis.uns['mod']['fact_names']]
+                clust_names = adata_vis.uns['mod']['fact_names']
+                adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+
+                sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                              color=clust_names, ncols=5,  library_id=s,
+                              size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=0,
+                              vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                              save=s + 'All_cell_types_cell_density.pdf',
+                              show=False
+                             );
+                sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                              color=clust_names, ncols=5,  library_id=s,
+                              size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=1,
+                              vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                              save=s + 'All_cell_types_cell_density.pdf',
+                              show=False
+                             );
+                
+                
+                if export_args['export_q05']:
+                    # Visualize cell type locations - mRNA_count = nUMI #####
+                    # making copy to transform to log & assign nice names
+                    adata_vis.obs = adata_vis.obs.loc[:,~adata_vis.obs.columns.duplicated()]
+                    adata_vis_pl = adata_vis.copy()
+                    clust_names_orig = ['q05_nUMI_factors' + i for i in adata_vis.uns['mod']['fact_names']]
+                    clust_names = adata_vis.uns['mod']['fact_names']
+
+                    adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+                    sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==i, :], cmap='magma',
+                                  color=clust_names, ncols=5,  library_id=i,
+                                  size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=0,
+                                  vmin=0, vmax=export_args['scanpy_plot_vmax'], 
+                                  save='cell_locations_W_mRNA_count_q05_' + str(i) + '.' \
+                           + export_args['plot_extension'],
+                                  show=False
+                                 );
+                    sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                                  color=clust_names, ncols=5,  library_id=s,
+                                  size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=1,
+                                  vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                  save=s + 'All_cell_types_nUMI_linear_p99.pdf',
+                                  show=False
+                                 );
+
+                    # Visualize cell type locations #####
+                    # making copy to transform to log & assign nice names
+                    adata_vis_pl = adata_vis.copy()
+                    clust_names_orig = ['q05_spot_factors' + i for i in adata_vis.uns['mod']['fact_names']]
+                    clust_names = adata_vis.uns['mod']['fact_names']
+                    adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+
+                    sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                                  color=clust_names, ncols=5,  library_id=s,
+                                  size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=0,
+                                  vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                  save=s + 'All_cell_types_cell_density.pdf',
+                                  show=False
+                                 );
+                    sc.pl.spatial(adata_vis_pl[adata_vis_pl.obs["sample"]==s, :], cmap='magma',
+                                  color=clust_names, ncols=5,  library_id=s,
+                                  size=export_args['scanpy_plot_size'],img_key='hires', alpha_img=1,
+                                  vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                  save=s + 'All_cell_types_cell_density.pdf',
+                                  show=False
+                                 );
+                
+            else:
+
                 p=c2lpl.plot_factor_spatial(adata=sp_data, 
-                                fact_ind = np.arange(mod.spot_factors_q05.shape[1]),
-                                fact=mod.spot_factors_q05,
+                                fact_ind = np.arange(mod.spot_factors_df.shape[1]),
+                                fact=mod.spot_factors_df,
                                 cluster_names=cluster_plot_names,
                                 n_columns=6, trans='log',
                                 sample_name=i, samples_col=train_args['sample_name_col'],
                                 obs_x='imagecol', obs_y='imagerow')
-                p.save(filename=fig_path + 'cell_locations_W_mRNA_count_q05_' + str(i) + '.' \
+                p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(i) + '.' \
                        + export_args['plot_extension'])
-    
-            if verbose:
-                print(p)
+
+                if export_args['export_q05']:
+                    p=c2lpl.plot_factor_spatial(adata=sp_data, 
+                                    fact_ind = np.arange(mod.spot_factors_q05.shape[1]),
+                                    fact=mod.spot_factors_q05,
+                                    cluster_names=cluster_plot_names,
+                                    n_columns=6, trans='log',
+                                    sample_name=i, samples_col=train_args['sample_name_col'],
+                                    obs_x='imagecol', obs_y='imagerow')
+                    p.save(filename=fig_path + 'cell_locations_W_mRNA_count_q05_' + str(i) + '.' \
+                           + export_args['plot_extension'])
+
+                if show_locations:
+                    print(p)
     except Exception as e:
-        print('Some error in plotting `mod.plot_factor_spatial()`\n ' + str(e))
+        print('Some error in plotting with scanpy or `cell2location.plt.plot_factor_spatial()`\n ' + str(e))
     
     if verbose:
         print('### Done ### - time ' + res_dict['run_time'])
