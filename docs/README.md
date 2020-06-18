@@ -1,5 +1,6 @@
 # How to compile documentation
 ```shell script
+cd docs
 pip install -r requirements.txt
 make html
 ```
