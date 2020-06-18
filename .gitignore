@@ -30,6 +30,7 @@ var/
 .ipynb_checkpoints
 .Rhistory
 
+*/_build
 
 mapping_video/
 notebooks/lymph_nodes_analysis/data/V1_Human_Lymph_Node/

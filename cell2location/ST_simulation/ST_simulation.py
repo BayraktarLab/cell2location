@@ -1,12 +1,10 @@
-import sys,os
-import pandas as pd
-import numpy as np
-import scanpy as sc
-import anndata 
 import random
-import collections
+
+import numpy as np
+import pandas as pd
 import torch as t
 import torch.distributions as dists
+
 
 ## --- Version 2: cell densities --- ##
 
@@ -22,19 +20,22 @@ def assemble_ct_composition(design_df, tot_spots, ncells_scale=5):
     ------
     pd.DataFrame of cell types x spots with no of cells 
     '''
-    spots_members = pd.DataFrame(columns=range(tot_spots), 
-                                   index=design_df.index)
+    spots_members = pd.DataFrame(columns=range(tot_spots),
+                                 index=design_df.index)
     ## Cell types to spot
     for i in range(len(design_df.nspots)):
         l = ([0] * (tot_spots - int(design_df.nspots[i]))) + ([1] * int(design_df.nspots[i]))
-        l = random.sample(l, k = tot_spots)
+        l = random.sample(l, k=tot_spots)
         spots_members.iloc[i] = pd.Series(l)
 
     ## No of cells per spot
-    ncells = [np.round(np.random.gamma(design_df.loc[ct,].mean_ncells, ncells_scale, size=int(design_df.loc[ct,].nspots))) for ct in design_df.index]
+    ncells = [
+        np.round(np.random.gamma(design_df.loc[ct,].mean_ncells, ncells_scale, size=int(design_df.loc[ct,].nspots))) for
+        ct in design_df.index]
     for i in range(spots_members.shape[0]):
-        spots_members.iloc[i, spots_members.columns[spots_members.iloc[i]==1]] = ncells[i]
-    return(spots_members)
+        spots_members.iloc[i, spots_members.columns[spots_members.iloc[i] == 1]] = ncells[i]
+    return (spots_members)
+
 
 def assemble_spot_2(cnt, labels, members, fraction):
     uni_labels = members.index
@@ -46,26 +47,26 @@ def assemble_spot_2(cnt, labels, members, fraction):
             np.random.shuffle(idx)
             idx = idx[0:int(members[z])]
             # add fraction of transcripts to spot expression
-            z_expr = t.tensor((cnt.iloc[idx,:]*fraction).sum(axis = 0).round().astype(np.float32))
-            spot_expr +=  z_expr
-    return(spot_expr)
+            z_expr = t.tensor((cnt.iloc[idx, :] * fraction).sum(axis=0).round().astype(np.float32))
+            spot_expr += z_expr
+    return (spot_expr)
+
 
 def assemble_st_2(cnt, labels, spots_members, gene_level_scaled):
     tot_spots = spots_members.shape[1]
-    st_cnt = np.zeros((tot_spots,cnt.shape[1]))
+    st_cnt = np.zeros((tot_spots, cnt.shape[1]))
     for spot in range(tot_spots):
         print("making spot no." + str(spot) + "...", flush=True)
-        spot_data =  assemble_spot_2(cnt, labels, spots_members.iloc[:,spot], fraction=gene_level_scaled)
-        st_cnt[spot,:] = spot_data
+        spot_data = assemble_spot_2(cnt, labels, spots_members.iloc[:, spot], fraction=gene_level_scaled)
+        st_cnt[spot, :] = spot_data
     # convert to pandas DataFrames
     index = pd.Index(['Spotx' + str(x + 1) for \
-                  x in range(tot_spots) ])
+                      x in range(tot_spots)])
     st_cnt = pd.DataFrame(st_cnt,
-                          index = index,
-                          columns = cnt.columns,
-                         )
-    return(st_cnt)
-
+                          index=index,
+                          columns=cnt.columns,
+                          )
+    return (st_cnt)
 
 
 ## --- Version 1: proportions --- ##
@@ -91,21 +92,22 @@ def pick_cell_types(uni_labels, alpha, min_n_cells):
     # get number of different
     # cell types present
     n_labels = uni_labels.shape[0]
-    
+
     # sample number of types to be present at current spot
     # w/o having more types than cells
-    n_types = dists.uniform.Uniform(low = 1,
-                                    high = min([n_labels, min_n_cells])).sample()
+    n_types = dists.uniform.Uniform(low=1,
+                                    high=min([n_labels, min_n_cells])).sample()
 
     n_types = n_types.round().type(t.int)
 
     # select which types to include
     pick_types = t.randperm(n_labels)[0:n_types]
     alpha = t.Tensor(np.array(alpha[pick_types]))
-    
+
     # select cell type proportions
-    member_props = dists.Dirichlet(concentration = alpha * t.ones(n_types)).sample()        
-    return((pick_types, member_props))
+    member_props = dists.Dirichlet(concentration=alpha * t.ones(n_types)).sample()
+    return ((pick_types, member_props))
+
 
 def assemble_spot(cnt, labels, n_cells, fraction, pick_types, member_props):
     '''
@@ -131,11 +133,11 @@ def assemble_spot(cnt, labels, n_cells, fraction, pick_types, member_props):
     '''
     # get unique labels found in single cell data
     uni_labels, uni_counts = np.unique(labels,
-                                     return_counts = True)
+                                       return_counts=True)
     n_labels = uni_labels.shape[0]
 
-    assert np.all(uni_counts >=  30), "Insufficient number of cells"
-    
+    assert np.all(uni_counts >= 30), "Insufficient number of cells"
+
     # get no. of members of spot for each cell type
     members = t.zeros(n_labels).type(t.float)
     members[pick_types] = (n_cells * member_props).round()
@@ -153,14 +155,15 @@ def assemble_spot(cnt, labels, n_cells, fraction, pick_types, member_props):
             np.random.shuffle(idx)
             idx = idx[0:members[z]]
             # add fraction of transcripts to spot expression
-            z_expr = t.tensor((cnt.iloc[idx,:]*fraction).sum(axis = 0).round().astype(np.float32))
+            z_expr = t.tensor((cnt.iloc[idx, :] * fraction).sum(axis=0).round().astype(np.float32))
             nUMIs[z] = z_expr.sum()
-            spot_expr +=  z_expr
-    return {'expr':spot_expr,
-            'proportions':props,
+            spot_expr += z_expr
+    return {'expr': spot_expr,
+            'proportions': props,
             'members': members,
             'umis': nUMIs
-           }
+            }
+
 
 def assemble_region(cnt, labels, n_cells_vec, alpha, fraction):
     '''
@@ -185,50 +188,51 @@ def assemble_region(cnt, labels, n_cells_vec, alpha, fraction):
     n_labels = uni_labels.shape[0]
 
     # prepare matrices
-    st_cnt = np.zeros((n_spots,cnt.shape[1]))
-    st_prop = np.zeros((n_spots,n_labels))
-    st_memb = np.zeros((n_spots,n_labels))
-    st_umis = np.zeros((n_spots,n_labels))
+    st_cnt = np.zeros((n_spots, cnt.shape[1]))
+    st_prop = np.zeros((n_spots, n_labels))
+    st_memb = np.zeros((n_spots, n_labels))
+    st_umis = np.zeros((n_spots, n_labels))
 
     # generate one spot at a time
-    pick_types,member_props = pick_cell_types(uni_labels, alpha, min(n_cells_vec))
+    pick_types, member_props = pick_cell_types(uni_labels, alpha, min(n_cells_vec))
     #     np.random.seed(1337)
     #     t.manual_seed(1337)
     for spot in range(n_spots):
         spot_data = assemble_spot(cnt,
-                                 labels,
+                                  labels,
                                   n_cells_vec[spot], fraction, pick_types, member_props
-                                 )
+                                  )
 
-        st_cnt[spot,:] = spot_data['expr']
-        st_prop[spot,:] = spot_data['proportions']
-        st_memb[spot,:] =  spot_data['members']
-        st_umis[spot,:] =  spot_data['umis']
+        st_cnt[spot, :] = spot_data['expr']
+        st_prop[spot, :] = spot_data['proportions']
+        st_memb[spot, :] = spot_data['members']
+        st_umis[spot, :] = spot_data['umis']
 
         index = pd.Index(['Spotx' + str(x + 1) for \
-                          x in range(n_spots) ])
+                          x in range(n_spots)])
 
     # convert to pandas DataFrames
     st_cnt = pd.DataFrame(st_cnt,
-                          index = index,
-                          columns = cnt.columns,
-                         )
-    st_prop = pd.DataFrame(st_prop,
-                           index = index,
-                           columns = uni_labels,
+                          index=index,
+                          columns=cnt.columns,
                           )
+    st_prop = pd.DataFrame(st_prop,
+                           index=index,
+                           columns=uni_labels,
+                           )
     st_memb = pd.DataFrame(st_memb,
-                           index = index,
-                           columns = uni_labels,
+                           index=index,
+                           columns=uni_labels,
                            )
     st_umis = pd.DataFrame(st_umis,
-                       index = index,
-                       columns = uni_labels,
-                       )
-    return {'counts':st_cnt,
-        'proportions':st_prop,
-        'members':st_memb,
-           'umis':st_umis}
+                           index=index,
+                           columns=uni_labels,
+                           )
+    return {'counts': st_cnt,
+            'proportions': st_prop,
+            'members': st_memb,
+            'umis': st_umis}
+
 
 def assemble_st(cnt, labels, n_regions, n_cells_tot, alpha, fraction):
     '''
@@ -253,66 +257,65 @@ def assemble_st(cnt, labels, n_regions, n_cells_tot, alpha, fraction):
     '''
     # count total number of spots
     tot_spots = len(n_cells_tot)
-    
+
     # get unique labels
     uni_labels = np.unique(labels.values)
     n_labels = uni_labels.shape[0]
-    
+
     # assign spots to regions
     # avoding to have regions with no spots 
     if n_regions != tot_spots:
-        region_labels=[]
-        while len(np.unique(region_labels))!=n_regions:
+        region_labels = []
+        while len(np.unique(region_labels)) != n_regions:
             region_labels = np.array(random.choices(range(n_regions), k=tot_spots))
     else:
-        region_labels=np.array(range(n_regions))
+        region_labels = np.array(range(n_regions))
 
-    
     # prepare matrices
-    st_cnt = np.zeros((tot_spots,cnt.shape[1]))
-    st_prop = np.zeros((tot_spots,n_labels))
-    st_memb = np.zeros((tot_spots,n_labels))
-    st_umis = np.zeros((tot_spots,n_labels))
-    idx=0
-    
+    st_cnt = np.zeros((tot_spots, cnt.shape[1]))
+    st_prop = np.zeros((tot_spots, n_labels))
+    st_memb = np.zeros((tot_spots, n_labels))
+    st_umis = np.zeros((tot_spots, n_labels))
+    idx = 0
+
     # sort number of cells to have ~ same number of cells per spot for each region
     n_cells_tot.sort()
-    
+
     # assemble one region at a time
     for reg in range(n_regions):
         print("making reg" + str(reg) + "...", flush=True)
-        n_spots_reg = len(region_labels[region_labels==reg])
-        n_cells_vec = n_cells_tot[idx:idx+n_spots_reg]
+        n_spots_reg = len(region_labels[region_labels == reg])
+        n_cells_vec = n_cells_tot[idx:idx + n_spots_reg]
         reg_data = assemble_region(cnt, labels, n_cells_vec, alpha, fraction)
 
-        st_cnt[idx:idx+n_spots_reg,:] = reg_data['counts']
-        st_prop[idx:idx+n_spots_reg,:] = reg_data['proportions']
-        st_memb[idx:idx+n_spots_reg,:] = reg_data['members']
-        st_umis[idx:idx+n_spots_reg,:] = reg_data['umis']
+        st_cnt[idx:idx + n_spots_reg, :] = reg_data['counts']
+        st_prop[idx:idx + n_spots_reg, :] = reg_data['proportions']
+        st_memb[idx:idx + n_spots_reg, :] = reg_data['members']
+        st_umis[idx:idx + n_spots_reg, :] = reg_data['umis']
         idx = idx + n_spots_reg
 
     index = pd.Index(['Spotx' + str(x + 1) for \
-                      x in range(tot_spots) ])
+                      x in range(tot_spots)])
     # convert to pandas DataFrames
     st_cnt = pd.DataFrame(st_cnt,
-                          index = index,
-                          columns = cnt.columns,
-                         )
+                          index=index,
+                          columns=cnt.columns,
+                          )
 
     st_prop = pd.DataFrame(st_prop,
-                           index = index,
-                           columns = uni_labels,
-                          )
+                           index=index,
+                           columns=uni_labels,
+                           )
     st_memb = pd.DataFrame(st_memb,
-                           index = index,
-                           columns = uni_labels,
+                           index=index,
+                           columns=uni_labels,
                            )
     st_umis = pd.DataFrame(st_umis,
-                           index = index,
-                           columns = uni_labels,
+                           index=index,
+                           columns=uni_labels,
                            )
-    return {'counts':st_cnt,
-            'proportions':st_prop,
-            'members':st_memb,
-            'umis':st_umis,
-            'regions':region_labels}
+    return {'counts': st_cnt,
+            'proportions': st_prop,
+            'members': st_memb,
+            'umis': st_umis,
+            'regions': region_labels}
