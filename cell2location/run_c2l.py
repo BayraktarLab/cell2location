@@ -114,7 +114,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
             - which training restart to use? (Default: 'init_1')
     :param export_args: arguments for exporting results
         * 'path' - file path where to save results (Default: "./results")
-        * 'plot_extension' - file extension of saved plots (Default: "pdf")
+        * 'plot_extension' - file extension of saved plots (Default: "png")
         * 'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3 - scanpy.pl.spatial plottin settings
         * 'save_model' - boolean, save trained model? Could be useful but also takes up 10s of GB of disk space. (Default: False)
         * 'run_name_suffix' - optinal suffix to modify the name the run. (Default: '')
@@ -141,7 +141,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     d_posterior_args = {'n_samples': 1000, 'evaluate_stability_align': False, 'mean_field_slot': "init_1"}
 
     d_export_args = {'path': "./results",
-                     'plot_extension': "pdf",
+                     'plot_extension': "png",
                      'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                      'save_model': False, 'run_name_suffix': '', 'export_q05': True,
                      'scanpy_coords_name': 'spatial'}
