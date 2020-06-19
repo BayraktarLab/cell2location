@@ -59,7 +59,8 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
 ## Usage
 
-See [cell2location short demo Jupyter notebook](https://github.com/BayraktarLab/cell2location/blob/master/notebooks/cell2location_short_demo.ipynb) for usage example.
+See [cell2location short demo Jupyter notebook](https://github.com/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_short_demo.ipynb) for usage example, and the next notebook for
+[cell2location downstream analysis](https://github.com/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_short_demo_downstream.ipynb)
 
 ## API details
 
