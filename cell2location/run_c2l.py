@@ -53,8 +53,8 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     Anndata object with exported results, W weights representing cell state densities,
     and the trained model object are saved to `export_args['path']`
 
-    NOTE! This pipeline is not specific to a particular model so please look up the relevant parameters
-    in model documentation (the default is CoLocationModelNB4V2).
+    .. note:: This pipeline is not specific to a particular model so please look up the relevant parameters
+        in model documentation (the default is CoLocationModelNB4V2).
     
     :param sc_data: anndata object with single cell / nucleus data,
         or pd.DataFrame with genes in rows and cell type signatures (factors) in columns.
@@ -66,64 +66,71 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     :param return_all: boolean, return the model and annotated `sp_data`. If True, both are saved but not returned?
 
     :param summ_sc_data_args: arguments for summarising single cell data
-        * 'cluster_col' - name of sc_data.obs column containing cluster annotations
-        * 'which_genes' - select intersect or union genes between single cell and spatial? (Default: intersect)
-        * 'selection' - select highly variable genes in sc_data? (Default: None - do not select), available options:
-            None
-            "high_cv" use rank by coefficient of variation (variance / mean)
-            "cluster_markers" use cluster markers (derived using sc.tl.rank_genes_groups)
-            "AutoGeneS" use https://github.com/theislab/AutoGeneS
-        * 'select_n' - how many variable genes to select? Used only when selection is not None (Default: 5000).
-        * 'select_n_AutoGeneS' - how many variable genes tor select with AutoGeneS (lower than select_n)? (Default: 1000).
+
+        * **cluster_col** - name of sc_data.obs column containing cluster annotations
+        * **which_genes** - select intersect or union genes between single cell and spatial? (Default: intersect)
+        * **selection** - select highly variable genes in sc_data? (Default: None - do not select), available options:
+
+            * None
+            * "high_cv" use rank by coefficient of variation (variance / mean)
+            * "cluster_markers" use cluster markers (derived using sc.tl.rank_genes_groups)
+            * "AutoGeneS" use https://github.com/theislab/AutoGeneS
+        * **select_n** - how many variable genes to select? Used only when selection is not None (Default: 5000).
+        * **select_n_AutoGeneS** - how many variable genes tor select with AutoGeneS (lower than select_n)? (Default: 1000).
     :param train_args: arguments for training methods. See help(c2l.LocationModel) for more details
-        * 'mode' - "normal" or "tracking" parameters? (Default: normal).
-        * 'use_raw' - extract data from RAW slot of anndata? Applies only to spatial data, not single cell reference.
-        For reference sc_data.raw is always used. (Default: True)
-        * 'data_type' - use arrays with which precision? (Default: 'float32').
-        * 'n_iter' - number of training iterations (Default: 20000).
-        * 'learning_rate' - ADAM optimiser learning rate (Default: 0.005).
-            If the training is very unstable try reducing the learning rate.
-        * 'total_grad_norm_constraint' - ADAM optimiser total_grad_norm_constraint (Default: 200).
-        Prevents exploding gradient problem, of the training is very unstable (jumps to Inf/NaN loss) try reducing this parameter.
-        * 'method' - which method to use to find posterior. Use default 'advi' unless you know what you are doing.
-        * 'sample_prior' - use sampling from the prior to evaluate how reasonable priors are for your data. (Default: False)
-            This is not essential for 10X Visium data but can be very useful for troubleshooting when
-            the model fails training with NaN or Inf likelihood / ELBO loss.
-            It is essential to do this first to choose priors appropriate for any other technology.
-            Sample from the prior should be in the same range as data, span similar number of orders of magnitude,
-            and ideally be weakly informative: results/plots/evaluating_prior.png plot should looks like a very wide diagonal.
-            Caution: takes a lot of RAM (10s-100s of GB) depending on data size so reduce the number of locations in needed.
-        * 'n_prior_samples' - number of prior samples. The more the better but also takes a lot of RAM. (Default: 10)
-        * 'n_restarts' - number of training restarts to evaluate stability (Default: 2)
-        * 'n_type' - type of restart training: 'restart' 'cv' 'bootstrap' (Default: restart)
-            (see help(cell2location.LocationModel.fit_advi_iterative) for details)
-        * 'tracking_every', 'tracking_n_samples' - parameters for "tracking" mode:
-            Posterior samples are saved after 'tracking_every' iterations (Default: 1000),
-            the process is repeated 'tracking_n_samples' times (Default: 50)
-        * 'readable_var_name_col' - column in sp_data.var that contains readable gene ID (e.g. HGNC symbol) (Default: None)
-        * 'sample_name_col' - column in sp_data.obs that contains sample / slide ID (e.g. Visium section),
-            for plotting W cell locations from a multi-sample object correctly (Default: None)
-        * 'fact_names' - optional list of factor names, by default taken from cluster names in sc_data.
-    :param posterior_args: arguments for sampling posterior, 
+
+        * **mode** - "normal" or "tracking" parameters? (Default: normal)
+        * **use_raw** - extract data from RAW slot of anndata? Applies only to spatial data, not single cell reference.
+          For reference sc_data.raw is always used. (Default: True)
+        * **data_type** - use arrays with which precision? (Default: 'float32').
+        * **n_iter** - number of training iterations (Default: 20000).
+        * **learning_rate** - ADAM optimiser learning rate (Default: 0.005).
+          If the training is very unstable try reducing the learning rate.
+        * **total_grad_norm_constraint** - ADAM optimiser total_grad_norm_constraint (Default: 200).
+          Prevents exploding gradient problem, of the training is very unstable (jumps to Inf/NaN loss) try reducing this parameter.
+        * **method** - which method to use to find posterior. Use default 'advi' unless you know what you are doing.
+        * **sample_prior** - use sampling from the prior to evaluate how reasonable priors are for your data. (Default: False)
+          This is not essential for 10X Visium data but can be very useful for troubleshooting when
+          the model fails training with NaN or Inf likelihood / ELBO loss.
+          It is essential to do this first to choose priors appropriate for any other technology.
+          Sample from the prior should be in the same range as data, span similar number of orders of magnitude,
+          and ideally be weakly informative: results/plots/evaluating_prior.png plot should looks like a very wide diagonal.
+
+          .. caution:: Takes a lot of RAM (10s-100s of GB) depending on data size so reduce the number of locations in needed.
+
+        * **n_prior_samples** - number of prior samples. The more the better but also takes a lot of RAM. (Default: 10)
+        * **n_restarts** - number of training restarts to evaluate stability (Default: 2)
+        * **n_type** - type of restart training: 'restart' 'cv' 'bootstrap' (Default: restart)
+          (see help(cell2location.LocationModel.fit_advi_iterative) for details)
+        * **tracking_every**, **tracking_n_samples** - parameters for "tracking" mode:
+          Posterior samples are saved after 'tracking_every' iterations (Default: 1000),
+          the process is repeated 'tracking_n_samples' times (Default: 50)
+        * **readable_var_name_col** - column in sp_data.var that contains readable gene ID (e.g. HGNC symbol) (Default: None)
+        * **sample_name_col** - column in sp_data.obs that contains sample / slide ID (e.g. Visium section),
+          for plotting W cell locations from a multi-sample object correctly (Default: None)
+        * **fact_names** - optional list of factor names, by default taken from cluster names in sc_data.
+    :param posterior_args: arguments for sampling posterior
         The model generates samples from the posterior distribution of each parameter
         to compute mean, SD, 5% and 95% quantiles - stored in `mod.samples` and exported in `adata.uns['mod']`.
-        * 'n_samples' - number of samples to generate (the more the better but you run out
-            of the GPU memory if too many). (Default: 1000)
-        * 'evaluate_stability_align' - when generating the model stability plots, align different restarts? (Default: False)
-        * 'mean_field_slot' - Posterior of all parameters is sampled only from one training restart due to stability of the model.
-            - which training restart to use? (Default: 'init_1')
+
+        * **n_samples** - number of samples to generate (the more the better but you run out
+          of the GPU memory if too many). (Default: 1000)
+        * **evaluate_stability_align** - when generating the model stability plots, align different restarts? (Default: False)
+        * **mean_field_slot** - Posterior of all parameters is sampled only from one training restart due to stability of the model. -
+          which training restart to use? (Default: 'init_1')
     :param export_args: arguments for exporting results
-        * 'path' - file path where to save results (Default: "./results")
-        * 'plot_extension' - file extension of saved plots (Default: "png")
-        * 'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3 - scanpy.pl.spatial plottin settings
-        * 'save_model' - boolean, save trained model? Could be useful but also takes up 10s of GB of disk space. (Default: False)
-        * 'run_name_suffix' - optinal suffix to modify the name the run. (Default: '')
-        * 'export_q05' - boolean, save plots of 5% quantile of parameters. (Default: True)
-        * 'scanpy_coords_name' - sp_data.obsm entry that stores X and Y coordinates of each location.
+
+        * **path** - file path where to save results (Default: "./results")
+        * **plot_extension** - file extension of saved plots (Default: "png")
+        * **scanpy_plot_vmax** - 'p99.2', 'scanpy_plot_size': 1.3 - scanpy.pl.spatial plottin settings
+        * **save_model** - boolean, save trained model? Could be useful but also takes up 10s of GB of disk space. (Default: False)
+        * **run_name_suffix** - optinal suffix to modify the name the run. (Default: '')
+        * **export_q05** - boolean, save plots of 5% quantile of parameters. (Default: True)
+        * **scanpy_coords_name** - sp_data.obsm entry that stores X and Y coordinates of each location.
 
     :param model_kwargs: Keyword arguments for the model class. See the list of relevant arguments for CoLocationModelNB4V2.
 
-    :return: results as a dictionary, use dict.keys() to find the elements. Results are saved to `export_args['path']`.
+    :return: Results as a dictionary, use dict.keys() to find the elements. Results are saved to `export_args['path']`.
     """
 
     # set default parameters
