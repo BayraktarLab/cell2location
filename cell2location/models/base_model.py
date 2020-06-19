@@ -311,12 +311,18 @@ class BaseModel():
         if gene_filt is not None:
             gene_loadings = gene_loadings.loc[gene_filt, :]
 
-        print('Top loadings by magnitude\n---------------------')
+        rows = []
+        index = []
+        columns = [f'top-{i+1}' for i in range(top_n)]
+
         for clmn_ in gene_loadings.columns:
             loading_ = gene_loadings[clmn_].sort_values(ascending=False)
-            fstr = clmn_ + ':\t'
-            fstr += '\t'.join([f'{self.var_names_read[i]}, {loading_[i]:.2}' for i in loading_.head(top_n).index])
-            print(fstr + '\n---------------------\n')
+            index.append(clmn_)
+            row = [f'{self.var_names_read[i]}: {loading_[i]:.2}' for i in loading_.head(top_n).index]
+            rows.append(row)
+
+        return pd.DataFrame(rows, index=index, columns=columns)
+
 
     def plot_gene_loadings(self, sel_var_names, var_names,
                            gene_fact_name='gene_factors',
