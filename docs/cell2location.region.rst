@@ -1,10 +1,8 @@
-cell2location.region package
+Region
 ============================
 
-Submodules
-----------
 
-cell2location.region.spatial\_knn module
+Spatial kNN
 ----------------------------------------
 
 .. automodule:: cell2location.region.spatial_knn
@@ -13,10 +11,3 @@ cell2location.region.spatial\_knn module
    :show-inheritance:
 
 
-Module contents
----------------
-
-.. automodule:: cell2location.region
-   :members:
-   :undoc-members:
-   :show-inheritance:

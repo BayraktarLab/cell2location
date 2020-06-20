@@ -1,10 +1,8 @@
-cell2location.models package
+Models
 ============================
 
-Submodules
-----------
 
-cell2location.models.CoLocatedCombination\_sklearnNMF module
+CoLocatedCombination_sklearnNMF
 ------------------------------------------------------------
 
 .. automodule:: cell2location.models.CoLocatedCombination_sklearnNMF
@@ -12,7 +10,7 @@ cell2location.models.CoLocatedCombination\_sklearnNMF module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.CoLocationModelNB4V2 module
+CoLocationModelNB4V2
 ------------------------------------------------
 
 .. automodule:: cell2location.models.CoLocationModelNB4V2
@@ -20,7 +18,7 @@ cell2location.models.CoLocationModelNB4V2 module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.LocationModelNB4V7\_V4\_V4 module
+LocationModelNB4V7_V4_V4
 ------------------------------------------------------
 
 .. automodule:: cell2location.models.LocationModelNB4V7_V4_V4
@@ -28,7 +26,7 @@ cell2location.models.LocationModelNB4V7\_V4\_V4 module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.RegressionNBV2Torch module
+RegressionNBV2Torch
 -----------------------------------------------
 
 .. automodule:: cell2location.models.RegressionNBV2Torch
@@ -36,7 +34,7 @@ cell2location.models.RegressionNBV2Torch module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.RegressionNBV4Torch module
+RegressionNBV4Torch
 -----------------------------------------------
 
 .. automodule:: cell2location.models.RegressionNBV4Torch
@@ -44,7 +42,7 @@ cell2location.models.RegressionNBV4Torch module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.base\_model module
+BaseModel
 ---------------------------------------
 
 .. automodule:: cell2location.models.base_model
@@ -52,7 +50,7 @@ cell2location.models.base\_model module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.pymc3\_loc\_model module
+Pymc3LocModel
 ---------------------------------------------
 
 .. automodule:: cell2location.models.pymc3_loc_model
@@ -60,7 +58,7 @@ cell2location.models.pymc3\_loc\_model module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.pymc3\_model module
+Pymc3Model
 ----------------------------------------
 
 .. automodule:: cell2location.models.pymc3_model
@@ -68,7 +66,7 @@ cell2location.models.pymc3\_model module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.regression\_torch\_model module
+RegressionTorchModel
 ----------------------------------------------------
 
 .. automodule:: cell2location.models.regression_torch_model
@@ -76,7 +74,7 @@ cell2location.models.regression\_torch\_model module
    :undoc-members:
    :show-inheritance:
 
-cell2location.models.torch\_model module
+TorchModel
 ----------------------------------------
 
 .. automodule:: cell2location.models.torch_model
@@ -84,11 +82,3 @@ cell2location.models.torch\_model module
    :undoc-members:
    :show-inheritance:
 
-
-Module contents
----------------
-
-.. automodule:: cell2location.models
-   :members:
-   :undoc-members:
-   :show-inheritance:
