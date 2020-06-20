@@ -1,0 +1,11 @@
+version: latest
+
+sphinx:
+  configuration: docs/conf.py
+  builder: html
+
+python:
+  version: 3.7
+
+conda:
+  environment: environment.yml
