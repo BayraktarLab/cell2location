@@ -24,13 +24,16 @@ def plot_contours(spot_factors_df, coords, text=None,
                   max_color_quantile=0.95,
                   show_img=True, img=None, img_alpha=1,
                   plot_contour=False,
-                  save_path=None, save_name='', save_facecolor='black',
+                  save_path=None, save_name='', save_extension='png',
+                  save_facecolor='black',
                   show_fig=True, lim=None,
                   fontsize=12, adjust_text=False,
                   plt_axis='off', axis_y_flipped=True, x_y_labels=['', ''],
                   crop_x=None, crop_y=None, text_box_alpha=0.9,
                   reorder_cmap=range(7), overwrite_color=None):
-    r"""
+    r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation. 
+      This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
+      'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
     :param spot_factors_df: pd.DataFrame - spot locations of cell types, only 6 cell types allowed
     :param coords: np.ndarray - x and y coordinates (in columns) to be used for ploting spots
     :param text: pd.DataFrame - with x, y coordinates, text to be printed
@@ -46,6 +49,7 @@ def plot_contours(spot_factors_df, coords, text=None,
     :param plot_contour: boolean, whether to plot contours (not implemented yet).
     :param save_path: if not None - directory where to save images, otherwise the plot is shown.
     :param save_name: file name when saving the plot
+    :param save_extension: file extension when saving the plot
     :param show_fig: boolean, show figure?
     :param lim: x and y max limits on the plot. Minimum is always set to 0, if `lim` is None maximum 
         is set to image height and width. If 'no_limit' then no limit is set.
@@ -251,7 +255,7 @@ def plot_contours(spot_factors_df, coords, text=None,
         plt.show()
 
     if save_path is not None:
-        plt.savefig(save_path + 'density_maps_{}.png'.format(save_name),
+        plt.savefig(f'{save_path}density_maps_{save_name}.{save_extension}',
                     bbox_inches='tight', facecolor=save_facecolor)
 
     fig.clear()

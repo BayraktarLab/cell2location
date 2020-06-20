@@ -127,6 +127,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         * **run_name_suffix** - optinal suffix to modify the name the run. (Default: '')
         * **export_q05** - boolean, save plots of 5% quantile of parameters. (Default: True)
         * **scanpy_coords_name** - sp_data.obsm entry that stores X and Y coordinates of each location.
+          If None - no spatial plot is produced.
 
     :param model_kwargs: Keyword arguments for the model class. See the list of relevant arguments for CoLocationModelNB4V2.
 
@@ -173,10 +174,6 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     start = time.time()
 
     sp_data = sp_data.copy()
-
-    # move spatial coordinates to obs for compatibility with our plotter
-    sp_data.obs['imagecol'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 0]
-    sp_data.obs['imagerow'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 1]
 
     # import the specied version of the model
     if type(model_name) is str:
@@ -538,26 +535,32 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
             else:
 
-                p = c2lpl.plot_factor_spatial(adata=sp_data,
-                                              fact_ind=np.arange(mod.spot_factors_df.shape[1]),
-                                              fact=mod.spot_factors_df,
-                                              cluster_names=cluster_plot_names,
-                                              n_columns=6, trans='log',
-                                              sample_name=s, samples_col=train_args['sample_name_col'],
-                                              obs_x='imagecol', obs_y='imagerow')
-                p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(s) + '.' \
-                                + export_args['plot_extension'])
+                # if coordinates exist plot
+                if export_args['scanpy_coords_name'] is not None:
+                    # move spatial coordinates to obs for compatibility with our plotter
+                    sp_data.obs['imagecol'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 0]
+                    sp_data.obs['imagerow'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 1]
 
-                if export_args['export_q05']:
                     p = c2lpl.plot_factor_spatial(adata=sp_data,
-                                                  fact_ind=np.arange(mod.spot_factors_q05.shape[1]),
-                                                  fact=mod.spot_factors_q05,
-                                                  cluster_names=cluster_plot_names,
-                                                  n_columns=6, trans='log',
-                                                  sample_name=s, samples_col=train_args['sample_name_col'],
-                                                  obs_x='imagecol', obs_y='imagerow')
-                    p.save(filename=fig_path + 'cell_locations_W_mRNA_count_q05_' + str(s) + '.' \
+                                                fact_ind=np.arange(mod.spot_factors_df.shape[1]),
+                                                fact=mod.spot_factors_df,
+                                                cluster_names=cluster_plot_names,
+                                                n_columns=6, trans='log',
+                                                sample_name=s, samples_col=train_args['sample_name_col'],
+                                                obs_x='imagecol', obs_y='imagerow')
+                    p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(s) + '.' \
                                     + export_args['plot_extension'])
+
+                    if export_args['export_q05']:
+                        p = c2lpl.plot_factor_spatial(adata=sp_data,
+                                                      fact_ind=np.arange(mod.spot_factors_q05.shape[1]),
+                                                     fact=mod.spot_factors_q05,
+                                                     cluster_names=cluster_plot_names,
+                                                      n_columns=6, trans='log',
+                                                      sample_name=s, samples_col=train_args['sample_name_col'],
+                                                      obs_x='imagecol', obs_y='imagerow')
+                        p.save(filename=fig_path + 'cell_locations_W_mRNA_count_q05_' + str(s) + '.' \
+                                        + export_args['plot_extension'])
 
                 if show_locations:
                     print(p)
