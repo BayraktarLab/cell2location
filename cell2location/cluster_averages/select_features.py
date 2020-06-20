@@ -3,7 +3,8 @@ import scanpy as sc
 
 
 def select_features(adata, groupName, n_features=10000, use_raw=True, verbose=False):
-    r""" Select
+    r"""
+    #TODO Write docstring
     """
     # Subsets adata to features that best distinguish a group given in adata.obs[groupName]
     if 'rank_genes_groups' in adata.uns.keys():

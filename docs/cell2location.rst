@@ -1,4 +1,7 @@
-cell2location.run\_c2l module
+Pipelines
+=========================
+
+Run cell2location
 -----------------------------
 
 .. automodule:: cell2location.run_c2l
@@ -6,7 +9,7 @@ cell2location.run\_c2l module
    :undoc-members:
    :show-inheritance:
 
-cell2location.run\_regression module
+Run regression
 ------------------------------------
 
 .. automodule:: cell2location.run_regression
