@@ -95,7 +95,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
       * **sd** standard deviation in this prior
       When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
     :param spot_fact_mean_var_ratio: the parameter that controls the strength of co-located cell combination prior on
-      :math:`{w_{s,f}` density across locations. It is expressed as mean / variance ratio with low values corresponding to
+      :math:`w_{s,f}` density across locations. It is expressed as mean / variance ratio with low values corresponding to
       a weakly informative prior. Use the default value of 0.5 unless you know what you are doing.
     """
 
@@ -244,6 +244,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
         r"""
         Plot the histogram of log10 of the sum across w_sf for each location
+
         :param fact_name: parameter of the model to use plot
         """
 
