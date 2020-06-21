@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""LocationModelNB4V7_V4_V4 Cell location model with E_g overdispersion & NB likelihood 
-    - similar to LocationModelV7_V4_V4"""
+"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
+    it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
+    across locations with similar cell composition, thus has reduced accuracy."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,28 +13,21 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class LocationModelNB4V7_V4_V4(Pymc3LocModel):
-    r"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
-    it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
-    across locations with similar cell composition, thus has reduced accuracy.
+    r"""
     Provided here as a 'base' model for completeness.
 
-    :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
+    :param cell_state_mat: Pandas data frame with gene programmes - genes in rows, cell types / factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
     :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
-    :param gene_level_prior: prior on change in sensitivity between single cell and spatial (mean), 
-                                how much it varies across cells (sd),
-                                and how certain we are in those numbers (mean_var_ratio) 
-                                 - by default the variance in our prior of mean and sd is equal to the mean and sd
-                                 descreasing this number means having higher uncertainty about your prior
-    :param cell_number_prior: prior on cell density parameter:
-                                cells_per_spot - what is the number of cells you expect per location?
-                                factors_per_spot - what is the number of cell types 
-                                                        / number of factors expressed per location?
-                                cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
-                                                        expressed as a mean/var ratio, numbers < 1 mean high uncertainty
-    :param phi_hyp_prior: prior on overdispersion parameter, rate of exponential distribution over phi / theta
+    :param learning_rate, data_type, total_grad_norm_constraint ...: See parent class BaseModel for details.
+
+    :param gene_level_prior: see the description for CoLocationModelNB4V2
+    :param gene_level_var_prior: see the description for CoLocationModelNB4V2
+    :param cell_number_prior: see the description for CoLocationModelNB4V2, this model does not have **combs_per_spot**
+      parameter.
+    :param cell_number_var_prior: see the description for CoLocationModelNB4V2, this model does not have
+      **combs_mean_var_ratio** parameter.
+    :param phi_hyp_prior: see the description for CoLocationModelNB4V2
     """
 
     def __init__(
@@ -41,15 +35,18 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
             cell_state_mat: np.ndarray,
             X_data: np.ndarray,
             data_type: str = 'float32',
-            n_iter=200000,
-            learning_rate=0.001,
+            n_iter=20000,
+            learning_rate=0.005,
             total_grad_norm_constraint=200,
             verbose=True,
             var_names=None, var_names_read=None,
             obs_names=None, fact_names=None, sample_id=None,
-            gene_level_prior={'mean': 1 / 2, 'sd': 1 / 8, 'mean_var_ratio': 1},
-            cell_number_prior={'cells_per_spot': 7, 'factors_per_spot': 6,
-                               'cells_mean_var_ratio': 1, 'factors_mean_var_ratio': 1},
+            gene_level_prior={'mean': 1 / 2, 'sd': 1 / 4},
+            gene_level_var_prior={'mean_var_ratio': 1},
+            cell_number_prior={'cells_per_spot': 8,
+                               'factors_per_spot': 7},
+            cell_number_var_prior={'cells_mean_var_ratio': 1,
+                                   'factors_mean_var_ratio': 1},
             phi_hyp_prior={'mean': 3, 'sd': 1}
     ):
         ############# Initialise parameters ################
@@ -59,8 +56,14 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
                          verbose, var_names, var_names_read,
                          obs_names, fact_names, sample_id)
 
+        for k in gene_level_var_prior.keys():
+            gene_level_prior[k] = gene_level_var_prior[k]
         self.gene_level_prior = gene_level_prior
+
+        for k in cell_number_var_prior.keys():
+            cell_number_prior[k] = cell_number_var_prior[k]
         self.cell_number_prior = cell_number_prior
+
         self.phi_hyp_prior = phi_hyp_prior
 
         ############# Define the model ################
@@ -145,43 +148,61 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
             self.nUMI_factors = pm.Deterministic('nUMI_factors',
                                                  (self.spot_factors * (self.gene_factors * self.gene_level).sum(0)))
 
-    def plot_posterior_vs_dataV1(self):
-        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
-                                    cell_fact_name='spot_factors_scaled')
-
     def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
+        r"""
+        Plot the histogram of log10 of the sum across w_sf for each location
+
+        :param fact_name: parameter of the model to use plot
+        """
+
         plt.hist(np.log10(self.samples['post_sample_means'][fact_name].sum(1)), bins=50)
         plt.xlabel('Biological spot nUMI (log10)')
         plt.title('Biological spot nUMI')
         plt.tight_layout()
 
     def plot_spot_add(self):
+        r"""
+        Plot the histogram of log10 of additive location background.
+        """
+
         plt.hist(np.log10(self.samples['post_sample_means']['spot_add'][:, 0]), bins=50)
         plt.xlabel('UMI unexplained by biological factors')
         plt.title('Additive technical spot nUMI')
         plt.tight_layout()
 
     def plot_gene_E(self):
+        r"""
+        Plot the histogram of 1 / sqrt(overdispersion alpha)
+        """
+
         plt.hist((self.samples['post_sample_means']['gene_E'][:, 0]), bins=50)
         plt.xlabel('E_g overdispersion parameter')
         plt.title('E_g overdispersion parameter')
         plt.tight_layout()
 
     def plot_gene_add(self):
+        r"""
+        Plot the histogram of additive gene background.
+        """
+
         plt.hist((self.samples['post_sample_means']['gene_add'][:, 0]), bins=50)
         plt.xlabel('S_g additive background noise parameter')
         plt.title('S_g additive background noise parameter')
         plt.tight_layout()
 
     def plot_gene_level(self):
-        plt.hist((self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
+        r"""
+        Plot the histogram of log10 of M_g change in sensitivity between technologies.
+        """
+
+        plt.hist(np.log10(self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
         plt.xlabel('M_g expression level scaling parameter')
         plt.title('M_g expression level scaling parameter')
         plt.tight_layout()
 
     def compute_expected(self):
-        r"""Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well the
-            model learned expression pattern of all genes in the data.
+        r""" Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
+            the model learned expression pattern of all genes in the data.
         """
 
         # compute the poisson rate
@@ -190,4 +211,8 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
                    * self.samples['post_sample_means']['gene_level'].T
                    + self.samples['post_sample_means']['gene_add'].T
                    + self.samples['post_sample_means']['spot_add'])
+
+    def plot_posterior_vs_dataV1(self):
+        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
+                                    cell_fact_name='spot_factors_scaled')
 
