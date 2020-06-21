@@ -15,26 +15,28 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     r""" The Co-Location model decomposes the expression of genes across locations into a set
     of reference regulatory programmes, while accounting for correlation of programs
     across locations with similar cell composition.
-    Cell2location models the elements of $D$ as Negative Binomial distributed,
-    given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter $\alpha_g$
+    Cell2location models the elements of :math:`D` as Negative Binomial distributed,
+    given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
-    $$ D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g) $$
+    :math:`D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g)`
 
-    The containment prior on overdispersion $\alpha_g$ parameter is used
+    The containment prior on overdispersion :math:`\alpha_g` parameter is used
     (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
 
-    The spatial expression levels of genes $\mu_{s,g}$ in the rate space are modelled
+    The spatial expression levels of genes :math:`\mu_{s,g}` in the rate space are modelled
     as the sum of five non-negative components:
-    $$ \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{g}\\$$
 
-    Here, $w_{s,f}$ denotes regression weight of each program $f$ at location $s$;
-    $g_{f,g}$ denotes the regulatory programmes $f$ of each gene $g$ - input to the model;
-    $m_{g}$ denotes a gene-specific scaling parameter which accounts for difference
+    .. math::
+        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{g}
+
+    Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
+    :math:`g_{f,g}` denotes the regulatory programmes :math:`f` of each gene :math:`g` - input to the model;
+    :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
     in the global expression estimates between technologies;
-    $l_{s}$ and $s_{g}$ are additive components that capture additive background variation
+    :math:`l_{s}` and :math:`s_{g}` are additive components that capture additive background variation
     that is not explained by the bi-variate decomposition.
 
-    The prior distribution on ${w_{s,f}$ is chosen to reflect the absolute scale and account for correlation of programs
+    The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale and account for correlation of programs
     across locations with similar cell composition. This is done by inferring a hierarchical prior representing
     the co-located cell type combinations.
     This prior is specified using 3 `cell_number_prior` input parameters.
@@ -46,13 +48,13 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     and a number close 1 tells that each cell type is co-located with `factors_per_spot` other cell types.
     Choosing a number halfway in-between is a sensible default: some cell types are co-located with others but some stand alone.
 
-    The prior distribution on m_{g} is informed by the expected change in sensitivity from single cell to spatial
+    The prior distribution on :math:`m_{g}` is informed by the expected change in sensitivity from single cell to spatial
     technology, and is specified in `gene_level_prior`.
 
-    .. Note :: `gene_level_prior` and `cell_number_prior` determine the absolute scale of ${w_{s,f}$ density across locations,
+    .. Note :: `gene_level_prior` and `cell_number_prior` determine the absolute scale of :math:`w_{s,f}` density across locations,
       but have a very limited effect on the absolute count of mRNA molecules attributed to each cell type.
       Comparing your prior on **cells_per_spot** to average nUMI in the reference and spatial data helps to choose
-      the gene_level_prior and guide the model to learn ${w_{s,f}$ close to the true cell count.
+      the gene_level_prior and guide the model to learn :math:`w_{s,f}` close to the true cell count.
 
     :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
@@ -93,7 +95,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
       * **sd** standard deviation in this prior
       When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
     :param spot_fact_mean_var_ratio: the parameter that controls the strength of co-located cell combination prior on
-      ${w_{s,f}$ density across locations. It is expressed as mean / variance ratio with low values corresponding to
+      :math:`{w_{s,f}` density across locations. It is expressed as mean / variance ratio with low values corresponding to
       a weakly informative prior. Use the default value of 0.5 unless you know what you are doing.
     """
 
