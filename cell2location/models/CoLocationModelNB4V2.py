@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""CoLocationModelNB4V2 Cell location model with E_g overdispersion & NB likelihood 
-    - similar to LocationModelV7_V4_V4"""
+"""The Co-Location model decomposes the expression of genes across locations into a set
+    of reference regulatory programmes, while accounting for correlation of programs
+    across locations with similar cell composition."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,9 +13,7 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class CoLocationModelNB4V2(Pymc3LocModel):
-    r""" The Co-Location model decomposes the expression of genes across locations into a set
-    of reference regulatory programmes, while accounting for correlation of programs
-    across locations with similar cell composition.
+    r"""
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
@@ -56,7 +55,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
       Comparing your prior on **cells_per_spot** to average nUMI in the reference and spatial data helps to choose
       the gene_level_prior and guide the model to learn :math:`w_{s,f}` close to the true cell count.
 
-    :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
+    :param cell_state_mat: Pandas data frame with gene programmes - genes in rows, cell types / factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
     :param n_comb: The number of co-located cell type combinations (in the prior).
       The model is fairly robust to this choice when the prior has low effect on location weights W
