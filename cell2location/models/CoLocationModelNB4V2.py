@@ -12,25 +12,31 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class CoLocationModelNB4V2(Pymc3LocModel):
-    r"""CoLocationModelNB4V2 Cell location model with E_g overdispersion & NB likelihood - similar to
-        LocationModelV7_V4_V4 pymc3 NB parametrisation but overdisp priors as described
-        here https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/
+    r""" Location model decomposes the expression of genes across locations into a set of reference regulatory programmes.
+      Cell2location models the elements of $D$ as Negative Binomial distributed,
+      given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter $\alpha_g$
+      which describes variance in expression of individual genes that is not explained by the regulatory programs:
+      $$ D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g) $$
+
+
+      The containment prior on overdispersion parameters is used (see https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/)
+
     :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
     :param learning_rate: ADAM learning rate for optimising Variational inference objective
     :param n_iter: number of training iterations
     :param total_grad_norm_constraint: gradient constraints in optimisation
     :param gene_level_prior: prior on change in sensitivity between single cell and spatial (mean), 
-                                how much it varies across cells (sd),
-                                and how certain we are in those numbers (mean_var_ratio) 
-                                 - by default the variance in our prior of mean and sd is equal to the mean and sd
-                                 decreasing this number means having higher uncertainty about your prior
+      how much it varies across cells (sd),
+      and how certain we are in those numbers (mean_var_ratio)
+      - by default the variance in our prior of mean and sd is equal to the mean and sd
+      decreasing this number means having higher uncertainty about your prior
     :param cell_number_prior: prior on cell density parameter:
-                                cells_per_spot - what is the number of cells you expect per location?
-                                factors_per_spot - what is the number of cell types 
-                                                        / number of factors expressed per location?
-                                cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
-                                                        expressed as a mean/var ratio, numbers < 1 mean high uncertainty
+      cells_per_spot - what is the number of cells you expect per location?
+      factors_per_spot - what is the number of cell types
+        / number of factors expressed per location?
+      cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
+      expressed as a mean/var ratio, numbers < 1 mean high uncertainty
     :param phi_hyp_prior: prior on overdispersion parameter, rate of exponential distribution over phi / theta
     """
 
