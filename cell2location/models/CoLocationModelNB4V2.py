@@ -12,32 +12,89 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class CoLocationModelNB4V2(Pymc3LocModel):
-    r""" Location model decomposes the expression of genes across locations into a set of reference regulatory programmes.
-      Cell2location models the elements of $D$ as Negative Binomial distributed,
-      given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter $\alpha_g$
-      which describes variance in expression of individual genes that is not explained by the regulatory programs:
-      $$ D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g) $$
+    r""" The Co-Location model decomposes the expression of genes across locations into a set
+    of reference regulatory programmes, while accounting for correlation of programs
+    across locations with similar cell composition.
+    Cell2location models the elements of $D$ as Negative Binomial distributed,
+    given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter $\alpha_g$
+    which describes variance in expression of individual genes that is not explained by the regulatory programs:
+    $$ D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g) $$
 
+    The containment prior on overdispersion $\alpha_g$ parameter is used
+    (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
 
-      The containment prior on overdispersion parameters is used (see https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/)
+    The spatial expression levels of genes $\mu_{s,g}$ in the rate space are modelled
+    as the sum of five non-negative components:
+    $$ \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{g}\\$$
+
+    Here, $w_{s,f}$ denotes regression weight of each program $f$ at location $s$;
+    $g_{f,g}$ denotes the regulatory programmes $f$ of each gene $g$ - input to the model;
+    $m_{g}$ denotes a gene-specific scaling parameter which accounts for difference
+    in the global expression estimates between technologies;
+    $l_{s}$ and $s_{g}$ are additive components that capture additive background variation
+    that is not explained by the bi-variate decomposition.
+
+    The prior distribution on ${w_{s,f}$ is chosen to reflect the absolute scale and account for correlation of programs
+    across locations with similar cell composition. This is done by inferring a hierarchical prior representing
+    the co-located cell type combinations.
+    This prior is specified using 3 `cell_number_prior` input parameters.
+    **cells_per_spot** is derived from examining the paired histology image to get an idea about
+    the average nuclei count per location.
+    **factors_per_spot** reflects the number of regulatory programmes / cell types you expect to find in each location.
+    **combs_per_spot** prior tells the model how much co-location signal to expect between the programmes / cell types.
+    A number close to `factors_per_spot` tells that all cell types have independent locations,
+    and a number close 1 tells that each cell type is co-located with `factors_per_spot` other cell types.
+    Choosing a number halfway in-between is a sensible default: some cell types are co-located with others but some stand alone.
+
+    The prior distribution on m_{g} is informed by the expected change in sensitivity from single cell to spatial
+    technology, and is specified in `gene_level_prior`.
+
+    .. Note :: `gene_level_prior` and `cell_number_prior` determine the absolute scale of ${w_{s,f}$ density across locations,
+      but have a very limited effect on the absolute count of mRNA molecules attributed to each cell type.
+      Comparing your prior on **cells_per_spot** to average nUMI in the reference and spatial data helps to choose
+      the gene_level_prior and guide the model to learn ${w_{s,f}$ close to the true cell count.
 
     :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
+    :param n_comb: The number of co-located cell type combinations (in the prior).
+      The model is fairly robust to this choice when the prior has low effect on location weights W
+      (`spot_fact_mean_var_ratio` parameter is low), but please use the default unless know what you are doing (Default: 50)
+
     :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
-    :param gene_level_prior: prior on change in sensitivity between single cell and spatial (mean), 
-      how much it varies across cells (sd),
-      and how certain we are in those numbers (mean_var_ratio)
+    :param learning_rate, data_type, total_grad_norm_constraint ...: See parent class BaseModel for details.
+
+    :param gene_level_prior: prior on change in sensitivity between single cell and spatial technology (**mean**),
+      how much individual genes deviate from that (**sd**),
+
+      * **mean** a good choice of this prior for 10X Visium data and 10X Chromium reference is between 1/3 and 1 depending
+        on how well each experiment worked. A good choice for SmartSeq 2 reference is around ~ 1/10.
+      * **sd** a good choice of this prior is **mean** / 2.
+        Avoid setting **sd** >= **mean** because it puts a lot of weight on 0.
+    :param gene_level_var_prior: Certainty in the gene_level_prior (mean_var_ratio)
       - by default the variance in our prior of mean and sd is equal to the mean and sd
-      decreasing this number means having higher uncertainty about your prior
+      decreasing this number means having higher uncertainty in the prior
     :param cell_number_prior: prior on cell density parameter:
-      cells_per_spot - what is the number of cells you expect per location?
-      factors_per_spot - what is the number of cell types
+
+      * **cells_per_spot** - what is the average number of cells you expect per location? This could also be the nuclei
+        count from the paired histology image segmentation.
+      * **factors_per_spot** - what is the number of cell types
         / number of factors expressed per location?
-      cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
-      expressed as a mean/var ratio, numbers < 1 mean high uncertainty
-    :param phi_hyp_prior: prior on overdispersion parameter, rate of exponential distribution over phi / theta
+      * **combs_per_spot** - what is the average number of factor combinations per location?
+        a number halfway in-between `factors_per_spot` and 1 is a sensible default
+        Low numbers mean more factors are co-located with other factors.
+    :param cell_number_var_prior: Certainty in the cell_number_prior (cells_mean_var_ratio, factors_mean_var_ratio,
+      combs_mean_var_ratio)
+      - by default the variance in the value of this prior is equal to the value of this itself.
+      decreasing this number means having higher uncertainty in the prior
+    :param phi_hyp_prior: prior on NB alpha overdispersion parameter, the rate of exponential distribution over alpha.
+      This is a containment prior so low values mean low deviation from the mean of NB distribution.
+
+      * **mu** average prior
+      * **sd** standard deviation in this prior
+      When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
+    :param spot_fact_mean_var_ratio: the parameter that controls the strength of co-located cell combination prior on
+      ${w_{s,f}$ density across locations. It is expressed as mean / variance ratio with low values corresponding to
+      a weakly informative prior. Use the default value of 0.5 unless you know what you are doing.
     """
 
     def __init__(
@@ -182,11 +239,11 @@ class CoLocationModelNB4V2(Pymc3LocModel):
             self.nUMI_factors = pm.Deterministic('nUMI_factors',
                                                  (self.spot_factors * (self.gene_factors * self.gene_level).sum(0)))
 
-    def plot_posterior_vs_dataV1(self):
-        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
-                                    cell_fact_name='spot_factors_scaled')
-
     def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
+        r"""
+        Plot the histogram of log10 of the sum across w_sf for each location
+        :param fact_name: parameter of the model to use plot
+        """
 
         plt.hist(np.log10(self.samples['post_sample_means'][fact_name].sum(1)), bins=50)
         plt.xlabel('Biological spot nUMI (log10)')
@@ -194,6 +251,9 @@ class CoLocationModelNB4V2(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_spot_add(self):
+        r"""
+        Plot the histogram of log10 of additive location background.
+        """
 
         plt.hist(np.log10(self.samples['post_sample_means']['spot_add'][:, 0]), bins=50)
         plt.xlabel('UMI unexplained by biological factors')
@@ -201,6 +261,9 @@ class CoLocationModelNB4V2(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_E(self):
+        r"""
+        Plot the histogram of 1 / sqrt(overdispersion alpha)
+        """
 
         plt.hist((self.samples['post_sample_means']['gene_E'][:, 0]), bins=50)
         plt.xlabel('E_g overdispersion parameter')
@@ -208,6 +271,9 @@ class CoLocationModelNB4V2(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_add(self):
+        r"""
+        Plot the histogram of additive gene background.
+        """
 
         plt.hist((self.samples['post_sample_means']['gene_add'][:, 0]), bins=50)
         plt.xlabel('S_g additive background noise parameter')
@@ -215,8 +281,11 @@ class CoLocationModelNB4V2(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_level(self):
+        r"""
+        Plot the histogram of log10 of M_g change in sensitivity between technologies.
+        """
 
-        plt.hist((self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
+        plt.hist(np.log10(self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
         plt.xlabel('M_g expression level scaling parameter')
         plt.title('M_g expression level scaling parameter')
         plt.tight_layout()
@@ -231,5 +300,8 @@ class CoLocationModelNB4V2(Pymc3LocModel):
                           self.samples['post_sample_means']['gene_factors'].T)
                    * self.samples['post_sample_means']['gene_level'].T
                    + self.samples['post_sample_means']['gene_add'].T
-                   + self.samples['post_sample_means']['spot_add'])  # \
-    # * self.samples['post_sample_means']['gene_E']
+                   + self.samples['post_sample_means']['spot_add'])
+
+    def plot_posterior_vs_dataV1(self):
+        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
+                                    cell_fact_name='spot_factors_scaled')

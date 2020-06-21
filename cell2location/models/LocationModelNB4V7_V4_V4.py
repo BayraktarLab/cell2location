@@ -12,9 +12,11 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class LocationModelNB4V7_V4_V4(Pymc3LocModel):
-    r"""LocationModelNB4V7_V4_V4 Cell location model with E_g overdispersion & NB likelihood - similar to
-        LocationModelNB2V7_V4_V4 pymc3 NB parametrisation but overdisp priors as
-        described here https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/
+    r"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
+    it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
+    across locations with similar cell composition, thus has reduced accuracy.
+    Provided here as a 'base' model for completeness.
+
     :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
     :param learning_rate: ADAM learning rate for optimising Variational inference objective
