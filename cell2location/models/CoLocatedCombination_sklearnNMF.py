@@ -14,11 +14,56 @@ from cell2location.models.base_model import BaseModel
 class CoLocatedCombination_sklearnNMF(BaseModel):
     r""" Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF.
 
-    :param n_fact: Maximum number of cell circuits
-    :param X_data: Numpy array of gene expression (cols) in cells (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
+    This model takes the absolute cell density inferred by CoLocationModelNB4V2 as input
+    to non-negative matrix factorisation to identify co-occuring cell type combinations or 'microenvironments'.
+
+    If you want to find the most disctinct cell type combinations, use a small number of factors.
+
+    If you want to find very strong co-location signal and assume that most cell types are on their own,
+    use a lot of factors (> 30).
+
+    To perform this analysis we initialise the model and train it several times to evaluate consitency.
+    This class wraps around scikit-learn NMF to perform training, visualisation, export of the results.
+
+    .. Note:: factors are exchangeable so while you find constistent factors,
+      every time you train they model you get those factors in a different order.
+
+    This analysis is most revealing for tissues (such as lymph node) and cell types (such as glial cells)
+    where signals between cell types mediate their location patterns.
+    In the mouse brain locations of neurones are determined during development
+    so most neurones stand alone in their location pattern.
+
+    Density :math:`w_{sf}` of each cell type `f` across locations `s` is modelled as an additive function of
+    the cell combinations (micro-environments) `r`. This means the density of one cell type in one location can
+    be explained by 2 distinct combinations `r`.
+
+    Cell type density is therefore a function of the following non-negative components:
+
+    .. math::
+        w_{sf} = \sum_{r} ({i_{sr} \: k_{rf} \: m_{f}})
+
+    Components
+      * :math:`k_{rf}` represents the proportion of cells of each type (regulatory programmes) `f` that correspond to each
+        co-located combination `r`, normalised for total abundance of each cell type :math: `m_{f}`.
+      * :math:`m_{f}` cell type budget accounts for the difference in abundance between cell types,
+        thus focusing the interpretation of :math:`k_{rf}` on cell co-location.
+      * :math:`i_{sr}` is proportional to the number of cells from each neighbourhood `r` in each location `s`,
+        and shows the abundance of combinations `r` in locations `s`.
+
+    In practice :math:`q_{rf} = k_{rf} \: m_{f}` is obtained from scikit-learn NMF and normalised by the sum across
+    factors to obtain :math:`k_{rf}`:
+
+    .. math::
+        k_{rf} = q_{rf} / (\sum_{r} q_{rf})
+
+    .. Note:: So, the model reports the proportion of cells of each type that belong to each combination 'cell_type_fractions'.
+      E.g. 81% of Astro_2 are found in fact_28. This way we are not biased by the absolute abundance of each cell type.
+
+
+    :param n_fact: Maximum number of cell type (regulatory programmes) combinations
+    :param X_data: Numpy array of the cell abundance (cols) in locations (rows)
     :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
+    :param verbose, var_names, var_names_read, obs_names, fact_names, sample_id: See parent class BaseModel for details.
     :param init, random_state, alpha, l1_ratio: arguments for sklearn.decomposition.NMF with sensible defaults
         see help(sklearn.decomposition.NMF) for more details
     :param nmf_kwd_args: dictionary with more keyword arguments for sklearn.decomposition.NMF
@@ -54,7 +99,7 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
         self.nmf_kwd_args = nmf_kwd_args
 
     def fit(self, n=3, n_type='restart'):
-        r"""Find parameters using sklearn.decomposition.NMF, optically restart several times,
+        r"""Find parameters using sklearn.decomposition.NMF, optionally restart several times,
             and export parameters to self.samples['post_sample_means']
         :param n: number of independent initialisations
         :param n_type: type of repeated initialisation: 
@@ -63,7 +108,6 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
                                          for now, only n=2 is implemented
                                   'bootstrap' for fitting the model to multiple downsampled datasets. 
                                          Run `mod.bootstrap_data()` to generate variants of data
-        :param n_iter: number of iterations, supersedes self.n_iter
         :return: exported parameters in self.samples['post_sample_means'] 
         """
 
@@ -110,7 +154,7 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
 
     def evaluate_stability(self, node_name, align=True):
         r"""Evaluate stability of the solution between training initialisations
-            (takes samples and correlates the values of factors between training initialisations)
+            (correlates the values of factors between training initialisations)
         :param node_name: name of the parameter to evaluate, see `self.samples['post_sample_means'].keys()`  
                         Factors should be in columns.
         :param align: boolean, match factors between training restarts using linear_sum_assignment?
@@ -143,7 +187,8 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
                          self.samples['post_sample_means']['cell_type_factors'].T[fact_ind, :])
 
     def plot_posterior_mu_vs_data(self, mu_node_name='mu', data_node='X_data'):
-        r""" Plot expected value of the model (e.g. mean of poisson distribution)
+        r""" Plot expected value (of cell density) of the model against observed input data:
+        2D histogram, where each point is each point in the input data matrix
 
         :param mu_node_name: name of the object slot containing expected value
         :param data_node: name of the object slot containing data
@@ -166,13 +211,13 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
         plt.tight_layout()
 
     def sample2df(self, node_name='nUMI_factors',
-                  gene_node_name='cell_type_factors'):
-        r""" Export cell factors as Pandas data frames.
+                  ct_node_name='cell_type_factors'):
+        r""" Export cell combinations and their profile across locations as Pandas data frames.
 
-        :param node_name: name of the cell factor model parameter to be exported
-        :param gene_node_name: name of the gene factor model parameter to be exported
+        :param node_name: name of the location loading model parameter to be exported
+        :param ct_node_name: name of the cell_type loadings model parameter to be exported
         :return: 8 Pandas dataframes added to model object:
-                 .cell_factors_df, .cell_factors_sd, .cell_factors_q05, .cell_factors_q95
+                 .cell_type_loadings, .cell_factors_sd, .cell_factors_q05, .cell_factors_q95
                  .gene_loadings, .gene_loadings_sd, .gene_loadings_q05, .gene_loadings_q95
         """
 
@@ -183,9 +228,9 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
                                       columns=['mean_' + node_name + i for i in self.fact_names])
 
         self.cell_type_loadings = \
-            pd.DataFrame.from_records(self.samples['post_sample_means'][gene_node_name],
+            pd.DataFrame.from_records(self.samples['post_sample_means'][ct_node_name],
                                       index=self.var_names,
-                                      columns=['mean_' + gene_node_name + i for i in self.fact_names])
+                                      columns=['mean_' + ct_node_name + i for i in self.fact_names])
 
         self.cell_type_fractions = (self.cell_type_loadings.T / self.cell_type_loadings.sum(1)).T
 
@@ -195,7 +240,7 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
 
 
     def annotate_adata(self, adata):
-        r""" Add location factors to anndata.obs
+        r""" Add location loadings to anndata.obs
 
         :param adata: anndata object to annotate
         :return: updated anndata object
@@ -204,7 +249,7 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
         if self.location_factors_df is None:
             self.sample2df()
 
-        ### location factors
+        # location factors
         # add location factors to adata
         adata.obs[self.location_factors_df.columns] = self.location_factors_df.loc[adata.obs.index, :]
 

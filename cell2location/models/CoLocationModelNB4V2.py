@@ -17,7 +17,8 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
-    :math:`D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g)`
+    .. math::
+        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g)
 
     The containment prior on overdispersion :math:`\alpha_g` parameter is used
     (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
@@ -38,11 +39,16 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale and account for correlation of programs
     across locations with similar cell composition. This is done by inferring a hierarchical prior representing
     the co-located cell type combinations.
-    This prior is specified using 3 `cell_number_prior` input parameters.
+
+    This prior is specified using 3 `cell_number_prior` input parameters:
+
     **cells_per_spot** is derived from examining the paired histology image to get an idea about
     the average nuclei count per location.
+
     **factors_per_spot** reflects the number of regulatory programmes / cell types you expect to find in each location.
+
     **combs_per_spot** prior tells the model how much co-location signal to expect between the programmes / cell types.
+
     A number close to `factors_per_spot` tells that all cell types have independent locations,
     and a number close 1 tells that each cell type is co-located with `factors_per_spot` other cell types.
     Choosing a number halfway in-between is a sensible default: some cell types are co-located with others but some stand alone.
