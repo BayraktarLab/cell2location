@@ -10,15 +10,25 @@ from cell2location.models.torch_model import TorchModel
 
 
 class RegressionTorchModel(TorchModel):
-    r"""RegressionTorchModel Base class for model with no cell specific parameters
+    r"""Base class for regression models with no cell-specific parameters (enable minibatch training).
 
-    :param sample_col: str with column name in cell2covar that denotes sample
+    :param sample_id: str with column name in cell2covar that denotes sample
     :param cell2covar: pd.DataFrame with covariates in columns and cells in rows, rows should be named.
-    :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
-    :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
-    :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
+    :param X_data: Numpy array of gene expression (cols) in cells (rows)
+    :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
+      supersedes self.n_iter
+    :param (data_type, learning_rate, total_grad_norm_constraint, verbose, var_names, var_names_read, obs_names, fact_names):
+      arguments for parent class :func:`~cell2location.models.BaseModel`
+    :param minibatch_size: if None all data is used for training,
+      if not None - the number of cells / observations per batch. For best results use 1024 cells per batch.
+    :param minibatch_seed: order of cells in minibatch is chose randomly, so a seed for each traning restart
+      should be provided
+    :param prior_eps: numerical stability constant added to initial values
+    :param nb_param_conversion_eps: NB distribution numerical stability constant, see :func:`~cell2location.models.TorchModel.nb_log_prob`
+    :param use_cuda: boolean, telling pytorch to use the GPU (if true).
+    :param use_average_as_initial_value: boolean, use average gene expression for each categorical covariate as initial value?
+    :param stratify_cv: when using cross-validation on cells (selected in the training method), this is a pd.Series that
+      tells :func:`~sklearn.model_selection.train_test_split` how to stratify when creating a split.
     """
 
     def __init__(
@@ -34,7 +44,7 @@ class RegressionTorchModel(TorchModel):
             var_names=None, var_names_read=None,
             obs_names=None, fact_names=None,
             minibatch_size=None, minibatch_seed=[41, 56, 345],
-            phi_hyp_prior=None, prior_eps=1e-8,
+            prior_eps=1e-8,
             nb_param_conversion_eps=1e-8,
             use_cuda=False,
             use_average_as_initial_value=True,
@@ -71,7 +81,6 @@ class RegressionTorchModel(TorchModel):
         self.n_samples = np.sum(self.which_sample)
         self.n_covar = self.n_fact - self.n_samples
 
-        self.phi_hyp_prior = phi_hyp_prior
         self.prior_eps = prior_eps
 
         self.cell2sample_df = cell2sample_df
