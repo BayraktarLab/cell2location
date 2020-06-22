@@ -39,14 +39,23 @@ from cell2location.models.regression_torch_model import RegressionTorchModel
 
 # defining the model itself
 class RegressionNBV4TorchModule(nn.Module):
-    r"""Module class that defines the model graph and parameters.
+    r""" Module class that defines the model graph and parameters.
+    A module class should have the following methods:
 
-    :param sample_col: str with column name in cell2covar that denotes sample
-    :param cell2covar: pd.DataFrame with covariates in columns and cells in rows, rows should be named.
+      * __init__ which defines parameters (real scale)
+      * forward which uses input data and parameters to compute parameters of data-generating distribution
+        (e.g. NB mean and alpha)
+      * initialize_parameters which initialises parameters (real scale)
+      * export_parameters which transforms parameters correct domain (e.g. positive)
+
     :param n_cells: number of cells / spots / observations
     :param n_genes: number of genes / variables
-    :param n_fact: number of factors / reference signatures (extracted from `cell_state_mat.shape[1]`)
-    :param cell_state_mat: reference signatures with n_genes rows and signatures in columns
+    :param n_fact: number of factors / covariates / reference signatures (extracted from `cell_state_mat.shape[1]`)
+    :param n_tech: number of technologies
+    :param clust_average_mat: initial value of factors / covariates (if None, initialised as normal_(mean=0, std=1/2)
+    :param which_sample: boolean array, which covariates denote sample / experiment
+    :param data_type: np.dtype to use (Default 'float32')
+    :param eps: numerical stability constant
     """
 
     def __init__(self, n_cells, n_genes, n_fact, n_tech, clust_average_mat,
@@ -75,9 +84,13 @@ class RegressionNBV4TorchModule(nn.Module):
         self.gene_E_log = nn.Parameter(torch.Tensor(1, self.n_genes))
 
     def forward(self, cell2sample_covar, cell2tech):
-        r""" Computes expected value of the model (mu_biol) and gene-overdispersion (gene_E).
+        r""" Computes NB distribution parameters using input covariates for each cell:
+        expected value of expression (mu_biol, cells (minibatch * genes) and overdispersion (gene_E).
 
-        :return: a list with mu_biol and gene_E
+        :param cell2sample_covar: np.narray that gives sample membership (first X columns)
+          and covariate values (all other columns) for each cell / observation (rows) - could be done in in mini batches.
+        :param cell2tech: np.narray that gives technology membership (columns) for each cell / observation (rows)
+        :return: a list with [mu_biol, gene_E]
         """
 
         # sample-specific scaling of expression levels
@@ -97,8 +110,10 @@ class RegressionNBV4TorchModule(nn.Module):
         return [self.mu_biol, self.gene_E]
 
     def initialize_parameters(self):
-        r""" Randomly initialise parameters
+        r""" Initialise parameters, using `clust_average_mat` for covariate and sample effects,
+        random initialisation in a sensible range (see code) for all other parameters.
         """
+
         # initialise at average for each covariate
         if self.clust_average_mat is not None:
             self.gene_factors_log.data = \
@@ -114,7 +129,8 @@ class RegressionNBV4TorchModule(nn.Module):
 
     def export_parameters(self):
         r""" Compute parameters from their real number representation.
-        :return: a dictionary with parameters
+
+        :return: a dictionary with parameters {'gene_factors', 'sample_scaling', 'tech_scaling', 'gene_E'}
         """
 
         export = {'gene_factors': torch.exp(self.gene_factors_log),
