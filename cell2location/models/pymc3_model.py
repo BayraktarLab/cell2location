@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Base Pymc3 model class"""
+"""Base Pymc3 model class for all models in pymc3"""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,13 +15,11 @@ from cell2location.models.base_model import BaseModel
 # base model class - defining shared methods but not the model itself
 class Pymc3Model(BaseModel):
     r"""
-    Base class for pymc3 models.
+    This class provides functions to train PyMC3 models and sample their parameters.
+    A model must have a main X_data input and can have arbitrary self.extra_data parameters.
 
-    :param n_fact: number of factors
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
-    :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
+    :param ...: the rest are arguments for parent class BaseModel
     """
 
     def __init__(
@@ -44,6 +42,13 @@ class Pymc3Model(BaseModel):
                          verbose, var_names, var_names_read,
                          obs_names, fact_names, sample_id)
 
+        # Create dictionaries storing results
+        self.advi = {}
+        self.mean_field = {}
+        self.samples = {}
+        self.node_samples = {}
+        self.n_type = 'restart' # default
+
         # Pass data to theano
         self.x_data = theano.shared(X_data.astype(self.data_type))
 
@@ -52,31 +57,26 @@ class Pymc3Model(BaseModel):
 
         :return: self.prior_trace dictionary with an element for each parameter of the model. 
         """
-        # Take one sample from the prior (fails for more due to tensor dimensions problem)
+        # Take samples from the prior
         with self.model:
             self.prior_trace = pm.sample_prior_predictive(samples=samples)
 
     def fit_advi(self, n=3, method='advi', n_type='restart'):
         r"""Find posterior using ADVI (maximising likehood of the data and
             minimising KL-divergence of posterior to prior)
+
         :param n: number of independent initialisations
-        :param method: to allow for potential use of SVGD or MCMC (currently only ADVI implemented).
+        :param method: 'advi', to allow for potential use of SVGD, MCMC, custom (currently only ADVI implemented).
         :param n_type: type of repeated initialisation:
-                                  'restart' to pick different initial value,
-                                  'cv' for molecular cross-validation - splits counts into n datasets,
-                                         for now, only n=2 is implemented
-                                  'bootstrap' for fitting the model to multiple downsampled datasets.
-                                         Run `mod.bootstrap_data()` to generate variants of data
-                                  '
-        :return: self.mean_field dictionary with MeanField pymc3 objects. 
+          * **'restart'** to pick different initial value,
+          * **'cv'** for molecular cross-validation - splits counts into n datasets, for now, only n=2 is implemented
+          * **'bootstrap'** for fitting the model to multiple downsampled datasets.
+            Run `mod.bootstrap_data()` to generate variants of data
+        :return: self.mean_field dictionary with MeanField pymc3 objects for each initialisation.
         """
 
         if not np.isin(n_type, ['restart', 'cv', 'bootstrap']):
             raise ValueError("n_type should be one of ['restart', 'cv', 'bootstrap']")
-
-        self.mean_field = {}
-        self.samples = {}
-        self.node_samples = {}
 
         self.n_type = n_type
 
@@ -116,23 +116,26 @@ class Pymc3Model(BaseModel):
                            progressbar=True,
                            scale_cost_to_minibatch=True):
         r""" Find posterior using pm.ADVI() method directly (allows continuing training through `refine` method.
-            (maximising likehood of the data and minimising KL-divergence of posterior to prior)
-        :param n: number of independent initialisations
-        :param method: to allow for potential use of SVGD or MCMC (currently only ADVI implemented).
-        :param n_type: type of repeated initialisation: 
-                                  'restart' to pick different initial value,
-                                  'cv' for molecular cross-validation - splits counts into n datasets, 
-                                         for now, only n=2 is implemented
-                                  'bootstrap' for fitting the model to multiple downsampled datasets. 
-                                         Run `mod.bootstrap_data()` to generate variants of data
-        :param n_iter: number of iterations, supersedes self.n_iter
-        :return: self.mean_field dictionary with MeanField pymc3 objects, and self.advi dictionary with ADVI objects. 
-        """
+            (maximising likelihood of the data and minimising KL-divergence of posterior to prior - ELBO loss)
 
-        self.advi = {}
-        self.mean_field = {}
-        self.samples = {}
-        self.node_samples = {}
+        :param n: number of independent initialisations
+        :param method: 'advi', to allow for potential use of SVGD, MCMC, custom (currently only ADVI implemented).
+        :param n_type: type of repeated initialisation:
+
+          * **'restart'** to pick different initial value,
+          * **'cv'** for molecular cross-validation - splits counts into n datasets, for now, only n=2 is implemented
+          * **'bootstrap'** for fitting the model to multiple downsampled datasets.
+            Run `mod.bootstrap_data()` to generate variants of data
+
+        :param n_iter: number of iterations, supersedes self.n_iter specified when creating model instance.
+        :param learning_rate: learning rate, supersedes self.learning_rate specified when creating model instance.
+        :param reducing_lr: boolean, use decaying learning rate?
+        :param progressbar: boolean, show progress bar?
+        :param scale_cost_to_minibatch: when using training in minibatches, scale cost function appropriately?
+          See discussion https://discourse.pymc.io/t/effects-of-scale-cost-to-minibatch/1429 to understand the effects.
+        :return: self.mean_field dictionary with MeanField pymc3 objects,
+          and self.advi dictionary with ADVI objects for each initialisation.
+        """
 
         self.n_type = n_type
         self.scale_cost_to_minibatch = scale_cost_to_minibatch
@@ -238,11 +241,13 @@ class Pymc3Model(BaseModel):
 
     def fit_advi_refine(self, n_iter=10000, learning_rate=None,
                         progressbar=True, reducing_lr=False):
-        r""" Refine posterior using ADVI
+        r""" Refine posterior using ADVI - continue training after `.fit_advi_iterative()`
 
         :param n_iter: number of additional iterations
-        :param progressbar: boolean, show progress bar?
-        :return: updates the self.mean_field dictionary with MeanField pymc3 objects. 
+        :param learning_rate: same as in `.fit_advi_iterative()`
+        :param progressbar: same as in `.fit_advi_iterative()`
+        :param reducing_lr: same as in `.fit_advi_iterative()`
+        :return: update the self.mean_field dictionary with MeanField pymc3 objects.
         """
 
         self.n_iter = self.n_iter + n_iter
@@ -327,21 +332,22 @@ class Pymc3Model(BaseModel):
                                                             more_replacements=more_replacements)
 
                 if self.verbose:
-                    print(plt.plot(np.log10(self.mean_field[name].hist[15000:])));
+                    print(plt.plot(np.log10(self.mean_field[name].hist[15000:])))
 
     def plot_history(self, iter_start=0, iter_end=-1):
-        r""" Plot training history
+        r""" Plot loss function (ELBO) across training history
 
         :param iter_start: omit initial iterations from the plot
         :param iter_end: omit last iterations from the plot
         """
         for i in self.mean_field.keys():
-            print(plt.plot(np.log10(self.mean_field[i].hist[iter_start:iter_end])));
+            print(plt.plot(np.log10(self.mean_field[i].hist[iter_start:iter_end])))
 
     def b_evaluate_stability(self, node, n_samples=1000, align=True):
         r""" Evaluate stability of posterior samples between training initialisations
             (takes samples and correlates the values of factors between training initialisations)
-        :param node: which pymc3 node to sample? Factors should be in columns.
+
+        :param node: which pymc3 node (model parameter) to sample? Factors should be in columns.
         :param n_samples: the number of samples.
         :param align: boolean, match factors between training restarts using linear_sum_assignment?
         :return: self.samples[node_name+_stab] dictionary with an element for each training initialisation. 
@@ -366,15 +372,17 @@ class Pymc3Model(BaseModel):
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
                          mean_field_slot='init_1'):
-        r""" Sample posterior distribution of parameters - either all or single node
+        r""" Sample posterior distribution of all parameters or single parameter
 
         :param node: pymc3 node to sample (e.g. default "all", self.spot_factors)
         :param n_samples: number of posterior samples to generate (1000 is recommended, reduce if you get GPU memory error)
-        :param save_samples: save samples in addition to sample mean, 5% quantile, SD.
-        :param return_samples: return summarised samples in addition to saving them in `self.samples`
-        :param mean_field_slot: string, which mean_field slot to sample? 'init_1' by default
-        :return: dictionary of dictionaries (mean, 5% quantile, SD, optionally all samples) with numpy arrays for each parameter. 
-        Optional dictionary of all samples contains parameters as numpy arrays of shape ``(n_samples, ...)``
+        :param save_samples: save all samples, not just the mean, 5% and 95% quantile, SD.
+        :param return_samples: return summarised samples (mean, etc) in addition to saving them in `self.samples`?
+        :param mean_field_slot: string, which training initialisation (mean_field slot) to sample? 'init_1' by default
+        :return: dictionary `self.samples` (mean, 5% quantile, SD, optionally all samples) with dictionaries
+          with numpy arrays for each parameter.
+          Plus an optional dictionary in `self.samples` with all samples of parameters
+          as numpy arrays of shape ``(n_samples, ...)``
         """
 
         theano.config.compute_test_value = 'ignore'
@@ -417,14 +425,28 @@ class Pymc3Model(BaseModel):
 
     def factor_expressed_plot(self, shape_cut=4, rate_cut=15,
                               sample_type='post_sample_means',
-                              shape='cell_fact_mu_hyp', rate='cell_fact_sd_hyp'):
+                              shape='cell_fact_mu_hyp', rate='cell_fact_sd_hyp',
+                              x_lab='Cell factor, Gamma shape', y_lab='Cell factor, Gamma rate'):
+        r""" Not used for Location models. Ignore.
+        Identify which factors are expressed and filter them
+
+        :param shape_cut: cutoff on X-axis
+        :param rate_cut: cutoff on Y-axis
+        :param sample_type: which posterior summary type to use.
+        :param shape: name for X-axis parameter
+        :param rate: name for Y-axis parameter
+        :param x_lab: X-axis label
+        :param y_lab: Y-axis label
+        :return: a dictionary with extracted parameters and cutoffs {'shape': shape, 'rate': rate,
+          'shape_cut': shape_cut, 'rate_cut': rate_cut}
+        """
 
         # Expression shape and rate across cells
         shape = self.samples[sample_type][shape]
         rate = self.samples[sample_type][rate]
         plt.scatter(shape, rate)
-        plt.xlabel('Cell factor, Gamma shape')
-        plt.ylabel('Cell factor, Gamma rate')
+        plt.xlabel(x_lab)
+        plt.ylabel(y_lab)
         plt.vlines(shape_cut, 0, rate_cut)
         plt.hlines(rate_cut, 0, shape_cut)
         plt.text(shape_cut - 0.5 * shape_cut, rate_cut - 0.5 * rate_cut, 'expressed')
@@ -438,28 +460,36 @@ class Pymc3Model(BaseModel):
                          df_prior_node_name1='spot_fact_mu_hyp', df_prior_node_name2='spot_fact_sd_hyp',
                          mu_node_name='mu', data_node='X_data',
                          extra_df_parameters=('spot_add')):
-        r""" Track posterior distribution of all parameters during training
+        r""" Track posterior distribution of all parameters during training.
+        This is done by taking `n_samples` posterior samples `every` 1000 iterations. If `n_type` is 'cv',
+        or cross-validation, this function also computes RMSE on training and validation data (molecular cross-validation)
 
-        :param every: save posterior after each number of `every` iterations
+        :param every: save posterior `every` iterations
         :param n_samples: number of posterior samples to generate
         :param n: number of independent training initialisations
-        :param n_type: type of repeated initialisation: 
-                                  'restart' to pick different initial value,
-                                  'cv' for molecular cross-validation - splits counts into n datasets, 
-                                         for now, only n=2 is implemented
-                                  'bootstrap' for fitting the model to multiple downsampled datasets. 
-                                         Run `mod.bootstrap_data()` to generate variants of data
+        :param n_type: see .fit_advi_iterative() method
         :param df_node_name1: which node to convert to posterior with `self.sample2df`?
-        :param df_node_df_name: names of the object where `self.sample2df` stores dataframe for `df_node_name1`
-        :param df_prior_node_name1: first hierarchical prior for `df_node_name1`, set to None to not add this to column names
-        :param df_prior_node_name2: second hierarchical prior for `df_node_name1`, set to None to not add this to column names
-        :param mu_node_name: name of the object slot containing expected value
+        :param df_node_df_name1: names of the object where `self.sample2df` stores pd.DataFrame for `df_node_name1`
+        :param df_prior_node_name1: first hierarchical prior for `df_node_name1`,
+          set to None to not paste these values to column names
+        :param df_prior_node_name2: second hierarchical prior for `df_node_name1`,
+          set to None to not paste these values to column names
+        :param mu_node_name: name of the object slot containing expected value.
+          This is used to calculate RMSE on training and validation data
         :param data_node: name of the object slot containing data
-        :param extra_df_parameters: additional parameters that can be added to `samples_df`
+          This is used to calculate RMSE on training and validation data
+        :param extra_df_parameters: a tuple with names of additional parameters
+          that can be added to `df_node_df_name1` pd.DataFrame.
+
         :return: adds self.tracking dictionary with one element for each `n` containing:
-                  'samples': a list of length `self.n_iter / every` with every entry being a dictionary (one entry per parameter)
-                  'samples_df': a list of length `self.n_iter / every` with every entry being a pd.DataFrame for cell factors
-                  'rmse': a list of length `self.n_iter / every` with every entry being a dictionary ('genes', 'cells', 'total')
+        
+          * **'samples'**: a list of length `self.n_iter / every` with every entry being
+            a dictionary of parameters (one entry per parameter)
+          * **'samples_df'**: a list of length `self.n_iter / every` with every entry being
+            a pd.DataFrame for cell factors
+          * **'rmse'**: a list of length `self.n_iter / every` with every entry being
+            a dictionary ('rmse_genes', 'rmse_cells', 'rmse_total'). When using cross-validation data,
+            RMSE for validation data are also added ('rmse_genes_cv', 'rmse_cells_cv', 'rmse_total_cv').
         """
 
         self.tracking_n_steps = np.ceil(self.n_iter / every)
@@ -556,10 +586,13 @@ class Pymc3Model(BaseModel):
                 self.tracking[n_init]['samples_df'] = self.tracking[n_init]['samples_df'] + [factors_df.copy()]
 
     def sample_posterior_bootstrap(self, n_samples=100, save_samples=True):
-        r""" Sample posterior using training on bootstrapped data. 
-             SD of the posterior is calculated based on fits to bootstrapped data rather 
-             than samples from each posterior. 
-        :param: the same as `.sample_posterior()`
+        r""" Sample posterior using training on bootstrapped data.
+        This method could be give a better estimate of posterior variance than ADVI.
+        SD of the posterior is calculated based on fits to bootstrapped data rather
+        than samples from each posterior.
+
+        :param n_samples: the same as `.sample_posterior()`
+        :param save_samples: In this case, samples are values based on each bootstrapped dataset.
         """
 
         post_samples = self.sample_posterior(node='all', n_samples=n_samples,
