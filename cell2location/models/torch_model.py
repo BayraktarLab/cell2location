@@ -108,11 +108,10 @@ class TorchModel(BaseModel):
             (maximising likehood of the data and minimising KL-divergence of posterior to prior)
         :param n: number of independent initialisations
         :param n_type: type of repeated initialisation:
-                                  'restart' to pick different initial value,
-                                  'cv' for molecular cross-validation - splits counts into n datasets,
-                                         for now, only n=2 is implemented
-                                  'bootstrap' for fitting the model to multiple downsampled datasets.
-                                         Run `mod.bootstrap_data()` to generate variants of data
+          * **'restart'** to pick different initial value,
+          * **'cv'** for molecular cross-validation - splits counts into n datasets, for now, only n=2 is implemented
+          * **'bootstrap'** for fitting the model to multiple downsampled datasets.
+            Run `mod.bootstrap_data()` to generate variants of data
         :param n_iter: number of iterations, supersedes self.n_iter
         :param train_proportion: if not None, which proportion of cells to use for training and which for validation.
         :return: self.mean_field dictionary with MeanField pymc3 objects, and self.advi dictionary with ADVI objects.

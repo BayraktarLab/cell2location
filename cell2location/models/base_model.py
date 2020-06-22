@@ -54,6 +54,7 @@ class BaseModel():
         self.fact_filt = None
         self.gene_loadings = None
         self.minibatch_size = None
+        self.minibatch_seed = None
         self.extra_data = None  # input data
         self.extra_data_tt = None  # minibatch parameters
 
