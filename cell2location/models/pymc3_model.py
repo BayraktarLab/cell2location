@@ -16,10 +16,10 @@ from cell2location.models.base_model import BaseModel
 class Pymc3Model(BaseModel):
     r"""
     This class provides functions to train PyMC3 models and sample their parameters.
-    A model must have a main X_data input and can have arbitrary self.extra_data parameters.
+    A model must have a main X_data input and can have arbitrary self.extra_data inputs.
 
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param ...: the rest are arguments for parent class BaseModel
+    :param all other: the rest are arguments for parent class BaseModel
     """
 
     def __init__(
@@ -482,7 +482,7 @@ class Pymc3Model(BaseModel):
           that can be added to `df_node_df_name1` pd.DataFrame.
 
         :return: adds self.tracking dictionary with one element for each `n` containing:
-        
+
           * **'samples'**: a list of length `self.n_iter / every` with every entry being
             a dictionary of parameters (one entry per parameter)
           * **'samples_df'**: a list of length `self.n_iter / every` with every entry being

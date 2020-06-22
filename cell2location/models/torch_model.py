@@ -23,6 +23,14 @@ class MiniBatchDataset(Dataset):
 
 
 class TorchModel(BaseModel):
+    r"""
+    This class provides functions to train PyMC3 models and sample their parameters.
+    A model must have a main X_data input and can have arbitrary self.extra_data inputs.
+
+    :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
+    :param use_cuda: boolean, telling pytorch to use the GPU (if true).
+    :param all other: the rest are arguments for parent class BaseModel
+    """
 
     def __init__(
             self,
@@ -49,6 +57,13 @@ class TorchModel(BaseModel):
         self.device = 'cuda' if self.use_cuda else 'cpu'
         self.extra_data = {}  # if no extra data empty dictionary
 
+        self.mean_field = {}
+        self.hist = {}
+        self.validation_hist = {}
+        self.training_hist = {}
+        self.samples = {}
+        self.node_samples = {}
+
         if self.use_cuda:
             if data_type == 'float32':
                 torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -74,15 +89,17 @@ class TorchModel(BaseModel):
     @staticmethod
     def nb_log_prob(param, data, eps=1e-8):
         """ Method that returns log probability / log likelihood for each data point.
-        NB log prob - Copied over from scVI 
+        Negative Binomial (NB) log probability - Copied over from scVI
         https://github.com/YosefLab/scVI/blob/b20e34f02a87d16790dbacc95b2ae1714c08615c/scvi/models/log_likelihood.py#L249
+
         Note: All inputs should be torch Tensors
-        log likelihood (scalar) of a minibatch according to a nb model.
+
         :param param: list with [mu, theta]
+          * **mu**: mean of the negative binomial (has to be positive support) (shape: cells/minibatch x genes)
+          * **theta**: inverse dispersion parameter (has to be positive support) (shape: cells/minibatch x genes)
         :param data: data (cells * genes)
-        mu: mean of the negative binomial (has to be positive support) (shape: minibatch x genes)
-        theta: inverse dispersion parameter (has to be positive support) (shape: minibatch x genes)
-        eps: numerical stability constant
+        :param eps: numerical stability constant
+        :return: Log probability at every point in the data
         """
         mu = param[0]
         theta = param[1]
@@ -103,30 +120,29 @@ class TorchModel(BaseModel):
     def fit_advi_iterative(self, n=3, n_type='restart',
                            n_iter=None, learning_rate=None,
                            num_workers=2, train_proportion=None,
-                           l2_weight=False, sample_scaling_weight=0.5):
-        r""" Find posterior using pm.ADVI() method directly (allows continuing training through `refine` method.
-            (maximising likehood of the data and minimising KL-divergence of posterior to prior)
+                           l2_weight=None):
+        r""" Function is named for consistency but implements MLE and MAP training in pure pytorch rather than ADVI.
+
         :param n: number of independent initialisations
         :param n_type: type of repeated initialisation:
+
           * **'restart'** to pick different initial value,
-          * **'cv'** for molecular cross-validation - splits counts into n datasets, for now, only n=2 is implemented
+          * **'cv'** for molecular cross-validation - splits counts into n datasets (training and validation,
+            for now, only n=2 is implemented)
           * **'bootstrap'** for fitting the model to multiple downsampled datasets.
-            Run `mod.bootstrap_data()` to generate variants of data
+            Run `mod.bootstrap_data()` to generate bootstrapped variants of data.
         :param n_iter: number of iterations, supersedes self.n_iter
-        :param train_proportion: if not None, which proportion of cells to use for training and which for validation.
+        :param learning_rate: ADAM learning rate
+        :param num_workers: number of processes to use when generating minibatch datasets (passed to torch.utils.data.DataLoader)
+        :param train_proportion: if not None, which proportion of cells (rows) to use for training and which for validation.
+        :param l2_weight: a dictionary with L2 penalisation weights for each parameter in the model (default: None),
+          see the `.loss()` method of individual models for details
+
         :return: self.mean_field dictionary with MeanField pymc3 objects, and self.advi dictionary with ADVI objects.
         """
 
-        self.mean_field = {}
-        self.hist = {}
-        self.validation_hist = {}
-        self.training_hist = {}
-        self.samples = {}
-        self.node_samples = {}
-
         self.n_type = n_type
         self.l2_weight = l2_weight
-        self.sample_scaling_weight = sample_scaling_weight
         self.train_proportion = train_proportion
 
         if n_iter is None:
@@ -193,8 +209,7 @@ class TorchModel(BaseModel):
                     self.model.train()
                     optim.zero_grad()
                     y_pred = self.model.forward(**extra_data_train)
-                    loss = self.loss(y_pred, x_data, l2_weight=l2_weight,
-                                     sample_scaling_weight=sample_scaling_weight)
+                    loss = self.loss(y_pred, x_data, l2_weight=l2_weight)
                     loss.backward()
                     optim.step()
                     iter_loss = loss.item()
@@ -213,8 +228,7 @@ class TorchModel(BaseModel):
 
                         optim.zero_grad()
                         y_pred = self.model.forward(**extra_data_batch)
-                        loss = self.loss(y_pred, x_data_batch, l2_weight=l2_weight,
-                                         sample_scaling_weight=sample_scaling_weight)
+                        loss = self.loss(y_pred, x_data_batch, l2_weight=l2_weight)
                         aver_loss.append(loss.item())
                         loss.backward()
 
@@ -231,8 +245,7 @@ class TorchModel(BaseModel):
 
                     self.model.eval()
                     y_pred = self.model.forward(**extra_data_val)
-                    loss = self.loss(y_pred, x_data_val, l2_weight=l2_weight,
-                                     sample_scaling_weight=sample_scaling_weight)
+                    loss = self.loss(y_pred, x_data_val, l2_weight=l2_weight)
                     aver_loss_val.append(loss.item())
                     iter_loss_val = np.sum(aver_loss_val)
 
@@ -260,15 +273,16 @@ class TorchModel(BaseModel):
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
                          mean_field_slot='init_1'):
-        r""" Sample posterior distribution of parameters - either all or single parameter
+        r""" Extract point estimates from pure pytorch model - either all or single parameter
+        Named sample_posterior for consistency with Bayesian versions.
 
         :param node: torch parameter to sample (e.g. default "all", self.spot_factors)
-        :param n_samples: number of posterior samples to generate (1000 is recommended, reduce if you get GPU memory error)
-        :param save_samples: save samples in addition to sample mean, 5% quantile, SD.
+        :param n_samples: Not used but retained to keep the same call signatures as Bayesian versions.
+        :param save_samples: Not used but retained to keep the same call signatures as Bayesian versions.
         :param return_samples: return summarised samples in addition to saving them in `self.samples`
-        :param mean_field_slot: string, which mean_field slot to sample? 'init_1' by default
-        :return: dictionary of dictionaries (mean, 5% quantile, SD, optionally all samples) with numpy arrays for each parameter.
-        Optional dictionary of all samples contains parameters as numpy arrays of shape ``(n_samples, ...)``
+        :param mean_field_slot: string, extract parameters from training restart (Default: 'init_1').
+          Named for consistency with Bayesian versions.
+        :return: dictionary (mean, the rest empty) of dictionaries with numpy arrays for each parameter.
         """
 
         self.model.load_state_dict(self.mean_field[mean_field_slot])
@@ -293,15 +307,15 @@ class TorchModel(BaseModel):
             return self.samples
 
     def b_evaluate_stability(self, node_name, n_samples=1000, align=True, transpose=True):
-        r"""Evaluate stability of posterior samples between training initialisations
-            (takes samples and correlates the values of factors between training initialisations)
-        :param node: which pymc3 node to sample? Factors should be in columns.
-        :param n_samples: the number of samples.
-        :param align: boolean, match factors between training restarts using linear_sum_assignment?
+        r"""Evaluate stability of point estimates between training initialisations
+            (correlates the values of factors between training initialisations)
+
+        :param node_name: name of the parameter to analyse?
+        :param n_samples: Not used but retained to keep the same call signatures as Bayesian versions.
+        :param align: boolean, whether to match factors between training restarts using linear_sum_assignment?
+        :param transpose: boolean, if needed transpose parameters to put Factors in columns.
         :return: self.samples[node_name+_stab] dictionary with an element for each training initialisation.
         """
-
-        self.n_samples = n_samples
 
         self.samples[node_name + '_stab'] = {}
 
@@ -316,33 +330,3 @@ class TorchModel(BaseModel):
             print(self.align_plot_stability(self.samples[node_name + '_stab']['init_' + str(1)],
                                             self.samples[node_name + '_stab']['init_' + str(i + 2)],
                                             str(1), str(i + 2), align=align))
-
-    def sample2df(self, node_name='nUMI_factors'):
-        r""" Export spot factors as Pandas data frames.
-
-        :param node_name: name of the model parameter to be exported
-        :return: a Pandas dataframe added to model object:
-                 .spot_factors_df
-        """
-
-        if len(self.samples) == 0:
-            raise ValueError(
-                'Please run `.sample_posterior()` first to generate samples & summarise posterior of each parameter')
-
-        self.spot_factors_df = pd.DataFrame.from_records(self.samples['post_sample_means'][node_name],
-                                                         index=self.obs_names,
-                                                         columns=['mean_' + node_name + i for i in self.fact_names])
-
-    def annotate_spot_adata(self, adata):
-        r"""Add spot factors to anndata.obs
-        :param adata: anndata object to annotate
-        :return: updated anndata object
-        """
-
-        if self.spot_factors_df is None:
-            self.sample2df()
-
-        # add cell factors to adata
-        adata.obs[self.spot_factors_df.columns] = self.spot_factors_df.loc[adata.obs.index, :]
-
-        return adata
