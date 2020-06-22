@@ -25,8 +25,8 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
     To perform this analysis we initialise the model and train it several times to evaluate consitency.
     This class wraps around scikit-learn NMF to perform training, visualisation, export of the results.
 
-    .. Note:: factors are exchangeable so while you find constistent factors,
-      every time you train they model you get those factors in a different order.
+    .. Note:: factors are exchangeable so while you find factors with consistent cell type composition,
+      every time you train the model you get those factors in a different order.
 
     This analysis is most revealing for tissues (such as lymph node) and cell types (such as glial cells)
     where signals between cell types mediate their location patterns.
@@ -44,20 +44,21 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
 
     Components
       * :math:`k_{rf}` represents the proportion of cells of each type (regulatory programmes) `f` that correspond to each
-        co-located combination `r`, normalised for total abundance of each cell type :math: `m_{f}`.
+        co-located combination `r`, normalised for total abundance of each cell type :math:`m_{f}`.
       * :math:`m_{f}` cell type budget accounts for the difference in abundance between cell types,
         thus focusing the interpretation of :math:`k_{rf}` on cell co-location.
       * :math:`i_{sr}` is proportional to the number of cells from each neighbourhood `r` in each location `s`,
         and shows the abundance of combinations `r` in locations `s`.
 
     In practice :math:`q_{rf} = k_{rf} \: m_{f}` is obtained from scikit-learn NMF and normalised by the sum across
-    factors to obtain :math:`k_{rf}`:
+    combinations `r` to obtain :math:`k_{rf}`:
 
     .. math::
         k_{rf} = q_{rf} / (\sum_{r} q_{rf})
 
-    .. Note:: So, the model reports the proportion of cells of each type that belong to each combination 'cell_type_fractions'.
-      E.g. 81% of Astro_2 are found in fact_28. This way we are not biased by the absolute abundance of each cell type.
+    .. Note:: So, the model reports the proportion of cells of each type that belong to each combination
+      (parameter called 'cell_type_fractions').
+      For example, 81% of Astro_2 are found in fact_28. This way we are not biased by the absolute abundance of each cell type.
 
 
     :param n_fact: Maximum number of cell type (regulatory programmes) combinations

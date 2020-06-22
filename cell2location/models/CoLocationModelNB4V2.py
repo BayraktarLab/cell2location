@@ -17,6 +17,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved rate $\mu$ and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
+
     .. math::
         D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g)
 
