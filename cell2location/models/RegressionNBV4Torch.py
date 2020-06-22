@@ -1,6 +1,31 @@
 # -*- coding: utf-8 -*-
-"""RegressionNBV4Torch Negative binomial regression model with sample 
-    & gene-specific technology scaling in pytorch."""
+"""Negative binomial regression model with multiplicative sample scaling, gene-specific technology scaling
+and additive sample background in pytorch.
+
+To address the usage of challenging reference data composed of multiple batches :math:`e=\{1..E\}`
+and technologies :math:`t=\{1..T\}` the expression of each gene $g$ in each single cell reference
+cluster `f` (possibly other meaningful covariates) is inferred using a regularised Negative Binomial regression.
+
+The model accounts for the sequencing coverage :math:`h_e`, difference in expression level between
+technologies :math:`p_{tg}` and background expression :math:`b_{eg}` in each sample `e`.
+It models unexplained variance (overdispersion :math:`\alpha_g`) and count nature of the data using
+the Negative Binomial distribution:
+
+.. math::
+    J_{cg} \sim \mathtt{NB}(\mu_{cg}, 1 / \alpha_g^2)
+
+.. math::
+    \mu_{cg} = (g_{fg} + b_{eg}) \: {h_e} \: p_{tg}
+
+All model parameters are constrained to be positive to simplify interpretation.
+Weak L2 regularisation of :math:`g_{fg}` / :math:`b_{eg}` / :math:`\alpha_g` and penalty for large deviations of
+:math:`h_e` and :math:`p_{tg}` from 1 is used. :math:`g_{fg}` is initialised at analytical average for each `f`
+and :math:`b_{eg}` is initialised at average expression of each gene `g` in each sample `e` divided by a factor of 10,
+leading to fast convergence.
+
+Training can be performed using mini batches of cells (30sec-5min on GPU) or on full data.
+"""
+
 
 # +
 import numpy as np
