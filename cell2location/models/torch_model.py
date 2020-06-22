@@ -29,6 +29,9 @@ class TorchModel(BaseModel):
 
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
     :param use_cuda: boolean, telling pytorch to use the GPU (if true).
+    :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
+          supersedes self.n_iter
+    :param learning_rate: ADAM optimiser learning rate
     :param all other: the rest are arguments for parent class BaseModel
     """
 
@@ -131,7 +134,8 @@ class TorchModel(BaseModel):
             for now, only n=2 is implemented)
           * **'bootstrap'** for fitting the model to multiple downsampled datasets.
             Run `mod.bootstrap_data()` to generate bootstrapped variants of data.
-        :param n_iter: number of iterations, supersedes self.n_iter
+        :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
+          supersedes self.n_iter
         :param learning_rate: ADAM learning rate
         :param num_workers: number of processes to use when generating minibatch datasets (passed to torch.utils.data.DataLoader)
         :param train_proportion: if not None, which proportion of cells (rows) to use for training and which for validation.
