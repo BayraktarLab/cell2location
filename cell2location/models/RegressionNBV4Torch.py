@@ -164,14 +164,20 @@ class RegressionNBV4Torch(RegressionTorchModel):
 
     # =====================DATA likelihood loss function======================= #
     # define cost function 
-    def loss(self, param, data, l2_weight=None,
-             sample_scaling_weight=1, tech_scaling_weight=1,
-             gene_overdisp_weight=0.001):
-        r"""Method that returns loss (a single number)
+    def loss(self, param, data, l2_weight=None):
+        r"""Method that returns NB loss + L2 penalty on parameters (a single number)
 
-        :param param: list with [mu, theta]
-        :param data: data (cells * genes)
-        :param l2_weight: strength of L2 regularisation (on exported parameters), if None - no regularisation 
+        :param param: list with NB distribution parameters[mu, theta/alpha], see self.nb_log_prob for details
+        :param data: data (cells * genes), see self.nb_log_prob for details
+        :param l2_weight: strength of L2 regularisation for each parameter that needs distinct regularisation
+          (computed on exported parameters), if None - no regularisation :
+
+          * **l2_weight** - for all parameters but mainly for co-variate effects, this should be very weak to not
+            over-penalise good solution (Default: 0.001)
+          * **sample_scaling_weight** - strong penalty for deviation from 1 (Default: 0.5)
+          * **tech_scaling_weight** - strong penalty for deviation from 1 (Default: 1)
+          * **gene_overdisp_weight** - gene overdispersion penalty to provide containment prior
+            (Default: 0.001 but will be changed)
         """
 
         # initialise extra penalty on each parameter
@@ -179,24 +185,31 @@ class RegressionNBV4Torch(RegressionTorchModel):
 
         if l2_weight is not None:
 
+            # set default parameters
+            d_l2_weight = {'l2_weight': 0.001, 'sample_scaling_weight': 0.5,
+                           'tech_scaling_weight': 1, 'gene_overdisp_weight': 0.001}
+            # replace defaults with parameters supplied
+            for k in l2_weight.keys():
+                d_l2_weight[k] = l2_weight[k]
+
             param_dict = self.model.export_parameters()
             sample_scaling = param_dict['sample_scaling']
             tech_scaling = param_dict['tech_scaling']
-            gene_E = param_dict['gene_E']
+            gene_e = param_dict['gene_E']
 
             param_val = [param_dict[i] for i in param_dict.keys()
                          if i not in ['sample_scaling', 'tech_scaling', 'gene_E']]
 
             # regularise sample_scaling
-            l2_reg = l2_reg + sample_scaling_weight * (sample_scaling - 1).pow(2).sum()
+            l2_reg = l2_reg + l2_weight['sample_scaling_weight'] * (sample_scaling - 1).pow(2).sum()
             # regularise tech_scaling
-            l2_reg = l2_reg + tech_scaling_weight * (tech_scaling - 1).pow(2).sum()
+            l2_reg = l2_reg + l2_weight['tech_scaling_weight'] * (tech_scaling - 1).pow(2).sum()
             # regularise overdispersion
-            l2_reg = l2_reg + gene_overdisp_weight * gene_E.pow(2).sum()
+            l2_reg = l2_reg + l2_weight['gene_overdisp_weight'] * gene_e.pow(2).sum()
 
             # regularise other parameters
             for i in param_val:
-                l2_reg = l2_reg + l2_weight * i.pow(2).sum()
+                l2_reg = l2_reg + l2_weight['l2_weight'] * i.pow(2).sum()
 
         return -self.nb_log_prob(param, data).sum() + l2_reg
 
