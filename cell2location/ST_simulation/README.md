@@ -21,7 +21,7 @@ n_spots=100
 seed=$(ls labels_generation* | sed 's/.*_//' | sed 's/.p//')
 python cell2location/pycell2location/ST_simulation/assemble_design_2.py \
   labels_generation_${seed}.p counts_generation_${seed}.p \
-  --tot_spots $n_spots
+  --tot_spots $n_spots --mean_high 5 --mean_low 2
 ```
 
 3. Assemble cell type composition per spot
