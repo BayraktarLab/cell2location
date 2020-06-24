@@ -1,5 +1,5 @@
-import .ST_simulation
+from .ST_simulation import assemble_ct_composition
 
 __all__ = [
-    "ST_simulation",
+    "assemble_ct_composition",
 ]
