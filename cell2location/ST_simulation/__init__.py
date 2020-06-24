@@ -1,5 +1,5 @@
-from .ST_simulation import assemble_ct_composition
+import cell2location.ST_simulation.ST_simulation
 
 __all__ = [
-    "assemble_ct_composition",
+    "ST_simulation",
 ]
