@@ -5,9 +5,9 @@ import sys
 
 import numpy as np
 import pandas as pd
+import cell2location
 
-sys.path.insert(1, '/nfs/team238/ed6/cell2location')
-from ST_simulation import *
+from cell2location.ST_simulation import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('lbl_gen_file', type=str,
@@ -17,6 +17,14 @@ parser.add_argument('cnt_gen_file', type=str,
 parser.add_argument('--tot_spots', dest='tot_spots', type=int,
                     default=1000,
                     help='Total number of spots to simulate')
+
+parser.add_argument('--mean_high', dest='mean_high', type=int,
+                    default=15,
+                    help='Mean cell density for high-density cell types')
+parser.add_argument('--mean_low', dest='mean_low', type=int,
+                    default=5,
+                    help='Mean cell density for low-density cell types')
+
 parser.add_argument('--out_dir', dest='out_dir', type=str,
                     default='/nfs/team283/ed6/simulation/lowdens_synthetic_ST/',
                     help='Output directory')
@@ -29,6 +37,8 @@ args = parser.parse_args()
 lbl_gen_file = args.lbl_gen_file
 count_gen_file = args.cnt_gen_file
 tot_spots = args.tot_spots
+mean_high = args.mean_high
+mean_low = args.mean_low
 out_dir = args.out_dir
 assemble_id = args.assemble_id
 
@@ -66,9 +76,6 @@ design_df.loc[design_df.index[design_df.uniform == 1], 'nspots'] = unif_nspots
 design_df.loc[design_df.index[design_df.uniform == 0], 'nspots'] = reg_nspots
 
 ### Generate avg density per spot per cell type
-
-mean_high = 15
-mean_low = 5
 
 low_ncells_mean = np.round(np.random.normal(mean_low, 1, size=sum(design_df.density == 1)))
 high_ncells_mean = np.round(np.random.normal(mean_high, 1, size=sum(design_df.density == 0)))
