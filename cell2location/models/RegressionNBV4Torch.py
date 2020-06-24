@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Negative binomial regression model that accounts for multiplicative sample scaling, gene-specific technology scaling
+r"""Negative binomial regression model that accounts for multiplicative sample scaling, gene-specific technology scaling
 and additive sample background
 (MLE/MAP in pytorch).
 
@@ -39,23 +39,34 @@ from cell2location.models.regression_torch_model import RegressionTorchModel
 
 # defining the model itself
 class RegressionNBV4TorchModule(nn.Module):
-    r""" Module class that defines the model graph and parameters.
+    r"""Module class that defines the model graph and parameters.
     A module class should have the following methods:
-
+    
       * __init__ which defines parameters (real scale)
       * forward which uses input data and parameters to compute parameters of data-generating distribution
         (e.g. NB mean and alpha)
       * initialize_parameters which initialises parameters (real scale)
       * export_parameters which transforms parameters correct domain (e.g. positive)
 
-    :param n_cells: number of cells / spots / observations
-    :param n_genes: number of genes / variables
-    :param n_fact: number of factors / covariates / reference signatures (extracted from `cell_state_mat.shape[1]`)
-    :param n_tech: number of technologies
-    :param clust_average_mat: initial value of factors / covariates (if None, initialised as normal_(mean=0, std=1/2)
-    :param which_sample: boolean array, which covariates denote sample / experiment
-    :param data_type: np.dtype to use (Default 'float32')
-    :param eps: numerical stability constant
+    Parameters
+    ----------
+    n_cells :
+        number of cells / spots / observations
+    n_genes :
+        number of genes / variables
+    n_fact :
+        number of factors / covariates / reference signatures (extracted from `cell_state_mat.shape[1]`)
+    n_tech :
+        number of technologies
+    clust_average_mat :
+        initial value of factors / covariates (if None, initialised as normal_(mean=0, std=1/2)
+    which_sample :
+        boolean array, which covariates denote sample / experiment
+    data_type :
+        np.dtype to use (Default 'float32')
+    eps :
+        numerical stability constant
+
     """
 
     def __init__(self, n_cells, n_genes, n_fact, n_tech, clust_average_mat,
@@ -84,13 +95,22 @@ class RegressionNBV4TorchModule(nn.Module):
         self.gene_E_log = nn.Parameter(torch.Tensor(1, self.n_genes))
 
     def forward(self, cell2sample_covar, cell2tech):
-        r""" Computes NB distribution parameters using input covariates for each cell:
+        r"""Computes NB distribution parameters using input covariates for each cell:
         expected value of expression (mu_biol, cells (minibatch * genes) and overdispersion (gene_E).
 
-        :param cell2sample_covar: np.narray that gives sample membership (first X columns)
-          and covariate values (all other columns) for each cell / observation (rows) - could be done in in mini batches.
-        :param cell2tech: np.narray that gives technology membership (columns) for each cell / observation (rows)
-        :return: a list with [mu_biol, gene_E]
+        Parameters
+        ----------
+        cell2sample_covar :
+            np.narray that gives sample membership (first X columns)
+            and covariate values (all other columns) for each cell / observation (rows) - could be done in in mini batches.
+        cell2tech :
+            np.narray that gives technology membership (columns) for each cell / observation (rows)
+
+        Returns
+        -------
+        list :
+            a list with [mu_biol, gene_E]
+
         """
 
         # sample-specific scaling of expression levels
@@ -110,8 +130,9 @@ class RegressionNBV4TorchModule(nn.Module):
         return [self.mu_biol, self.gene_E]
 
     def initialize_parameters(self):
-        r""" Initialise parameters, using `clust_average_mat` for covariate and sample effects,
+        r"""Initialise parameters, using `clust_average_mat` for covariate and sample effects,
         random initialisation in a sensible range (see code) for all other parameters.
+
         """
 
         # initialise at average for each covariate
@@ -128,9 +149,15 @@ class RegressionNBV4TorchModule(nn.Module):
         self.gene_E_log.data.normal_(mean=-1 / 2, std=1 / 2)
 
     def export_parameters(self):
-        r""" Compute parameters from their real number representation.
+        r"""Compute parameters from their real number representation.
 
-        :return: a dictionary with parameters {'gene_factors', 'sample_scaling', 'tech_scaling', 'gene_E'}
+        Parameters
+        ----------
+
+        Returns
+        -------
+        dict :
+            a dictionary with parameters {'gene_factors', 'sample_scaling', 'tech_scaling', 'gene_E'}
         """
 
         export = {'gene_factors': torch.exp(self.gene_factors_log),
@@ -146,24 +173,20 @@ class RegressionNBV4Torch(RegressionTorchModel):
     r"""Negative binomial regression model that accounts for multiplicative sample scaling,
     gene-specific technology scaling and additive sample background (MLE/MAP in pytorch).
 
-    :param sample_id: str with column name in cell2covar that denotes sample
-    :param tech_id: pd.Series with technology annotation for each cell
-    :param cell2covar: pd.DataFrame with covariates in columns and cells in rows, rows should be named.
-    :param X_data: Numpy array of gene expression (cols) in cells (rows)
-    :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
-      supersedes self.n_iter
-    :param (data_type, learning_rate, total_grad_norm_constraint, verbose, var_names, var_names_read, obs_names, fact_names):
-      arguments for parent class :func:`~cell2location.models.BaseModel`
-    :param minibatch_size: if None all data is used for training,
-      if not None - the number of cells / observations per batch. For best results use 1024 cells per batch.
-    :param minibatch_seed: order of cells in minibatch is chose randomly, so a seed for each traning restart
-      should be provided
-    :param prior_eps: numerical stability constant added to initial values
-    :param nb_param_conversion_eps: NB distribution numerical stability constant, see :func:`~cell2location.models.TorchModel.nb_log_prob`
-    :param use_cuda: boolean, telling pytorch to use the GPU (if true).
-    :param use_average_as_initial_value: boolean, use average gene expression for each categorical covariate as initial value?
-    :param stratify_cv: when using cross-validation on cells (selected in the training method), this is a pd.Series that
-      tells :func:`~sklearn.model_selection.train_test_split` how to stratify when creating a split.
+    Parameters
+    ----------
+    sample_id :
+        str with column name in cell2covar that denotes sample
+    tech_id :
+        pd.Series with technology annotation for each cell
+    cell2covar :
+        pd.DataFrame with covariates in columns and cells in rows, rows should be named.
+    X_data :
+        Numpy array of gene expression (cols) in cells (rows)
+    n_iter :
+        number of iterations, when using minibatch, the number of epochs (passes through all data),
+        supersedes self.n_iter
+
     """
 
     def __init__(
@@ -220,17 +243,23 @@ class RegressionNBV4Torch(RegressionTorchModel):
     def loss(self, param, data, l2_weight=None):
         r"""Method that returns NB loss + L2 penalty on parameters (a single number)
 
-        :param param: list with NB distribution parameters[mu, theta/alpha], see self.nb_log_prob for details
-        :param data: data (cells * genes), see self.nb_log_prob for details
-        :param l2_weight: strength of L2 regularisation for each parameter that needs distinct regularisation
-          (computed on exported parameters), if None - no regularisation :
+        Parameters
+        ----------
+        param :
+            list with NB distribution parameters[mu, theta/alpha], see self.nb_log_prob for details
+        data :
+            data (cells * genes), see self.nb_log_prob for details
+        l2_weight :
+            strength of L2 regularisation for each parameter that needs distinct regularisation
+            (computed on exported parameters), if None - no regularisation :
+            
+            * **l2_weight** - for all parameters but mainly for co-variate effects, this should be very weak to not
+              over-penalise good solution (Default: 0.001)
+            * **sample_scaling_weight** - strong penalty for deviation from 1 (Default: 0.5)
+            * **tech_scaling_weight** - strong penalty for deviation from 1 (Default: 1)
+            * **gene_overdisp_weight** - gene overdispersion penalty to provide containment prior
+              (Default: 0.001 but will be changed)
 
-          * **l2_weight** - for all parameters but mainly for co-variate effects, this should be very weak to not
-            over-penalise good solution (Default: 0.001)
-          * **sample_scaling_weight** - strong penalty for deviation from 1 (Default: 0.5)
-          * **tech_scaling_weight** - strong penalty for deviation from 1 (Default: 1)
-          * **gene_overdisp_weight** - gene overdispersion penalty to provide containment prior
-            (Default: 0.001 but will be changed)
         """
 
         # initialise extra penalty on each parameter
@@ -269,8 +298,7 @@ class RegressionNBV4Torch(RegressionTorchModel):
     # =====================Other functions======================= #
 
     def compute_expected(self):
-        r""" Compute expected expression of each gene in each cell (Poisson mu).
-        """
+        r"""Compute expected expression of each gene in each cell (Poisson mu)."""
 
         # compute the poisson rate
         self.mu = np.dot(self.cell2sample_covar_mat,
@@ -281,8 +309,15 @@ class RegressionNBV4Torch(RegressionTorchModel):
     def compute_expected_fact(self, fact_ind,
                               sample_scaling=True):
         r"""Compute expected expression of each gene in each cell
-            that comes from a subset of factors (Poisson mu). E.g. expressed factors in self.fact_filt (by default)
-        :param sample_scaling: if False do not rescale levels to specific sample
+        that comes from a subset of factors (Poisson mu). E.g. expressed factors in self.fact_filt (by default)
+
+        Parameters
+        ----------
+        sample_scaling :
+            if False do not rescale levels to specific sample (Default value = True)
+        fact_ind :
+            #TODO
+
         """
 
         # compute the poisson rate
@@ -296,7 +331,17 @@ class RegressionNBV4Torch(RegressionTorchModel):
     def normalise_by_sample_scaling(self, remove_additive=True, remove_technology=True,
                                     remove_sample_scaling=True):
         r"""Normalise expression data by inferred sample scaling parameters, technology parameters
-            and remove additive sample background.
+        and remove additive sample background.
+
+        Parameters
+        ----------
+        remove_additive :
+             (Default value = True)
+        remove_technology :
+             (Default value = True)
+        remove_sample_scaling :
+             (Default value = True)
+
         """
 
         corrected = self.X_data.copy()
