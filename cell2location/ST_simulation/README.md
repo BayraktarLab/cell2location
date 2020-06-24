@@ -1,5 +1,7 @@
 ### Simulation of Visium spots from single-cell reference
 
+Note: This folder provides a collection of scripts we used to simulated data but the scripts need to be edited to be used on other platforms (contains hard-coded paths for our HPC).
+
 #### Contents
 
 - `ST_simulation.py` functions to simulate spots
