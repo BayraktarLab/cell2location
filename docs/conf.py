@@ -57,3 +57,7 @@ html_static_path = ['_static']
 
 
 master_doc = 'index'
+
+
+napoleon_use_param = False
+autodoc_member_order = 'bysource'

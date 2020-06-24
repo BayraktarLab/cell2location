@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 
 class MiniBatchDataset(Dataset):
+    r"""Dataset to use pytorch mini-batching"""
 
     def __init__(self, x_data, extra_data):
         self.x_data = x_data
@@ -23,16 +24,23 @@ class MiniBatchDataset(Dataset):
 
 
 class TorchModel(BaseModel):
-    r"""
-    This class provides functions to train PyMC3 models and sample their parameters.
+    r"""This class provides functions to train PyMC3 models and sample their parameters.
     A model must have a main X_data input and can have arbitrary self.extra_data inputs.
 
-    :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param use_cuda: boolean, telling pytorch to use the GPU (if true).
-    :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
-          supersedes self.n_iter
-    :param learning_rate: ADAM optimiser learning rate
-    :param all other: the rest are arguments for parent class BaseModel
+    Parameters
+    ----------
+    X_data :
+        Numpy array of gene expression (cols) in spatial locations (rows)
+    use_cuda :
+        boolean, telling pytorch to use the GPU (if true).
+    n_iter :
+        number of iterations, when using minibatch, the number of epochs (passes through all data),
+        supersedes self.n_iter
+    learning_rate :
+        ADAM optimiser learning rate
+    all other:
+        the rest are arguments for parent class BaseModel
+
     """
 
     def __init__(
@@ -91,18 +99,29 @@ class TorchModel(BaseModel):
 
     @staticmethod
     def nb_log_prob(param, data, eps=1e-8):
-        """ Method that returns log probability / log likelihood for each data point.
+        r"""Method that returns log probability / log likelihood for each data point.
         Negative Binomial (NB) log probability - Copied over from scVI
         https://github.com/YosefLab/scVI/blob/b20e34f02a87d16790dbacc95b2ae1714c08615c/scvi/models/log_likelihood.py#L249
-
+        
         Note: All inputs should be torch Tensors
 
-        :param param: list with [mu, theta]
-          * **mu**: mean of the negative binomial (has to be positive support) (shape: cells/minibatch x genes)
-          * **theta**: inverse dispersion parameter (has to be positive support) (shape: cells/minibatch x genes)
-        :param data: data (cells * genes)
-        :param eps: numerical stability constant
-        :return: Log probability at every point in the data
+        Parameters
+        ----------
+        param :
+            list with [mu, theta]
+
+            * **mu**: mean of the negative binomial (has to be positive support) (shape: cells/minibatch x genes)
+            * **theta**: inverse dispersion parameter (has to be positive support) (shape: cells/minibatch x genes)
+        data :
+            data (cells * genes)
+        eps :
+            numerical stability constant (Default value = 1e-8)
+
+        Returns
+        -------
+        tensor
+            Log probability at every point in the data
+
         """
         mu = param[0]
         theta = param[1]
@@ -124,25 +143,38 @@ class TorchModel(BaseModel):
                            n_iter=None, learning_rate=None,
                            num_workers=2, train_proportion=None,
                            l2_weight=None):
-        r""" Function is named for consistency but implements MLE and MAP training in pure pytorch rather than ADVI.
+        """Function is named for consistency but implements MLE and MAP training in pure pytorch rather than ADVI.
 
-        :param n: number of independent initialisations
-        :param n_type: type of repeated initialisation:
+        Parameters
+        ----------
+        n :
+            number of independent initialisations (Default value = 3)
+        n_type :
+            type of repeated initialisation:
+            
+            * **'restart'** to pick different initial value,
+            * **'cv'** for molecular cross-validation - splits counts into n datasets (training and validation,
+              for now, only n=2 is implemented)
+            * **'bootstrap'** for fitting the model to multiple downsampled datasets.
+              Run `mod.bootstrap_data()` to generate bootstrapped variants of data. (Default value = 'restart')
+        n_iter :
+            number of iterations, when using minibatch, the number of epochs (passes through all data),
+            supersedes self.n_iter (Default value = None)
+        learning_rate :
+            ADAM learning rate (Default value = None)
+        num_workers :
+            number of processes to use when generating minibatch datasets (passed to torch.utils.data.DataLoader) (Default value = 2)
+        train_proportion :
+            if not None, which proportion of cells (rows) to use for training and which for validation. (Default value = None)
+        l2_weight :
+            a dictionary with L2 penalisation weights for each parameter in the model (default: None),
+            see the `.loss()` method of individual models for details
 
-          * **'restart'** to pick different initial value,
-          * **'cv'** for molecular cross-validation - splits counts into n datasets (training and validation,
-            for now, only n=2 is implemented)
-          * **'bootstrap'** for fitting the model to multiple downsampled datasets.
-            Run `mod.bootstrap_data()` to generate bootstrapped variants of data.
-        :param n_iter: number of iterations, when using minibatch, the number of epochs (passes through all data),
-          supersedes self.n_iter
-        :param learning_rate: ADAM learning rate
-        :param num_workers: number of processes to use when generating minibatch datasets (passed to torch.utils.data.DataLoader)
-        :param train_proportion: if not None, which proportion of cells (rows) to use for training and which for validation.
-        :param l2_weight: a dictionary with L2 penalisation weights for each parameter in the model (default: None),
-          see the `.loss()` method of individual models for details
+        Returns
+        -------
+        dict
+            self.mean_field dictionary with MeanField pymc3 objects, and self.advi dictionary with ADVI objects.
 
-        :return: self.mean_field dictionary with MeanField pymc3 objects, and self.advi dictionary with ADVI objects.
         """
 
         self.n_type = n_type
@@ -277,16 +309,28 @@ class TorchModel(BaseModel):
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
                          mean_field_slot='init_1'):
-        r""" Extract point estimates from pure pytorch model - either all or single parameter
+        """Extract point estimates from pure pytorch model - either all or single parameter
         Named sample_posterior for consistency with Bayesian versions.
 
-        :param node: torch parameter to sample (e.g. default "all", self.spot_factors)
-        :param n_samples: Not used but retained to keep the same call signatures as Bayesian versions.
-        :param save_samples: Not used but retained to keep the same call signatures as Bayesian versions.
-        :param return_samples: return summarised samples in addition to saving them in `self.samples`
-        :param mean_field_slot: string, extract parameters from training restart (Default: 'init_1').
-          Named for consistency with Bayesian versions.
-        :return: dictionary (mean, the rest empty) of dictionaries with numpy arrays for each parameter.
+        Parameters
+        ----------
+        node :
+            torch parameter to sample (e.g. default "all", self.spot_factors)
+        n_samples :
+            Not used but retained to keep the same call signatures as Bayesian versions. (Default value = 1000)
+        save_samples :
+            Not used but retained to keep the same call signatures as Bayesian versions. (Default value = False)
+        return_samples :
+            return summarised samples in addition to saving them in `self.samples` (Default value = True)
+        mean_field_slot :
+            string, extract parameters from training restart (Default: 'init_1').
+            Named for consistency with Bayesian versions.
+
+        Returns
+        -------
+        dict
+            dictionary (mean, the rest empty) of dictionaries with numpy arrays for each parameter.
+
         """
 
         self.model.load_state_dict(self.mean_field[mean_field_slot])
@@ -311,14 +355,25 @@ class TorchModel(BaseModel):
             return self.samples
 
     def b_evaluate_stability(self, node_name, n_samples=1000, align=True, transpose=True):
-        r"""Evaluate stability of point estimates between training initialisations
-            (correlates the values of factors between training initialisations)
+        """Evaluate stability of point estimates between training initialisations
+        (correlates the values of factors between training initialisations)
 
-        :param node_name: name of the parameter to analyse?
-        :param n_samples: Not used but retained to keep the same call signatures as Bayesian versions.
-        :param align: boolean, whether to match factors between training restarts using linear_sum_assignment?
-        :param transpose: boolean, if needed transpose parameters to put Factors in columns.
-        :return: self.samples[node_name+_stab] dictionary with an element for each training initialisation.
+        Parameters
+        ----------
+        node_name :
+            name of the parameter to analyse?
+        n_samples :
+            Not used but retained to keep the same call signatures as Bayesian versions. (Default value = 1000)
+        align :
+            boolean, whether to match factors between training restarts using linear_sum_assignment? (Default value = True)
+        transpose :
+            boolean, if needed transpose parameters to put Factors in columns. (Default value = True)
+
+        Returns
+        -------
+        dict
+            self.samples[node_name+_stab] dictionary with an element for each training initialisation.
+
         """
 
         self.samples[node_name + '_stab'] = {}

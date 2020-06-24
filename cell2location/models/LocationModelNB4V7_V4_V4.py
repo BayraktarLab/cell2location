@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
+r"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
     it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
     across locations with similar cell composition, thus has reduced accuracy."""
 
@@ -13,21 +13,34 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class LocationModelNB4V7_V4_V4(Pymc3LocModel):
-    r"""
-    Provided here as a 'base' model for completeness.
+    r"""Provided here as a 'base' model for completeness.
 
-    :param cell_state_mat: Pandas data frame with gene programmes - genes in rows, cell types / factors in columns
-    :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param n_iter: number of training iterations
-    :param learning_rate, data_type, total_grad_norm_constraint ...: See parent class BaseModel for details.
+    Parameters
+    ----------
+    cell_state_mat :
+        Pandas data frame with gene programmes - genes in rows, cell types / factors in columns
+    X_data :
+        Numpy array of gene expression (cols) in spatial locations (rows)
+    n_iter :
+        number of training iterations
+    learning_rate, data_type, total_grad_norm_constraint, ...:
+        See parent class BaseModel for details.
+    gene_level_prior :
+        see the description for CoLocationModelNB4V2
+    gene_level_var_prior :
+        see the description for CoLocationModelNB4V2
+    cell_number_prior :
+        see the description for CoLocationModelNB4V2, this model does not have **combs_per_spot**
+        parameter.
+    cell_number_var_prior :
+        see the description for CoLocationModelNB4V2, this model does not have
+        **combs_mean_var_ratio** parameter.
+    phi_hyp_prior :
+        see the description for CoLocationModelNB4V2
 
-    :param gene_level_prior: see the description for CoLocationModelNB4V2
-    :param gene_level_var_prior: see the description for CoLocationModelNB4V2
-    :param cell_number_prior: see the description for CoLocationModelNB4V2, this model does not have **combs_per_spot**
-      parameter.
-    :param cell_number_var_prior: see the description for CoLocationModelNB4V2, this model does not have
-      **combs_mean_var_ratio** parameter.
-    :param phi_hyp_prior: see the description for CoLocationModelNB4V2
+    Returns
+    -------
+
     """
 
     def __init__(
@@ -149,10 +162,13 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
                                                  (self.spot_factors * (self.gene_factors * self.gene_level).sum(0)))
 
     def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
-        r"""
-        Plot the histogram of log10 of the sum across w_sf for each location
+        r"""Plot the histogram of log10 of the sum across w_sf for each location
 
-        :param fact_name: parameter of the model to use plot
+        Parameters
+        ----------
+        fact_name :
+            parameter of the model to use plot (Default value = 'nUMI_factors')
+
         """
 
         plt.hist(np.log10(self.samples['post_sample_means'][fact_name].sum(1)), bins=50)
@@ -161,9 +177,7 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_spot_add(self):
-        r"""
-        Plot the histogram of log10 of additive location background.
-        """
+        """Plot the histogram of log10 of additive location background."""
 
         plt.hist(np.log10(self.samples['post_sample_means']['spot_add'][:, 0]), bins=50)
         plt.xlabel('UMI unexplained by biological factors')
@@ -171,9 +185,7 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_E(self):
-        r"""
-        Plot the histogram of 1 / sqrt(overdispersion alpha)
-        """
+        """Plot the histogram of 1 / sqrt(overdispersion alpha)"""
 
         plt.hist((self.samples['post_sample_means']['gene_E'][:, 0]), bins=50)
         plt.xlabel('E_g overdispersion parameter')
@@ -181,9 +193,7 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_add(self):
-        r"""
-        Plot the histogram of additive gene background.
-        """
+        """Plot the histogram of additive gene background."""
 
         plt.hist((self.samples['post_sample_means']['gene_add'][:, 0]), bins=50)
         plt.xlabel('S_g additive background noise parameter')
@@ -191,9 +201,7 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
         plt.tight_layout()
 
     def plot_gene_level(self):
-        r"""
-        Plot the histogram of log10 of M_g change in sensitivity between technologies.
-        """
+        """Plot the histogram of log10 of M_g change in sensitivity between technologies."""
 
         plt.hist(np.log10(self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
         plt.xlabel('M_g expression level scaling parameter')
@@ -201,8 +209,9 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
         plt.tight_layout()
 
     def compute_expected(self):
-        r""" Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
-            the model learned expression pattern of all genes in the data.
+        r"""Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
+        the model learned expression pattern of all genes in the data.
+
         """
 
         # compute the poisson rate

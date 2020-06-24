@@ -1,14 +1,22 @@
-"""Class for rotating and cropping images."""
+r"""Class for rotating and cropping images."""
 import cv2 as cv
 import numpy as np
 
 
 # +
 def find_rectangle_corners(bottom_left, width):
-    r""" Find rectangle corners given positions of left side points and width of the plot.
+    r"""Find rectangle corners given positions of left side points and width of the plot.
 
-    :param bottom_left: array with x/y positions (columns) of top left and bottom left corners (in rows).
-    :param width: width of the rectangle.
+    Parameters
+    ----------
+    bottom_left :
+        array with x/y positions (columns) of top left and bottom left corners (in rows).
+    width :
+        width of the rectangle.
+
+    Returns
+    -------
+
     """
 
     # We identify the position of remaining corners of the rectangle using basic geometry
@@ -25,17 +33,22 @@ def find_rectangle_corners(bottom_left, width):
 
 class RotateCrop():
     def __init__(self, img, corners, rotate90=0, flip_axes=True):
+        r"""
+
+        Parameters
+        ----------
+        img :
+            Image to crop
+        corners :
+            Crop rectangle corners, 3 is enough
+        rotate90 : int
+            If you want to rotate cropped frame several times
+        flip_axes : bool
+            Try to switch it if cropped frame looks weird
+
+
         """
-        Args:
-            img:
-                Image to crop
-            corners:
-                Crop rectangle corners, 3 is enough
-            rotate90: int
-                If you want to rotate cropped frame several times
-            flip_axes: bool
-                Try to switch it if cropped frame looks weird
-        """
+
         self.img = img
         self.corners = np.array(corners).astype(np.float32)
         self.rotation_matrix = None
@@ -78,6 +91,19 @@ class RotateCrop():
         return cv.warpAffine(self.img, self.rotation_matrix, (self.width, self.height))
 
     def rotate_points(self, points, return_mask=False):
+        """
+
+        Parameters
+        ----------
+        points :
+            
+        return_mask :
+             (Default value = False)
+
+        Returns
+        -------
+
+        """
         if self.rotation_matrix is None:
             self.get_rotation_matrix()
 
