@@ -228,6 +228,7 @@ class BaseModel():
                 y = np.log10(y)
 
             plt.plot(y)
+            plt.tight_layout()
 
     def plot_validation_history(self, start_step=0, end_step=-1,
                                 mean_field_slot='init_1', log_y=True):
@@ -251,6 +252,7 @@ class BaseModel():
         plt.xlabel('Training epochs')
         plt.ylabel('Reconstruction accuracy (log10 NB + L2 loss)')
         plt.legend()
+        plt.tight_layout()
 
     def plot_posterior_vs_data(self, gene_fact_name='gene_factors',
                                cell_fact_name='cell_factors'):
