@@ -43,7 +43,7 @@ python ${c2l_dir}/pycell2location/ST_simulation/assemble_st_2.py \
 
 **To simulate > 100 spots:** Define design once then run steps 2 and 3 many times using wrapper 
 ```
-cell2location/pycell2location/ST_simulation/run_simulation2.sh $seed $n_spots $id
+cell2location/pycell2location/ST_simulation/run_simulation2.sh $seed $n_spots $id /nfs/team283/ed6/cell2location
 ```
 then merge in one object
 ```
