@@ -1,13 +1,7 @@
 ### Make ST datasets from single-cell data
 import argparse
 import pickle
-import sys
-
-import numpy as np
-import pandas as pd
-
-sys.path.insert(1, '/nfs/team238/ed6/cell2location')
-from ST_simulation import *
+from cell2location.ST_simulation.ST_simulation import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('lbl_gen_file', type=str,

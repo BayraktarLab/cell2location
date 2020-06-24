@@ -1,15 +1,9 @@
 ### Make ST datasets from single-cell data
 import argparse
 import pickle
-import random
-import sys
-
-import numpy as np
-import pandas as pd
 from sklearn.neighbors import KDTree
 
-sys.path.insert(1, '/home/jovyan/cellLocModel')
-from ST_simulation import *
+from cell2location.ST_simulation.ST_simulation import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('lbl_gen_file', type=str,
