@@ -230,6 +230,17 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     # evaluate predictive accuracy of the model
     mod.compute_expected()
 
+    # Predictive accuracy
+    try:
+        mod.plot_posterior_mu_vs_data()
+        save_plot(fig_path, filename='data_vs_posterior_mean',
+                  extension=export_args['plot_extension'])
+        if verbose:
+            plt.show()
+        plt.close()
+    except Exception as e:
+        print('Some error in plotting `mod.plot_posterior_mu_vs_data()`\n ' + str(e))
+
     ####### Export summarised posterior & Saving results #######
     if verbose:
         print('### Saving results ###')
@@ -281,17 +292,6 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     ####### Plotting #######
     if verbose:
         print('### Plotting results ###')
-
-    # Predictive accuracy
-    try:
-        mod.plot_posterior_mu_vs_data()
-        save_plot(fig_path, filename='data_vs_posterior_mean',
-                  extension=export_args['plot_extension'])
-        if verbose:
-            plt.show()
-        plt.close()
-    except Exception as e:
-        print('Some error in plotting `mod.plot_posterior_mu_vs_data()`\n ' + str(e))
 
     # Inferred sample_scaling
     try:
