@@ -27,7 +27,6 @@ The informative initialisation leads to fast convergence.
 Training can be performed using mini batches of cells (30sec-5min on GPU) or on full data.
 """
 
-
 # +
 import numpy as np
 import pandas as pd
@@ -222,7 +221,8 @@ class RegressionNBV4Torch(RegressionTorchModel):
                          use_average_as_initial_value, stratify_cv)
 
         if tech_id is None:
-            raise ValueError('Use RegressionNBV4Torch model when all samples were generated with the same technology (tech_id=None)')
+            raise ValueError(
+                'Use RegressionNBV4Torch model when all samples were generated with the same technology (tech_id=None)')
 
         # extract technology covariates
         self.tech_id = tech_id
@@ -274,8 +274,11 @@ class RegressionNBV4Torch(RegressionTorchModel):
             d_l2_weight = {'l2_weight': 0.001, 'sample_scaling_weight': 0.5,
                            'tech_scaling_weight': 1, 'gene_overdisp_weight': 0.001}
             # replace defaults with parameters supplied
-            for k in l2_weight.keys():
-                d_l2_weight[k] = l2_weight[k]
+            if l2_weight:  # if True use all defaults
+                l2_weight = d_l2_weight
+            else:
+                for k in l2_weight.keys():
+                    d_l2_weight[k] = l2_weight[k]
 
             param_dict = self.model.export_parameters()
             sample_scaling = param_dict['sample_scaling']
@@ -339,13 +342,15 @@ class RegressionNBV4Torch(RegressionTorchModel):
                                        self.samples['post_sample_means']['sample_scaling'])
 
     # check how well the model actually removed batch effect
-    def normalise_by_sample_scaling(self, remove_additive=True, remove_technology=True,
-                                    remove_sample_scaling=True):
+    def normalise(self, X_data, remove_additive=True, remove_technology=True,
+                  remove_sample_scaling=True):
         r"""Normalise expression data by inferred sample scaling parameters, technology parameters
         and remove additive sample background.
 
         Parameters
         ----------
+        X_data:
+             Data to normalise
         remove_additive :
              (Default value = True)
         remove_technology :
@@ -355,7 +360,7 @@ class RegressionNBV4Torch(RegressionTorchModel):
 
         """
 
-        corrected = self.X_data.copy()
+        corrected = X_data.copy()
         if remove_sample_scaling:
             corrected = corrected / np.dot(self.cell2sample_mat,
                                            self.samples['post_sample_means']['sample_scaling'])

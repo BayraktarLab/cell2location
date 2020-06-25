@@ -237,8 +237,11 @@ class RegressionNBV2Torch(RegressionTorchModel):
             d_l2_weight = {'l2_weight': 0.001, 'sample_scaling_weight': 0.5,
                            'gene_overdisp_weight': 0.001}
             # replace defaults with parameters supplied
-            for k in l2_weight.keys():
-                d_l2_weight[k] = l2_weight[k]
+            if l2_weight:  # if True use all defaults
+                l2_weight = d_l2_weight
+            else:
+                for k in l2_weight.keys():
+                    d_l2_weight[k] = l2_weight[k]
 
             param_dict = self.model.export_parameters()
             sample_scaling = param_dict['sample_scaling']
@@ -298,13 +301,15 @@ class RegressionNBV2Torch(RegressionTorchModel):
             self.mu = self.mu * np.dot(self.cell2sample_mat,
                                        self.samples['post_sample_means']['sample_scaling'])
 
-    def normalise_by_sample_scaling(self, remove_additive=True,
-                                    remove_sample_scaling=True):
+    def normalise(self, X_data, remove_additive=True,
+                  remove_sample_scaling=True):
         """Normalise expression data by inferred sample scaling parameters
         and remove additive sample background.
 
         Parameters
         ----------
+        X_data:
+             Data to normalise
         remove_additive :
              (Default value = True)
         remove_sample_scaling :
@@ -312,7 +317,7 @@ class RegressionNBV2Torch(RegressionTorchModel):
 
         """
 
-        corrected = self.X_data.copy()
+        corrected = X_data.copy()
         if remove_sample_scaling:
             corrected = corrected / np.dot(self.cell2sample_mat,
                                            self.samples['post_sample_means']['sample_scaling'])

@@ -57,7 +57,9 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                     'use_average_as_initial_value': True, 'use_cuda': True,
                     'train_proportion': 0.9,
                     'l2_weight': True,  # uses defaults for the model
-                    'sample_prior': False, 'readable_var_name_col': None}
+                    'sample_prior': False, 'readable_var_name_col': None,
+                    'use_raw': True,
+                    'mode': 'normal', 'n_type': 'restart', 'n_restarts': 2}
 
     d_posterior_args = {'n_samples': 1000,
                         'evaluate_stability_align': False, 'evaluate_stability_transpose': True,
@@ -103,17 +105,17 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     model_kwargs['sample_id'] = train_args['sample_name_col']
 
     if train_args['readable_var_name_col'] is not None:
-        model_kwargs['var_names_read'] = sc_data.var[train_args['readable_var_name_col']]
+        model_kwargs['var_names_read'] = sc_data.obs[train_args['readable_var_name_col']]
     else:
         model_kwargs['var_names_read'] = None
 
-    if train_args['tech_id'] is not None:
-        model_kwargs['tech_id'] = sc_data.var[train_args['tech_id']]
+    if train_args['tech_name_col'] is not None:
+        model_kwargs['tech_id'] = sc_data.obs[train_args['tech_name_col']]
     else:
         model_kwargs['tech_id'] = None
 
     if train_args['stratify_cv'] is not None:
-        model_kwargs['stratify_cv'] = sc_data.var[train_args['stratify_cv']]
+        model_kwargs['stratify_cv'] = sc_data.obs[train_args['stratify_cv']]
     else:
         model_kwargs['stratify_cv'] = None
 
@@ -177,7 +179,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2')
 
     plt.subplot(1, 3, 3)
-    mod.plot_validation_history(0, 30, mean_field_slot='init_1')
+    mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1')
     plt.tight_layout()
     save_plot(fig_path, filename='training_and_cv_history',
               extension=export_args['plot_extension'])
@@ -187,10 +189,10 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     ####### Use cross-validation to select the last epoch before validation loss increased (derivative > 0)
     new_n_epochs = []
-    for tr in mod.validation_hist:
+    for tr in mod.validation_hist.values():
         deriv = np.gradient(tr, 1)
         new_n_epochs.append(np.max(np.arange(deriv.shape[0])[(deriv < 0)]))
-    new_n_epochs = np.min(new_n_epochs)
+    new_n_epochs = np.min(new_n_epochs) + 1
 
     ####### Repeat training up until that iteration
     mod.fit_advi_iterative(n_iter=int(new_n_epochs), learning_rate=train_args['learning_rate'],
@@ -248,17 +250,20 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     # add posterior of all parameters to `sc_data.uns['regression_mod']`
     mod.fact_filt = None
     sc_data = mod.export2adata(sc_data, slot_name='regression_mod')
-    sc_data.uns['mod']['fact_names'] = list(sc_data.uns['mod']['fact_names'])
-    sc_data.uns['mod']['var_names'] = list(sc_data.uns['mod']['var_names'])
-    sc_data.uns['mod']['obs_names'] = list(sc_data.uns['mod']['obs_names'])
+    sc_data.uns['regression_mod']['fact_names'] = list(sc_data.uns['regression_mod']['fact_names'])
+    sc_data.uns['regression_mod']['var_names'] = list(sc_data.uns['regression_mod']['var_names'])
+    sc_data.uns['regression_mod']['obs_names'] = list(sc_data.uns['regression_mod']['obs_names'])
 
     # save anndata with exported posterior
-    sc_data.write(filename=path + 'sp.h5ad', compression='gzip')
+    sc_data.write(filename=path + 'sc.h5ad', compression='gzip')
 
     # save model object and related annotations
     if export_args['save_model']:
         # save the model and other objects
-        res_dict = {'mod': mod, 'sc_data': sc_data,
+        mod.X_data = None
+        mod.x_data = None
+        mod.mu = None
+        res_dict = {'mod': mod,
                     'model_name': model_name,
                     'train_args': train_args, 'posterior_args': posterior_args,
                     'export_args': export_args, 'run_name': run_name,
@@ -275,7 +280,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     ####### Plotting #######
     if verbose:
-        print('### Ploting results ###')
+        print('### Plotting results ###')
 
     # Predictive accuracy
     try:
@@ -335,7 +340,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         print('### Done ### - time ' + res_dict['run_time'])
 
     if return_all:
-        return res_dict
+        return res_dict, sc_data
     else:
         del res_dict
         del mod
