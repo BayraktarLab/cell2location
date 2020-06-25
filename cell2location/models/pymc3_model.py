@@ -131,7 +131,7 @@ class Pymc3Model(BaseModel):
 
                 # plot training history
                 if self.verbose:
-                    print(plt.plot(np.log10(self.mean_field[name].hist[15000:])));
+                    plt.plot(np.log10(self.mean_field[name].hist[15000:]))
 
     def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
                            n_iter=None,

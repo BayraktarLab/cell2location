@@ -260,6 +260,14 @@ class RegressionNBV2Torch(RegressionTorchModel):
 
     # =====================Other functions======================= #
 
+    def evaluate_stability(self, n_samples=1000, align=True, transpose=True):
+        r"""Evaluate stability of point estimates between training initialisations
+        (correlates the values of factors between training initialisations)
+        See TorchModel.b_evaluate_stability for argument details (node_name='gene_factors' here).
+        """
+        self.b_evaluate_stability('gene_factors', n_samples=n_samples,
+                                  align=align, transpose=transpose)
+
     def compute_expected(self):
         """Compute expected expression of each gene in each cell (Poisson mu)."""
 
@@ -279,6 +287,7 @@ class RegressionNBV2Torch(RegressionTorchModel):
         sample_scaling :
             if False do not rescale levels to specific sample (Default value = True)
         fact_ind :
+            boolean or integer array selecting covariates for reconstruction (to include all use .compute_expected())
 
         """
 

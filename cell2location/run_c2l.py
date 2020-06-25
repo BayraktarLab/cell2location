@@ -24,7 +24,7 @@ def save_plot(path, filename, extension='png'):
 
     plt.savefig(path + filename + '.' + extension)
     # fig.clear()
-    plt.close()
+    # plt.close()
 
 
 def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
@@ -436,7 +436,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     # Predictive accuracy 
     try:
         mod.plot_posterior_mu_vs_data()
-        save_plot(fig_path, filename='data_vs_posterior_mean_Poisson_rate',
+        save_plot(fig_path, filename='data_vs_posterior_mean',
                   extension=export_args['plot_extension'])
         plt.close()
     except Exception as e:
