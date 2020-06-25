@@ -360,7 +360,8 @@ class RegressionNBV4Torch(RegressionTorchModel):
 
         """
 
-        corrected = X_data.copy()
+        corrected = X_data.toarray().copy()
+
         if remove_sample_scaling:
             corrected = corrected / np.dot(self.cell2sample_mat,
                                            self.samples['post_sample_means']['sample_scaling'])
