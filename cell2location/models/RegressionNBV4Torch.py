@@ -221,6 +221,9 @@ class RegressionNBV4Torch(RegressionTorchModel):
                          nb_param_conversion_eps, use_cuda,
                          use_average_as_initial_value, stratify_cv)
 
+        if tech_id is None:
+            raise ValueError('Use RegressionNBV4Torch model when all samples were generated with the same technology (tech_id=None)')
+
         # extract technology covariates
         self.tech_id = tech_id
         self.cell2tech_df = pd.get_dummies(tech_id)
@@ -297,6 +300,14 @@ class RegressionNBV4Torch(RegressionTorchModel):
 
     # =====================Other functions======================= #
 
+    def evaluate_stability(self, n_samples=1000, align=True, transpose=True):
+        r"""Evaluate stability of point estimates between training initialisations
+        (correlates the values of factors between training initialisations)
+        See TorchModel.b_evaluate_stability for argument details (node_name='gene_factors' here).
+        """
+        self.b_evaluate_stability('gene_factors', n_samples=n_samples,
+                                  align=align, transpose=transpose)
+
     def compute_expected(self):
         r"""Compute expected expression of each gene in each cell (Poisson mu)."""
 
@@ -316,7 +327,7 @@ class RegressionNBV4Torch(RegressionTorchModel):
         sample_scaling :
             if False do not rescale levels to specific sample (Default value = True)
         fact_ind :
-            #TODO
+            boolean or integer array selecting covariates for reconstruction (to include all use .compute_expected())
 
         """
 

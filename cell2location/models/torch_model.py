@@ -304,7 +304,7 @@ class TorchModel(BaseModel):
             self.mean_field[name] = self.model.state_dict()
 
             if self.verbose:
-                print(plt.plot(np.log10(self.hist[name][0:])))
+                plt.plot(np.log10(self.hist[name][0:]))
 
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
