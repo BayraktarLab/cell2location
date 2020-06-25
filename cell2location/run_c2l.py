@@ -318,6 +318,8 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
         # plot & save plot
         mod.plot_prior_vs_data()
+
+        plt.tight_layout()
         save_plot(fig_path, filename='evaluating_prior', extension=export_args['plot_extension'])
         plt.close()
 
@@ -347,6 +349,8 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     if train_args['n_restarts'] > 1:
         mod.evaluate_stability(n_samples=posterior_args['n_samples'],
                                align=posterior_args['evaluate_stability_align'])
+
+        plt.tight_layout()
         save_plot(fig_path, filename='evaluate_stability', extension=export_args['plot_extension'])
         plt.close()
 
@@ -419,16 +423,20 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
     # Show training history #
     if verbose:
-        print(mod.plot_history(0))
+        mod.plot_history(0)
     else:
         mod.plot_history(0)
+
+    plt.tight_layout()
     save_plot(fig_path, filename='training_history_all', extension=export_args['plot_extension'])
     plt.close()
 
     if verbose:
-        print(mod.plot_history(int(np.ceil(train_args['n_iter'] * 0.2))))
+        mod.plot_history(int(np.ceil(train_args['n_iter'] * 0.2)))
     else:
         mod.plot_history(int(np.ceil(train_args['n_iter'] * 0.2)))
+
+    plt.tight_layout()
     save_plot(fig_path, filename='training_history_without_first_20perc',
               extension=export_args['plot_extension'])
     plt.close()
@@ -436,15 +444,16 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     # Predictive accuracy 
     try:
         mod.plot_posterior_mu_vs_data()
+        plt.tight_layout()
         save_plot(fig_path, filename='data_vs_posterior_mean',
                   extension=export_args['plot_extension'])
         plt.close()
     except Exception as e:
         print('Some error in plotting `mod.plot_posterior_mu_vs_data()`\n ' + str(e))
 
-    ####### Ploting posterior of W / cell locations #######
+    ####### Plotting posterior of W / cell locations #######
     if verbose:
-        print('### Ploting posterior of W / cell locations ###')
+        print('### Plotting posterior of W / cell locations ###')
 
     data_samples = sp_data.obs[train_args['sample_name_col']].unique()
     cluster_plot_names = pd.Series([i[17:] for i in mod.spot_factors_df.columns])
