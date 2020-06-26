@@ -111,8 +111,6 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     if train_args['tech_name_col'] is not None:
         model_kwargs['tech_id'] = sc_data.obs[train_args['tech_name_col']]
-    else:
-        model_kwargs['tech_id'] = None
 
     if train_args['stratify_cv'] is not None:
         model_kwargs['stratify_cv'] = sc_data.obs[train_args['stratify_cv']]
@@ -157,7 +155,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     ####### Training model #######
     if verbose:
-        print('### Training model ###')
+        print('### Training model to determine n_epochs with CV ###')
     if train_args['mode'] == 'normal':
         mod.fit_advi_iterative(n_iter=train_args['n_epochs'], learning_rate=train_args['learning_rate'],
                                train_proportion=train_args['train_proportion'],
@@ -195,6 +193,8 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     new_n_epochs = np.min(new_n_epochs) + 1
 
     ####### Repeat training up until that iteration
+    if verbose:
+        print('### Re-training model to stop before overfitting ###')
     mod.fit_advi_iterative(n_iter=int(new_n_epochs), learning_rate=train_args['learning_rate'],
                            train_proportion=train_args['train_proportion'],
                            n_type=train_args['n_type'],
