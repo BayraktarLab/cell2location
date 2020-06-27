@@ -231,9 +231,14 @@ class BaseModel():
             plt.tight_layout()
 
     def plot_validation_history(self, start_step=0, end_step=-1,
-                                mean_field_slot='init_1', log_y=True):
+                                mean_field_slot='init_1', log_y=True, ax=None):
         r""" Plot model loss (NB likelihood + penalty) using the model on training and validation data
         """
+
+        if ax is None:
+            ax = plt
+            ax.set_xlabel = plt.xlabel
+            ax.set_xlabel = plt.ylabel
 
         if end_step == -1:
             end_step = np.array(self.training_hist[mean_field_slot]).flatten().shape[0]
@@ -241,17 +246,15 @@ class BaseModel():
         y = np.array(self.training_hist[mean_field_slot]).flatten()[start_step:end_step]
         if log_y:
             y = np.log10(y)
-        plt.plot(np.arange(start_step, end_step), y,
-                 label='model on training data')
+        ax.plot(np.arange(start_step, end_step), y, label='train')
 
         y = np.array(self.validation_hist[mean_field_slot]).flatten()[start_step:end_step]
         if log_y:
             y = np.log10(y)
-        plt.plot(np.arange(start_step, end_step), y,
-                 label='model on cross-validation data')
-        plt.xlabel('Training epochs')
-        plt.ylabel('Reconstruction accuracy (log10 NB + L2 loss)')
-        plt.legend()
+        ax.plot(np.arange(start_step, end_step), y, label='validation')
+        ax.set_xlabel('Training epochs')
+        ax.set_ylabel('Reconstruction accuracy (log10 NB + L2 loss)')
+        ax.legend()
         plt.tight_layout()
 
     def plot_posterior_vs_data(self, gene_fact_name='gene_factors',
@@ -316,7 +319,7 @@ class BaseModel():
 
         rows = []
         index = []
-        columns = [f'top-{i+1}' for i in range(top_n)]
+        columns = [f'top-{i + 1}' for i in range(top_n)]
 
         for clmn_ in gene_loadings.columns:
             loading_ = gene_loadings[clmn_].sort_values(ascending=False)
@@ -325,7 +328,6 @@ class BaseModel():
             rows.append(row)
 
         return pd.DataFrame(rows, index=index, columns=columns)
-
 
     def plot_gene_loadings(self, sel_var_names, var_names,
                            gene_fact_name='gene_factors',
