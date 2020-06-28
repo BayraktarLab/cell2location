@@ -238,7 +238,7 @@ class BaseModel():
         if ax is None:
             ax = plt
             ax.set_xlabel = plt.xlabel
-            ax.set_xlabel = plt.ylabel
+            ax.set_ylabel = plt.ylabel
 
         if end_step == -1:
             end_step = np.array(self.training_hist[mean_field_slot]).flatten().shape[0]
