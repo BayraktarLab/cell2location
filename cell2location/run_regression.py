@@ -130,6 +130,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                 minibatch_size=train_args['minibatch_size'], minibatch_seed=train_args['minibatch_seed'],
                 use_cuda=train_args['use_cuda'],
                 use_average_as_initial_value=train_args['use_average_as_initial_value'],
+                verbose=False,
                 **model_kwargs)
 
     ####### Print run name #######
@@ -170,12 +171,14 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     fig, axs = plt.subplots(1, 3, sharey=True, figsize=(12, 5))
 
     mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_1', ax=axs[0])
-    axs[0].legend([])
+    axs[0].get_legend().remove()
 
     mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2', ax=axs[1])
-    axs[1].legend([])
+    axs[1].get_legend().remove()
+    axs[1].set_ylabel(None)
 
     mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1', ax=axs[2])
+    axs[2].set_ylabel(None)
 
     plt.tight_layout()
     save_plot(fig_path, filename='training_and_cv_history',
