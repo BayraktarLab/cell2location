@@ -142,7 +142,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     # create the export directory
     path = export_args['path'] + run_name + '/'
     if not os.path.exists(path):
-        mkdir(path)
+        os.makedirs(os.path.abspath(path))
 
     fig_path = path + 'plots/'
     if not os.path.exists(fig_path):
