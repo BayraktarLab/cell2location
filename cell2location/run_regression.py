@@ -10,7 +10,6 @@ import time
 from os import mkdir
 
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
 import numpy as np
 import pandas as pd
 
@@ -29,12 +28,12 @@ def save_plot(path, filename, extension='png'):
 def run_regression(sc_data, model_name='RegressionNBV4Torch',
                    verbose=True, return_all=True,
                    train_args={'covariate_col_names': [None], 'sample_name_col': None,
-                    'tech_name_col': None, 'stratify_cv': None,
-                    'n_epochs': 100, 'minibatch_size': 1024, 'learning_rate': 0.01,
-                    'use_average_as_initial_value': True, 'use_cuda': True,
-                    'train_proportion': 0.9,
-                    'l2_weight': True,  # uses defaults for the model
-                    'readable_var_name_col': None},
+                               'tech_name_col': None, 'stratify_cv': None,
+                               'n_epochs': 100, 'minibatch_size': 1024, 'learning_rate': 0.01,
+                               'use_average_as_initial_value': True, 'use_cuda': True,
+                               'train_proportion': 0.9,
+                               'l2_weight': True,  # uses defaults for the model
+                               'readable_var_name_col': None},
                    model_kwargs={},
                    posterior_args={},
                    export_args={'path': "./results", 'save_model': True,
@@ -168,16 +167,16 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
 
     ####### Evaluate cross-validation
-    rcParams['figure.figsize'] = 15, 5
-    rcParams["axes.facecolor"] = "white"
-    plt.subplot(1, 3, 1)
-    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_1')
+    fig, axs = plt.subplots(1, 3, sharey=True, figsize=(12, 5))
 
-    plt.subplot(1, 3, 2)
-    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2')
+    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_1', ax=axs[0])
+    axs[0].legend([])
 
-    plt.subplot(1, 3, 3)
-    mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1')
+    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2', ax=axs[1])
+    axs[1].legend([])
+
+    mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1', ax=axs[2])
+
     plt.tight_layout()
     save_plot(fig_path, filename='training_and_cv_history',
               extension=export_args['plot_extension'])
@@ -200,7 +199,8 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                            n_type=train_args['n_type'],
                            n=train_args['n_restarts'], l2_weight=train_args['l2_weight'])
     # save the training and validation loss history
-    rcParams['figure.figsize'] = 5, 5
+
+    plt.figure(figsize=(5, 5))
     mod.plot_validation_history(0)
     plt.tight_layout()
     save_plot(fig_path, filename='re_training_and_cv_history',
@@ -308,7 +308,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                                   for i in mean_total_count.index]
         mean_total_count = mean_total_count[mod.sample_effects.columns]
 
-        rcParams['figure.figsize'] = 5, 5
+        plt.figure(figsize=(5, 5))
         plt.scatter(np.array(mean_total_count),
                     mod.samples['post_sample_means']['sample_scaling'].flatten())
         plt.xlabel('Mean total mRNA count per cell')
@@ -346,3 +346,5 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         del mod
         gc.collect()
         return str((time.time() - start) / 60) + ' min'
+
+
