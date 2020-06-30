@@ -11,6 +11,10 @@ def get_rgb_function(cmap, min_value, max_value):
     r""" Generate a function to map continous values to RGB values using colormap between min_value & max_value.
     """
 
+    if min_value >= max_value:
+        raise ValueError('Max_value should be greater than min_value. If you are using plot_contours '
+                         'function try increasing max_color_quantile parameter.')
+
     def func(x):
         return cmap((np.clip(x, min_value, max_value) - min_value) / (max_value - min_value))
 
@@ -20,7 +24,7 @@ def get_rgb_function(cmap, min_value, max_value):
 def plot_contours(spot_factors_df, coords, text=None,
                   circle_diameter=4, alpha_scaling=0.6,
                   col_breaks=[0.1, 100, 1000, 3000],
-                  max_col=[5000, 5000, 5000, 5000, 5000, 5000, 5000],
+                  max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
                   max_color_quantile=0.95,
                   show_img=True, img=None, img_alpha=1,
                   plot_contour=False,
@@ -28,7 +32,7 @@ def plot_contours(spot_factors_df, coords, text=None,
                   save_facecolor='black',
                   show_fig=True, lim=None,
                   fontsize=12, adjust_text=False,
-                  plt_axis='off', axis_y_flipped=True, x_y_labels=['', ''],
+                  plt_axis='off', axis_y_flipped=True, x_y_labels=('', ''),
                   crop_x=None, crop_y=None, text_box_alpha=0.9,
                   reorder_cmap=range(7), overwrite_color=None):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation. 
@@ -109,10 +113,10 @@ def plot_contours(spot_factors_df, coords, text=None,
     weights = spot_factors_df.values.copy()
 
     # plot tissue image
+    # plot tissue image
     if img is not None and show_img:
         plt.imshow(img, aspect='equal', alpha=img_alpha)
-        img_lim_0 = int(img.shape[1])
-        img_lim_1 = int(img.shape[0])
+        img_lim_0, img_lim_1 = img.shape[:2]
 
     elif show_img:
         if len(coords.shape) == 3:
@@ -142,19 +146,11 @@ def plot_contours(spot_factors_df, coords, text=None,
                                                                     dtype=int))
 
     for c in c_ord:
-        rgb_function = get_rgb_function(cmaps[c],
-                                        weights[:, c].min(),
-                                        np.min([np.quantile(weights[:, c], max_color_quantile), max_col[c]]))
 
-        # for idx in range(coords_s.shape[0]):
-        #    
-        #    dots = [Circle((coords_s[idx, 0], coords_s[idx, 1]), circle_diameter)] # dot coordinates
-        #    color = rgb_function(weights[idx, c])
-        #    coll = PatchCollection(dots, facecolor=color, # dot color
-        #                           alpha=color[3] * 0.5,
-        #                           edgecolor=None)
-        #    
-        #    fig.axes[0].add_collection(coll)
+        rgb_function = get_rgb_function(cmap=cmaps[c],
+                                        min_value=weights[:, c].min(),
+                                        max_value=np.min([np.quantile(weights[:, c], max_color_quantile), max_col[c]]))
+
         if len(coords.shape) == 3:
             coords_s = coords[c, :, :]
         else:
@@ -168,25 +164,17 @@ def plot_contours(spot_factors_df, coords, text=None,
         color[:, 3] = color[:, 3] * alpha_scaling[c]
 
         plt.scatter(x=coords_s[:, 0], y=coords_s[:, 1],
-                    c=color, s=circle_diameter ** 2
-                    # cmap=cmaps[c],
-                    # alpha=0.1
-                    )
+                    c=color, s=circle_diameter ** 2)
 
     # plot_contours
     if plot_contour:
-        for c in range(weights.shape[1]):
-            # TO DO: first, compute a 2d histogram, next plot contours
-            raise ValueError('plotting contours is not implemented yet (useful for showing density in scRNA-seq)')
-            CS1 = plt.contour(coords_s, weights[:, c], col_breaks, vmin=0, vmax=100, cmap=cmaps[c],
-                              alpha=1, linestyles='dashed', linewidths=2)
-            plt.clabel(CS1, inline=1, fontsize=15, fmt='%1.0f')
+        # TODO: first, compute a 2d histogram, next plot contours
+        raise ValueError('plotting contours is not implemented yet (useful for showing density in scRNA-seq)')
 
     # add text
     if text is not None:
         bbox_props = dict(boxstyle="round", ec="0.5",
-                          alpha=text_box_alpha, fc="w",  # facecolor=PurpleCM(1)
-                          )
+                          alpha=text_box_alpha, fc="w")
         texts = []
         for x, y, s in zip(np.array(text.iloc[:, 0].values).flatten(),
                            np.array(text.iloc[:, 1].values).flatten(),
