@@ -103,8 +103,7 @@ def plot_contours(spot_factors_df, coords, text=None,
     # modify shape of alpha scaling
     alpha_scaling = alpha_scaling * np.ones_like(max_col)
 
-    from matplotlib import rcParams
-    fig = plt.figure(figsize=rcParams["figure.figsize"])
+    fig = plt.figure()
 
     # pick spot weights from just one sample
     weights = spot_factors_df.values.copy()
