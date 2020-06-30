@@ -63,65 +63,40 @@ def plot_contours(spot_factors_df, coords, text=None,
     if spot_factors_df.shape[1] > 7:
         raise ValueError('Maximum of 7 cell types / factors can be plotted at the moment')
 
-    alphas = np.concatenate((np.abs(np.linspace(0, 0, 256 - 200)), np.abs(np.linspace(0, 1.0, 256 - 56))))
-    N = 256
+    def create_colormap(R, G, B):
+        N = 255
+        alphas = np.concatenate([np.zeros(55),
+                                 np.linspace(0, 1.0, 255 - 55)])
+
+        vals = np.ones((N, 4))
+        vals[:, 0] = np.linspace(0, R / 255, N)
+        vals[:, 1] = np.linspace(0, G / 255, N)
+        vals[:, 2] = np.linspace(0, B / 255, N)
+        vals[:, 3] = alphas
+
+        return ListedColormap(vals)
 
     # Create linearly scaled colormaps
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 240 / 256, N)
-    vals[:, 1] = np.linspace(1, 228 / 256, N)
-    vals[:, 2] = np.linspace(1, 66 / 256, N)
-    vals[:, 3] = alphas
-    YellowCM = ListedColormap(vals)
-
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 213 / 256, N)
-    vals[:, 1] = np.linspace(1, 94 / 256, N)
-    vals[:, 2] = np.linspace(1, 0 / 256, N)
-    vals[:, 3] = alphas
-    RedCM = ListedColormap(vals)
-
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 86 / 256, N)
-    vals[:, 1] = np.linspace(1, 180 / 256, N)
-    vals[:, 2] = np.linspace(1, 233 / 256, N)
-    vals[:, 3] = alphas
-    BlueCM = ListedColormap(vals)
-
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 0 / 256, N)
-    vals[:, 1] = np.linspace(1, 158 / 256, N)
-    vals[:, 2] = np.linspace(1, 115 / 256, N)
-    vals[:, 3] = alphas
-    GreenCM = ListedColormap(vals)
-
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 200 / 256, N)
-    vals[:, 1] = np.linspace(1, 200 / 256, N)
-    vals[:, 2] = np.linspace(1, 200 / 256, N)
-    vals[:, 3] = alphas
-    GreyCM = ListedColormap(vals)
-
-    vals = np.ones((N, 4))
-    vals[:, 0] = np.linspace(1, 50 / 256, N)
-    vals[:, 1] = np.linspace(1, 50 / 256, N)
-    vals[:, 2] = np.linspace(1, 50 / 256, N)
-    vals[:, 3] = alphas
-    WhiteCM = ListedColormap(vals)
+    YellowCM = create_colormap(240, 228, 66)
+    RedCM = create_colormap(213, 94, 0)
+    BlueCM = create_colormap(86, 180, 233)
+    GreenCM = create_colormap(0, 158, 115)
+    GreyCM = create_colormap(200, 200, 200)
+    WhiteCM = create_colormap(50, 50, 50)
 
     PurpleCM = plt.cm.get_cmap('Purples')
     PurpleCM._init()
-    alphas = np.concatenate((np.abs(np.linspace(0, 0, 259 - 200)), np.abs(np.linspace(0, 1.0, 259 - 59))))
+    alphas = np.concatenate([np.zeros(59),
+                             np.linspace(0, 1.0, 259 - 59)])
     PurpleCM._lut[:, -1] = alphas
 
-    cmaps = []
-    cmaps = cmaps + [YellowCM]
-    cmaps = cmaps + [RedCM]
-    cmaps = cmaps + [BlueCM]
-    cmaps = cmaps + [GreenCM]
-    cmaps = cmaps + [PurpleCM]
-    cmaps = cmaps + [GreyCM]
-    cmaps = cmaps + [WhiteCM]
+    cmaps = [YellowCM,
+             RedCM,
+             BlueCM,
+             GreenCM,
+             PurpleCM,
+             GreyCM,
+             WhiteCM]
 
     cmaps = [cmaps[i] for i in reorder_cmap]
 
