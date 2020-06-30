@@ -147,9 +147,13 @@ def plot_contours(spot_factors_df, coords, text=None,
 
     for c in c_ord:
 
+        min_color_intensity = weights[:, c].min()
+        max_color_intensity = np.min([np.quantile(weights[:, c], max_color_quantile),
+                                      max_col[c]])
+
         rgb_function = get_rgb_function(cmap=cmaps[c],
-                                        min_value=weights[:, c].min(),
-                                        max_value=np.min([np.quantile(weights[:, c], max_color_quantile), max_col[c]]))
+                                        min_value=min_color_intensity,
+                                        max_value=max_color_intensity)
 
         if len(coords.shape) == 3:
             coords_s = coords[c, :, :]
