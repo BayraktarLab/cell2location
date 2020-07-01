@@ -123,7 +123,8 @@ def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
             print('### Creating model ### - time ' + str(np.around((time.time() - start) / 60, 2)) + ' min')
 
         # create model class
-        mod = Model(int(n_fact), X_data,
+        n_fact = int(n_fact)
+        mod = Model(n_fact, X_data,
                     n_iter=train_args['n_iter'],
                     verbose=verbose,
                     var_names=var_names,
