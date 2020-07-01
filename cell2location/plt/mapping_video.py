@@ -23,7 +23,7 @@ def get_rgb_function(cmap, min_value, max_value):
 
 def plot_contours(spot_factors_df, coords, text=None,
                   circle_diameter=4, alpha_scaling=0.6,
-                  col_breaks=[0.1, 100, 1000, 3000],
+                  col_breaks=(0.1, 100, 1000, 3000),
                   max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
                   max_color_quantile=0.95,
                   show_img=True, img=None, img_alpha=1,
@@ -73,9 +73,9 @@ def plot_contours(spot_factors_df, coords, text=None,
                                  np.linspace(0, 1.0, 255 - 55)])
 
         vals = np.ones((N, 4))
-        vals[:, 0] = np.linspace(0, R / 255, N)
-        vals[:, 1] = np.linspace(0, G / 255, N)
-        vals[:, 2] = np.linspace(0, B / 255, N)
+        vals[:, 0] = np.linspace(1, R / 255, N)
+        vals[:, 1] = np.linspace(1, G / 255, N)
+        vals[:, 2] = np.linspace(1, B / 255, N)
         vals[:, 3] = alphas
 
         return ListedColormap(vals)
