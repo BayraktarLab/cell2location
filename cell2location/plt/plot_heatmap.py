@@ -53,9 +53,6 @@ def heatmap(M, ticks=False, log=False, figsize=None, equal=False,
 
     plt.title(title)
 
-    plt.show()
-
-
 def clustermap(df, cluster_rows=True, cluster_cols=True,
                figure_size=(5, 5), cmap="RdPu", log=False,
                return_linkage=False, equal=True, title=''):

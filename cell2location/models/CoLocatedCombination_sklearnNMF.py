@@ -175,7 +175,7 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
             if self.verbose:
                 print(name + ' - iterations until convergence: ' + str(self.models[name].n_iter_));
 
-    def evaluate_stability(self, node_name, align=True):
+    def evaluate_stability(self, node_name, align=True, n_samples=1000):
         """Evaluate stability of the solution between training initialisations
         (correlates the values of factors between training initialisations)
 
@@ -186,6 +186,8 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
             Factors should be in columns.
         align :
             boolean, match factors between training restarts using linear_sum_assignment? (Default value = True)
+        n_samples:
+            does nothing, added to preserve call signature consistency with bayesian models
 
         Returns
         -------
@@ -194,10 +196,20 @@ class CoLocatedCombination_sklearnNMF(BaseModel):
 
         """
 
-        for i in range(len(self.results.keys()) - 1):
-            print(self.align_plot_stability(self.results['init_' + str(1)]['post_sample_means'][node_name],
-                                            self.results['init_' + str(i + 2)]['post_sample_means'][node_name],
-                                            str(1), str(i + 2), align=align))
+        n_plots = len(self.results.keys()) - 1
+        ncol = int(np.min((n_plots, 3)))
+        nrow = int(np.ceil(n_plots / ncol))
+        for i in range(n_plots):
+            plt.subplot(nrow, ncol, i + 1)
+            self.align_plot_stability(self.results['init_' + str(1)]['post_sample_means'][node_name],
+                                      self.results['init_' + str(i + 2)]['post_sample_means'][node_name],
+                                      str(1), str(i + 2), align=align)
+
+    def sample_posterior(self, node='all', n_samples=1000,
+                         save_samples=False, return_samples=True,
+                         mean_field_slot='init_1'):
+        """This function does nothing but added to preserve call signature with future Bayesian versions of the model."""
+        x = 1
 
     def compute_expected(self):
         """Compute expected abundance of each cell type in each location."""

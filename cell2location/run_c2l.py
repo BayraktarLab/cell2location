@@ -347,6 +347,10 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     theano.config.compute_test_value = 'ignore'
     ####### Evaluate stability of training #######
     if train_args['n_restarts'] > 1:
+        n_plots = train_args['n_restarts'] - 1
+        ncol = int(np.min((n_plots, 3)))
+        nrow = np.ceil(n_plots / ncol)
+        plt.figure(figsize=(5 * nrow, 5 * ncol))
         mod.evaluate_stability(n_samples=posterior_args['n_samples'],
                                align=posterior_args['evaluate_stability_align'])
 
@@ -461,7 +465,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     try:
         for s in data_samples:
             # if slots needed to generate scanpy plots are present, scanpy:
-            sc_spatial_present = np.isin(list(sp_data.uns.keys()), ['spatial'])[0]
+            sc_spatial_present = np.any(np.isin(list(sp_data.uns.keys()), ['spatial']))
 
             if sc_spatial_present:
 
