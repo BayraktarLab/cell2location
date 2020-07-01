@@ -428,10 +428,15 @@ class Pymc3Model(BaseModel):
             spot_f = self.mean_field[i].sample_node(node, size=n_samples)
             self.samples[node_name + '_stab'][i] = spot_f.eval().mean(0)
 
-        for i in range(len(self.samples[node_name + '_stab'].keys()) - 1):
-            print(self.align_plot_stability(self.samples[node_name + '_stab']['init_' + str(1)],
+        n_plots = len(self.samples[node_name + '_stab'].keys()) - 1
+        for i in range(n_plots):
+            ncol = int(np.min((n_plots, 3)))
+            nrow = np.ceil(n_plots / ncol)
+            plt.subplot(nrow, ncol, i + 1)
+            plt.subplot(np.ceil(n_plots/ncol), ncol, i+1)
+            self.align_plot_stability(self.samples[node_name + '_stab']['init_' + str(1)],
                                             self.samples[node_name + '_stab']['init_' + str(i + 2)],
-                                            str(1), str(i + 2), align=align))
+                                            str(1), str(i + 2), align=align)
 
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,

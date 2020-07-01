@@ -214,6 +214,10 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     ####### Evaluate stability of training #######
     if train_args['n_restarts'] > 1:
+        n_plots = train_args['n_restarts'] - 1
+        ncol = int(np.min((n_plots, 3)))
+        nrow = np.ceil(n_plots / ncol)
+        plt.figure(figsize=(5 * nrow, 5 * ncol))
         mod.evaluate_stability(n_samples=posterior_args['n_samples'],
                                align=posterior_args['evaluate_stability_align'],
                                transpose=posterior_args['evaluate_stability_transpose'])

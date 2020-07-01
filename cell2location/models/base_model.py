@@ -141,8 +141,7 @@ class BaseModel():
         else:
             img = corr12
 
-        fig, ax = plt.subplots()
-        im = ax.imshow(img)
+        plt.imshow(img)
 
         plt.title('Training initialisation ' + name1 + ' vs ' + name2)
         plt.xlabel(name2)
