@@ -28,10 +28,11 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
 # create conda environment yaml file
 COPY environment.yml /tmp/
 RUN /opt/conda/condabin/conda env create -f /tmp/environment.yml \
-    && echo "source activate cellpymc" >> ~/.bashrc
+    && echo "source activate cellpymc" >> ~/.bashrc \
+    && /opt/conda/condabin/conda clean --all --yes --quiet
 ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 
-# install cell2location and add cellpymc kernel for jupyter environment
+# install cell2location and add cellpymc kernel for jupyter environment and
 RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" \ 
     && /bin/bash -c "python -m ipykernel install --user --name cellpymc" 
 
