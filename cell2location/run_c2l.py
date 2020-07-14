@@ -108,7 +108,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         
         Caution
         -------
-            Takes a lot of RAM (10s-100s of GB) depending on data size so reduce the number of locations in needed.
+            Sampling the prior takes a lot of RAM (10s-100s of GB) depending on data size so if needed for troubleshooting - reduce the number of locations in needed.
 
         * **n_prior_samples** - number of prior samples. The more the better but also takes a lot of RAM. (Default: 10)
         * **n_restarts** - number of training restarts to evaluate stability (Default: 2)
@@ -470,7 +470,9 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
             if sc_spatial_present:
 
                 sc.settings.figdir = fig_path + 'spatial/'
-
+                facecolor = rcParams["axes.facecolor"]
+                rcParams["axes.facecolor"] = "black"
+                
                 s_ind = sp_data.obs[train_args['sample_name_col']] == s
                 s_keys = list(sp_data.uns['spatial'].keys())
                 s_spatial = np.array(s_keys)[[s in i for i in s_keys]][0]
@@ -564,6 +566,8 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                   save=f"histo_W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                   show=False
                                   )
+                    
+                rcParams["axes.facecolor"] = facecolor
 
             else:
 
