@@ -17,6 +17,7 @@ import scanpy as sc
 from re import sub
 
 import cell2location.plt as c2lpl
+from cell2location.region.spatial_knn import spatial_neighbours, sum_neighbours
 
 
 def save_plot(path, filename, extension='png'):
@@ -28,7 +29,7 @@ def save_plot(path, filename, extension='png'):
     # plt.close()
 
 
-def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
+def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_sklearnNMF',
                    verbose=True, return_all=True,
                    train_args={'n_fact': [30], 'n_iter': 20000,
                     'sample_name_col': None,
@@ -61,7 +62,8 @@ def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
                     'use_cuda': True,
                     'sample_prior': False,
                     'sample_name_col': None,
-                    'mode': 'normal', 'n_type': 'restart', 'n_restarts': 5}
+                    'mode': 'normal', 'n_type': 'restart', 'n_restarts': 5,
+                    'include_source_location': False}
 
     d_posterior_args = {'n_samples': 1000,
                         'evaluate_stability_align': False, 'evaluate_stability_transpose': True,
@@ -84,6 +86,23 @@ def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
         d_export_args[k] = export_args[k]
     export_args = d_export_args
 
+    # start timing
+    start = time.time()
+
+    sp_data = sp_data.copy()
+
+    # import the specified version of the model
+    if type(model_name) is str:
+        import cell2location.models as models
+        Model = getattr(models, model_name)
+    else:
+        Model = model_name
+
+    ####### Preparing data #######
+    # extract cell density parameter
+    X_data = sp_data.uns['mod']['post_sample_means']['spot_factors']
+    var_names = sp_data.uns['mod']['fact_names']
+    obs_names = sp_data.obs_names
     if train_args['sample_name_col'] is None:
         # if slots needed to generate scanpy plots are present, use scanpy spatial slot name:
         sc_spatial_present = np.isin(list(sp_data.uns.keys()), ['spatial'])[0]
@@ -94,26 +113,16 @@ def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
 
         train_args['sample_name_col'] = 'sample'
 
-    # start timing
-    start = time.time()
+    sample_id = sp_data.obs[train_args['sample_name_col']]
 
-    sp_data = sp_data.copy()
-
-    # import the specied version of the model
-    if type(model_name) is str:
-        import cell2location.models as models
-        Model = getattr(models, model_name)
-    else:
-        Model = model_name
-
-    ####### Preparing data #######
-    # extract cell density parameter
-    if sp_data is np.ndarray:
-        X_data = sp_data.copy()
-    else:
-        X_data = sp_data.uns['mod']['post_sample_means']['spot_factors']
-        var_names = sp_data.uns['mod']['fact_names']
-        obs_names = sp_data.obs_names
+    if n_neighbours is not None:
+        neighbours = spatial_neighbours(coords=sp_data.obsm['spatial'],
+                                        n_sp_neighbors=n_neighbours, radius=None,
+                                        include_source_location=train_args['include_source_location'],
+                                        sample_id=sample_id)
+        neighbours_sum = sum_neighbours(X_data, neighbours)
+        X_data = np.concatenate([X_data, neighbours_sum], axis=1)
+        var_names = list(var_names) + ['neigh_' + i for i in var_names]
 
     res_dict = {}
 
@@ -130,7 +139,7 @@ def run_colocation(sp_data, model_name='CoLocatedCombination_sklearnNMF',
                     var_names=var_names,
                     obs_names=obs_names,
                     fact_names=['fact_' + str(i) for i in range(n_fact)],
-                    sample_id=sp_data.obs[train_args['sample_name_col']],
+                    sample_id=sample_id,
                     **model_kwargs
                     )
 

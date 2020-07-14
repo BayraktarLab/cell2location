@@ -63,10 +63,64 @@ def compute_connectivities_umap(knn_indices, knn_dists,
 
 # ####################--------########################
 
+def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
+                       include_source_location=True,
+                       sample_id=None):
+    """
+    Find spatial neighbours using the number of neighbours or radius (KDTree approach).
+
+    :param coords: numpy.ndarray with x,y positions of spots.
+    :param n_sp_neighbors: how many spatially-adjacent neighbors to report for each spot (including the source spot).
+     Use 7 for hexagonal grid.
+    :param radius: Supersedes `n_sp_neighbors` - radius within which to report spatially-adjacent neighbors for each spot. Pick radius based on spot size.
+    """
+
+    # create and query spatial proximity tree within each sample
+    if radius is None:
+        if include_source_location:
+            coord_ind = np.zeros((coords.shape[0], n_sp_neighbors))
+        else:
+            coord_ind = np.zeros((coords.shape[0], n_sp_neighbors-1))
+    else:
+        coord_ind = np.zeros(coords.shape[0])
+
+    for sam in sample_id.unique():
+        sam_ind = sample_id.isin([sam])
+        coord_tree = KDTree(coords[sam_ind, :])
+        if radius is None:
+            n_list = coord_tree.query(coords[sam_ind, :],
+                                      k=n_sp_neighbors, return_distance=False)
+            n_list = np.array(n_list)
+
+            if include_source_location:
+                coord_ind[sam_ind, :] = n_list
+            else:
+                n_list_sel = n_list != np.arange(sam_ind.sum()).reshape(sam_ind.sum(), 1)
+                coord_ind[sam_ind, :] = n_list[n_list_sel].reshape((sam_ind.sum(), n_sp_neighbors-1))
+
+        else:
+            coord_ind[sam_ind] = coord_tree.query_radius(coords[sam_ind, :],
+                                                                       radius, count_only=False)
+
+    return coord_ind.astype(int)
+
+def sum_neighbours(X_data, neighbours):
+    """
+    Sum X_data values across neighbours.
+
+    :param coords: numpy.ndarray with variable measurements for each observation  (observations * variables)
+    :param neighbours: numpy.ndarray with neigbour indices for each observation (observations * neigbours)
+     """
+
+    return np.sum([X_data[neighbours[:,n], :] for n in range(neighbours.shape[1])], axis=0)
+
+# ####################--------########################
+
 def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=None,
                 which_exprs_dims=None, sample_id=None):
     """
-    A variant on the standard knn neighbor graph inference procedure that also includes the spatial neighbors of each spot. By Krzysztof Polanski.
+    A variant on the standard knn neighbor graph inference procedure that also includes the spatial neighbors of each spot.
+    With help from Krzysztof Polanski.
 
     :param coords: numpy.ndarray with x,y positions of spots.
     :param expression: numpy.ndarray with expression of programmes / cluster expression (cols) of spots (rows).
@@ -76,16 +130,7 @@ def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=Non
     :param which_exprs_dims: which expression dimensions to use (cols)?
     """
 
-    # if selected dimensions not provided choose all
-    if which_exprs_dims is None:
-        which_exprs_dims = np.arange(expression.shape[1])
-    # print(which_exprs_dims)
-
-    # extract and index the appropriate bit of the PCA
-    pca = expression[:, which_exprs_dims]
-    ckd = cKDTree(pca)
-
-    # create and query spatial proximity tree sample by sample
+    # create and query spatial proximity tree within each sample
     if radius is None:
         coord_ind = np.zeros((coords.shape[0], n_sp_neighbors))
     else:
@@ -100,6 +145,14 @@ def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=Non
             coord_ind[sample_id.isin([sam])] = coord_tree.query_radius(coords[sample_id.isin([sam]), :],
                                                                        radius, count_only=False)
 
+    # if selected dimensions not provided choose all
+    if which_exprs_dims is None:
+        which_exprs_dims = np.arange(expression.shape[1])
+    # print(which_exprs_dims)
+
+    # extract and index the appropriate bit of the PCA
+    pca = expression[:, which_exprs_dims]
+    ckd = cKDTree(pca)
     # the actual number of neighbours - you'll get seven extra spatial neighbours in the thing
     knn = n_neighbors + n_sp_neighbors
 
