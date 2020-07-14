@@ -142,7 +142,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
                                    'factors_mean_var_ratio': 1,
                                    'combs_mean_var_ratio': 1},
             phi_hyp_prior={'mean': 3, 'sd': 1},
-            spot_fact_mean_var_ratio=0.5
+            spot_fact_mean_var_ratio=5
     ):
 
         ############# Initialise parameters ################
