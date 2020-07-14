@@ -9,6 +9,7 @@ import pickle
 import theano
 
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 import os
 import gc
 from os import mkdir
