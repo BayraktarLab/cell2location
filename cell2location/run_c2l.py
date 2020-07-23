@@ -144,6 +144,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         * **export_q05** - boolean, save plots of 5% quantile of parameters. (Default: True)
         * **scanpy_coords_name** - sp_data.obsm entry that stores X and Y coordinates of each location.
           If None - no spatial plot is produced.
+        * **img_key** - which image to use for scanpy plotting ('hires', 'lowres', None)
     model_kwargs :
         Keyword arguments for the model class. See the list of relevant arguments for CoLocationModelNB4V2. (Default value = {})
 
@@ -172,7 +173,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                      'plot_extension': "png",
                      'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                      'save_model': False, 'run_name_suffix': '', 'export_q05': True,
-                     'scanpy_coords_name': 'spatial'}
+                     'scanpy_coords_name': 'spatial', 'img_key': 'hires'}
 
     # replace defaults with parameters supplied
     for k in summ_sc_data_args.keys():
@@ -487,14 +488,14 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                 adata_vis_pl.obs[clust_names] = adata_vis_pl.obs[clust_names_orig]
                 sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                               color=clust_names, ncols=5, library_id=s_spatial,
-                              size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=0,
+                              size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                               vmin=0, vmax=export_args['scanpy_plot_vmax'],
                               save=f"W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                               show=show_locations
                               )
                 sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                               color=clust_names, ncols=5, library_id=s_spatial,
-                              size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=1,
+                              size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                               vmin=0, vmax=export_args['scanpy_plot_vmax'],
                               save=f"histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                               show=False
@@ -509,14 +510,14 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
                 sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                               color=clust_names, ncols=5, library_id=s_spatial,
-                              size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=0,
+                              size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                               vmin=0, vmax=export_args['scanpy_plot_vmax'],
                               save=f"W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                               show=False
                               )
                 sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                               color=clust_names, ncols=5, library_id=s_spatial,
-                              size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=1,
+                              size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                               vmin=0, vmax=export_args['scanpy_plot_vmax'],
                               save=f"histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                               show=False
@@ -532,7 +533,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                     adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
                     sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                                   color=clust_names, ncols=5, library_id=s_spatial,
-                                  size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=0,
+                                  size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                                   vmin=0, vmax=export_args['scanpy_plot_vmax'],
                                   save=f"W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
 
@@ -540,7 +541,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                   )
                     sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                                   color=clust_names, ncols=5, library_id=s_spatial,
-                                  size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=1,
+                                  size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                                   vmin=0, vmax=export_args['scanpy_plot_vmax'],
                                   save=f"histo_W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                   show=False
@@ -555,14 +556,14 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
                     sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                                   color=clust_names, ncols=5, library_id=s_spatial,
-                                  size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=0,
+                                  size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                                   vmin=0, vmax=export_args['scanpy_plot_vmax'],
                                   save=f"W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                   show=False
                                   )
                     sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                                   color=clust_names, ncols=5, library_id=s_spatial,
-                                  size=export_args['scanpy_plot_size'], img_key='hires', alpha_img=1,
+                                  size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                                   vmin=0, vmax=export_args['scanpy_plot_vmax'],
                                   save=f"histo_W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                   show=False
