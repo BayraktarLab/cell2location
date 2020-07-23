@@ -179,12 +179,17 @@ class CoLocationModelNB4V2(Pymc3LocModel):
             rate = gene_level_prior['mean'] / gene_level_prior['sd'] ** 2
             shape_var = shape / gene_level_prior['mean_var_ratio']
             rate_var = rate / gene_level_prior['mean_var_ratio']
+            n_g_prior = np.array(gene_level_prior['mean']).shape
+            if len(n_g_prior) == 0:
+                n_g_prior = 1
+            else:
+                n_g_prior = self.n_genes
             self.gene_level_alpha_hyp = pm.Gamma('gene_level_alpha_hyp',
                                                  mu=shape, sigma=np.sqrt(shape_var),
-                                                 shape=(1, 1))
+                                                 shape=(n_g_prior, 1))
             self.gene_level_beta_hyp = pm.Gamma('gene_level_beta_hyp',
                                                 mu=rate, sigma=np.sqrt(rate_var),
-                                                shape=(1, 1))
+                                                shape=(n_g_prior, 1))
 
             self.gene_level = pm.Gamma('gene_level', self.gene_level_alpha_hyp,
                                        self.gene_level_beta_hyp, shape=(self.n_genes, 1))
