@@ -113,8 +113,23 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
 
     if train_args['stratify_cv'] is not None:
         model_kwargs['stratify_cv'] = sc_data.obs[train_args['stratify_cv']]
-    else:
-        model_kwargs['stratify_cv'] = None
+
+    if train_args['use_cuda'] is not None:
+        model_kwargs['use_cuda'] = train_args['use_cuda']
+
+    fit_kwards = {}
+    if train_args['n_epochs'] is not None:
+        fit_kwards['n_iter'] = train_args['n_epochs']
+    if train_args['learning_rate'] is not None:
+        fit_kwards['learning_rate'] = train_args['learning_rate']
+    if train_args['train_proportion'] is not None:
+        fit_kwards['train_proportion'] = train_args['train_proportion']
+    if train_args['n_type'] is not None:
+        fit_kwards['n_type'] = train_args['n_type']
+    if train_args['n_restarts'] is not None:
+        fit_kwards['n'] = train_args['n_restarts']
+    if train_args['l2_weight'] is not None:
+        fit_kwards['l2_weight'] = train_args['l2_weight']
 
     # extract pd.DataFrame with covariates
     cell2covar = sc_data.obs[[train_args['sample_name_col']] + train_args['covariate_col_names']]
@@ -128,7 +143,6 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                 n_iter=train_args['n_epochs'], learning_rate=train_args['learning_rate'],
                 var_names=sc_data.var_names,
                 minibatch_size=train_args['minibatch_size'], minibatch_seed=train_args['minibatch_seed'],
-                use_cuda=train_args['use_cuda'],
                 use_average_as_initial_value=train_args['use_average_as_initial_value'],
                 verbose=False,
                 **model_kwargs)
@@ -157,10 +171,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     if verbose:
         print('### Training model to determine n_epochs with CV ###')
     if train_args['mode'] == 'normal':
-        mod.fit_advi_iterative(n_iter=train_args['n_epochs'], learning_rate=train_args['learning_rate'],
-                               train_proportion=train_args['train_proportion'],
-                               n_type=train_args['n_type'],
-                               n=train_args['n_restarts'], l2_weight=train_args['l2_weight'])
+        mod.fit_advi_iterative(**fit_kwards)
 
     elif train_args['mode'] == 'tracking':
         raise ValueError('tracking training not implemented yet')
@@ -170,14 +181,23 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     ####### Evaluate cross-validation
     fig, axs = plt.subplots(1, 3, sharey=True, figsize=(12, 5))
 
-    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_1', ax=axs[0])
+    if train_args['train_proportion'] is None:
+        mod.plot_history(0, train_args['n_epochs'], mean_field_slot='init_1', ax=axs[0])
+    else:
+        mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_1', ax=axs[0])
     axs[0].get_legend().remove()
 
-    mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2', ax=axs[1])
+    if train_args['train_proportion'] is None:
+        mod.plot_history(0, train_args['n_epochs'], mean_field_slot='init_2', ax=axs[1])
+    else:
+        mod.plot_validation_history(0, train_args['n_epochs'], mean_field_slot='init_2', ax=axs[1])
     axs[1].get_legend().remove()
     axs[1].set_ylabel(None)
 
-    mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1', ax=axs[2])
+    if train_args['train_proportion'] is None:
+        mod.plot_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1', ax=axs[2])
+    else:
+        mod.plot_validation_history(0, int(np.min((train_args['n_epochs'], 30))), mean_field_slot='init_1', ax=axs[2])
     axs[2].set_ylabel(None)
 
     plt.tight_layout()
@@ -188,29 +208,28 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     plt.close()
 
     ####### Use cross-validation to select the last epoch before validation loss increased (derivative > 0)
-    new_n_epochs = []
-    for tr in mod.validation_hist.values():
-        deriv = np.gradient(tr, 1)
-        new_n_epochs.append(np.max(np.arange(deriv.shape[0])[(deriv < 0)]))
-    new_n_epochs = np.min(new_n_epochs) + 1
+    if train_args['train_proportion'] is not None:
+        new_n_epochs = []
+        for tr in mod.validation_hist.values():
+            deriv = np.gradient(tr, 1)
+            new_n_epochs.append(np.max(np.arange(deriv.shape[0])[(deriv < 0)]))
+        new_n_epochs = np.min(new_n_epochs) + 1
 
-    ####### Repeat training up until that iteration
-    if verbose:
-        print('### Re-training model to stop before overfitting ###')
-    mod.fit_advi_iterative(n_iter=int(new_n_epochs), learning_rate=train_args['learning_rate'],
-                           train_proportion=train_args['train_proportion'],
-                           n_type=train_args['n_type'],
-                           n=train_args['n_restarts'], l2_weight=train_args['l2_weight'])
-    # save the training and validation loss history
+        ####### Repeat training up until that iteration
+        if verbose:
+            print('### Re-training model to stop before overfitting ###')
+        fit_kwards['n_iter'] = int(new_n_epochs)
+        mod.fit_advi_iterative(**fit_kwards)
+        # save the training and validation loss history
 
-    plt.figure(figsize=(5, 5))
-    mod.plot_validation_history(0)
-    plt.tight_layout()
-    save_plot(fig_path, filename='re_training_and_cv_history',
-              extension=export_args['plot_extension'])
-    if verbose:
-        plt.show()
-    plt.close()
+        plt.figure(figsize=(5, 5))
+        mod.plot_validation_history(0)
+        plt.tight_layout()
+        save_plot(fig_path, filename='re_training_and_cv_history',
+                  extension=export_args['plot_extension'])
+        if verbose:
+            plt.show()
+        plt.close()
 
     ####### Evaluate stability of training #######
     if train_args['n_restarts'] > 1:
