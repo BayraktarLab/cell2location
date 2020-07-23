@@ -397,7 +397,7 @@ class Pymc3Model(BaseModel):
         for i in self.mean_field.keys():
             print(plt.plot(np.log10(self.mean_field[i].hist[iter_start:iter_end])))
 
-    def b_evaluate_stability(self, node, n_samples=1000, align=True):
+    def b_evaluate_stability(self, node, n_samples=1000, align=True, batch_size: int = 40):
         """Evaluate stability of posterior samples between training initialisations
         (takes samples and correlates the values of factors between training initialisations)
 
@@ -409,6 +409,8 @@ class Pymc3Model(BaseModel):
             the number of samples. (Default value = 1000)
         align :
             boolean, match factors between training restarts using linear_sum_assignment? (Default value = True)
+        batch_size :
+            int, the number of samples to generate per batch (conserves GPU memory allocation).
 
         Returns
         -------
@@ -420,13 +422,22 @@ class Pymc3Model(BaseModel):
         theano.config.compute_test_value = 'ignore'
 
         self.n_samples = n_samples
+        n_batches = int(n_samples / batch_size)
 
         node_name = node.name
         self.samples[node_name + '_stab'] = {}
 
         for i in self.mean_field.keys():
-            spot_f = self.mean_field[i].sample_node(node, size=n_samples)
-            self.samples[node_name + '_stab'][i] = spot_f.eval().mean(0)
+            # Sample a single node
+            post_node = self.mean_field[i].sample_node(node, size=batch_size).eval()
+
+            for b in tqdm(range(n_batches - 1)):
+                # sample remaining batches
+                post_node_1 = self.mean_field[i].sample_node(node, size=batch_size).eval()
+                # concatenate batches
+                post_node = np.concatenate((post_node, post_node_1), axis=0)
+
+            self.samples[node_name + '_stab'][i] = post_node.mean(0)
 
         n_plots = len(self.samples[node_name + '_stab'].keys()) - 1
         for i in range(n_plots):
@@ -440,7 +451,7 @@ class Pymc3Model(BaseModel):
 
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
-                         mean_field_slot='init_1'):
+                         mean_field_slot='init_1', batch_size: int = 40):
         """Sample posterior distribution of all parameters or single parameter
 
         Parameters
@@ -455,6 +466,8 @@ class Pymc3Model(BaseModel):
             return summarised samples (mean, etc) in addition to saving them in `self.samples`? (Default value = True)
         mean_field_slot :
             string, which training initialisation (mean_field slot) to sample? 'init_1' by default
+        batch_size :
+            int, the number of samples to generate per batch (conserves GPU memory allocation).
 
         Returns
         -------
@@ -467,25 +480,41 @@ class Pymc3Model(BaseModel):
         """
 
         theano.config.compute_test_value = 'ignore'
+        n_batches = int(n_samples / batch_size)
 
         if node == 'all':
-            # Sample all parameters - might use a lot of GPU memory
-            post_samples = self.mean_field[mean_field_slot].sample(n_samples)
-            self.samples['post_sample_means'] = {v: post_samples[v].mean(axis=0) for v in post_samples.varnames}
+
+            # Sample all parameters - might use a lot of GPU memory - so done in minibatches
+            post_samples = self.mean_field[mean_field_slot].sample(batch_size)
+
+            for i in tqdm(range(n_batches-1)):
+                # sample remaining batches
+                post_samples_1 = self.mean_field[mean_field_slot].sample(batch_size)
+                # concatenate batches
+                post_samples = {k: np.concatenate((post_samples[k], post_samples_1[k]), axis=0)
+                                for k in post_samples_1.varnames}
+
+
+            self.samples['post_sample_means'] = {v: post_samples[v].mean(axis=0) for v in post_samples.keys()}
             self.samples['post_sample_q05'] = {v: np.quantile(post_samples[v], 0.05, axis=0) for v in
-                                               post_samples.varnames}
+                                               post_samples.keys()}
             self.samples['post_sample_q95'] = {v: np.quantile(post_samples[v], 0.95, axis=0) for v in
-                                               post_samples.varnames}
-            self.samples['post_sample_sds'] = {v: post_samples[v].std(axis=0) for v in post_samples.varnames}
+                                               post_samples.keys()}
+            self.samples['post_sample_sds'] = {v: post_samples[v].std(axis=0) for v in post_samples.keys()}
 
             if (save_samples):
-                # convert multitrace object to a dictionary
-                post_samples = {v: post_samples[v] for v in post_samples.varnames}
                 self.samples['post_samples'] = post_samples
 
         else:
-            # Sample a singe node
-            post_node = self.mean_field[mean_field_slot].sample_node(node, size=n_samples).eval()
+            # Sample a single node
+            post_node = self.mean_field[mean_field_slot].sample_node(node, size=batch_size).eval()
+
+            for i in tqdm(range(n_batches - 1)):
+                # sample remaining batches
+                post_node_1 = self.mean_field[mean_field_slot].sample_node(node, size=batch_size).eval()
+                # concatenate batches
+                post_node = np.concatenate((post_node, post_node_1), axis=0)
+
             post_node_mean = post_node.mean(0)
             post_node_q05 = np.quantile(post_node, 0.05, axis=0)
             post_node_q95 = np.quantile(post_node, 0.95, axis=0)
