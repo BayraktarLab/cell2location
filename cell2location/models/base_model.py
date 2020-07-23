@@ -215,18 +215,34 @@ class BaseModel():
         plt.title('UMI counts (all cell, all genes)')
         plt.tight_layout()
 
-    def plot_history(self, iter_start=0, iter_end=-1, log_y=True):
+    def plot_history(self, iter_start=0, iter_end=-1,
+                     mean_field_slot=None, log_y=True, ax=None):
         r""" Plot training history
 
         :param iter_start: omit initial iterations from the plot
         :param iter_end: omit last iterations from the plot
         """
-        for i in self.hist.keys():
-            y = self.hist[i][iter_start:iter_end]
+
+        if ax is None:
+            ax = plt
+            ax.set_xlabel = plt.xlabel
+            ax.set_ylabel = plt.ylabel
+
+        if mean_field_slot is None:
+            mean_field_slot = self.hist.keys()
+
+        for i in mean_field_slot:
+
+            if iter_end == -1:
+                iter_end = np.array(self.hist[i]).flatten().shape[0]
+
+            y = np.array(self.hist[i]).flatten()[iter_start:iter_end]
             if log_y:
                 y = np.log10(y)
-
-            plt.plot(y)
+            ax.plot(np.arange(iter_start, iter_end), y, label='train')
+            ax.set_xlabel('Training epochs')
+            ax.set_ylabel('Reconstruction accuracy (ELBO loss)')
+            ax.legend()
             plt.tight_layout()
 
     def plot_validation_history(self, start_step=0, end_step=-1,
@@ -252,7 +268,7 @@ class BaseModel():
             y = np.log10(y)
         ax.plot(np.arange(start_step, end_step), y, label='validation')
         ax.set_xlabel('Training epochs')
-        ax.set_ylabel('Reconstruction accuracy (log10 NB + L2 loss)')
+        ax.set_ylabel('Reconstruction accuracy (log10 NB + L2 loss) / ELBO loss')
         ax.legend()
         plt.tight_layout()
 
