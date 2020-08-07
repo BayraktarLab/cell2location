@@ -279,7 +279,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_
                                fact_filt=mod.fact_filt,
                                loadings_attr='cell_type_fractions',
                                gene_fact_name='cell_type_fractions',
-                               cmap='RdPu', figsize=[mod.n_fact * 0.4, mod.n_genes * 0.4])
+                               cmap='RdPu', figsize=[mod.n_fact * 0.4+2, mod.n_genes * 0.4])
         plt.tight_layout()
 
         save_plot(fig_path, filename=f'n_fact{mod.n_fact}',
@@ -357,6 +357,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_
             print('Some error in plotting with scanpy or `cell2location.plt.plot_factor_spatial()`\n ' + str(e))
 
         rcParams["axes.facecolor"] = "white"
+        matplotlib.rc_file_defaults()
 
         # save model object and related annotations
         save_path = path + 'models/'

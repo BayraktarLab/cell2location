@@ -54,7 +54,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                     'n_epochs': 100, 'minibatch_size': 1024, 'learning_rate': 0.01,
                     'minibatch_seed': [41, 56, 345, 12, 6, 3],
                     'use_average_as_initial_value': True, 'use_cuda': True,
-                    'train_proportion': 0.9,
+                    'train_proportion': 0.9, 'retrain': True,
                     'l2_weight': True,  # uses defaults for the model
                     'sample_prior': False, 'readable_var_name_col': None,
                     'use_raw': True,
@@ -208,7 +208,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     plt.close()
 
     ####### Use cross-validation to select the last epoch before validation loss increased (derivative > 0)
-    if train_args['train_proportion'] is not None:
+    if train_args['train_proportion'] is not None and train_args['retrain'] is True:
         new_n_epochs = []
         for tr in mod.validation_hist.values():
             deriv = np.gradient(tr, 1)
