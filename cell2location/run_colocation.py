@@ -11,6 +11,7 @@ from os import mkdir
 
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+import matplotlib
 import numpy as np
 import scanpy as sc
 
@@ -69,7 +70,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_
                         'evaluate_stability_align': False, 'evaluate_stability_transpose': True,
                         'mean_field_slot': "init_1"}
 
-    d_export_args = {'path': "./results", 'plot_extension': "png",
+    d_export_args = {'path': "./results", 'plot_extension': "pdf",
                      'scanpy_coords_name': 'spatial',
                      'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                      'save_model': True, 'run_name_suffix': '',
@@ -279,8 +280,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_
                                fact_filt=mod.fact_filt,
                                loadings_attr='cell_type_fractions',
                                gene_fact_name='cell_type_fractions',
-                               cmap='RdPu', figsize=[mod.n_fact * 0.4+2, mod.n_genes * 0.4])
-        plt.tight_layout()
+                               cmap='RdPu', figsize=[5 + 0.12 * mod.n_fact, 5 + 0.1 * mod.n_genes])
 
         save_plot(fig_path, filename=f'n_fact{mod.n_fact}',
                   extension=export_args['plot_extension'])

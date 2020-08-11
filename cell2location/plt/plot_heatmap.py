@@ -52,6 +52,7 @@ def heatmap(array, ticks=False, log=False, figsize=None, equal=False,
         plt.xlim(array.shape[1] - 0.5, -0.5)
 
     plt.title(title)
+    plt.tight_layout()
 
 
 def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, equal=False,
@@ -110,6 +111,7 @@ def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, 
         plt.xlim(array_color.shape[1] - 0.5, -0.5)
 
     plt.title(title)
+    plt.tight_layout()
 
 
 def clustermap(df, cluster_rows=True, cluster_cols=True,
