@@ -366,6 +366,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         print('### Done ### - time ' + res_dict['run_time'])
 
     if return_all:
+        res_dict['mod'] = mod
         return res_dict, sc_data
     else:
         del res_dict
