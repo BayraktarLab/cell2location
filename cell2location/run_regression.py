@@ -59,7 +59,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                     'sample_prior': False, 'readable_var_name_col': None,
                     'use_raw': True,
                     'mode': 'normal', 'n_type': 'restart', 'n_restarts': 2,
-                    'checkpoints': 100}
+                    'checkpoints': None}
 
     d_posterior_args = {'n_samples': 1000,
                         'evaluate_stability_align': False, 'evaluate_stability_transpose': True,
@@ -132,10 +132,12 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     if train_args['l2_weight'] is not None:
         fit_kwards['l2_weight'] = train_args['l2_weight']
 
-    fit_kwards['checkpoints'] = train_args['checkpoints']
-    fit_kwards['checkpoint_dir'] = f'{export_args["path"]}/checkpoints'
-    if not os.path.exists(fit_kwards['checkpoint_dir']):
-        mkdir(fit_kwards['checkpoint_dir'])
+    train_args['checkpoint_dir'] = f'{export_args["path"]}/checkpoints'
+    if train_args['checkpoints'] is not None:
+        fit_kwards['checkpoints'] = train_args['checkpoints']
+        fit_kwards['checkpoint_dir'] = train_args['checkpoint_dir']
+        if not os.path.exists(fit_kwards['checkpoint_dir']):
+            mkdir(fit_kwards['checkpoint_dir'])
 
     # extract pd.DataFrame with covariates
     cell2covar = sc_data.obs[[train_args['sample_name_col']] + train_args['covariate_col_names']]
@@ -239,7 +241,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                 plt.show()
             plt.close()
         else:
-            file_path = f'{fit_kwards["checkpoint_dir"]}/{posterior_args["mean_field_slot"]}_{new_n_epochs}.ckp'
+            file_path = f'{train_args["checkpoint_dir"]}/{posterior_args["mean_field_slot"]}_{new_n_epochs}.ckp'
             if os.path.exists(file_path):
                 mod.load_checkpoint(file_path)
 
