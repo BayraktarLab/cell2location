@@ -58,7 +58,8 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                     'l2_weight': True,  # uses defaults for the model
                     'sample_prior': False, 'readable_var_name_col': None,
                     'use_raw': True,
-                    'mode': 'normal', 'n_type': 'restart', 'n_restarts': 2}
+                    'mode': 'normal', 'n_type': 'restart', 'n_restarts': 2,
+                    'checkpoints': 100}
 
     d_posterior_args = {'n_samples': 1000,
                         'evaluate_stability_align': False, 'evaluate_stability_transpose': True,
@@ -130,6 +131,11 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         fit_kwards['n'] = train_args['n_restarts']
     if train_args['l2_weight'] is not None:
         fit_kwards['l2_weight'] = train_args['l2_weight']
+
+    fit_kwards['checkpoints'] = train_args['checkpoints']
+    fit_kwards['checkpoint_dir'] = f'{export_args["path"]}/checkpoints'
+    if not os.path.exists(fit_kwards['checkpoint_dir']):
+        mkdir(fit_kwards['checkpoint_dir'])
 
     # extract pd.DataFrame with covariates
     cell2covar = sc_data.obs[[train_args['sample_name_col']] + train_args['covariate_col_names']]
@@ -208,7 +214,8 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     plt.close()
 
     ####### Use cross-validation to select the last epoch before validation loss increased (derivative > 0)
-    if train_args['train_proportion'] is not None and train_args['retrain'] is True:
+    if train_args['train_proportion'] is not None:
+
         new_n_epochs = []
         for tr in mod.validation_hist.values():
             deriv = np.gradient(tr, 1)
@@ -216,20 +223,25 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         new_n_epochs = np.min(new_n_epochs) + 1
 
         ####### Repeat training up until that iteration
-        if verbose:
-            print('### Re-training model to stop before overfitting ###')
-        fit_kwards['n_iter'] = int(new_n_epochs)
-        mod.fit_advi_iterative(**fit_kwards)
-        # save the training and validation loss history
+        if train_args['retrain'] is True:
+            if verbose:
+                print('### Re-training model to stop before overfitting ###')
+            fit_kwards['n_iter'] = int(new_n_epochs)
+            mod.fit_advi_iterative(**fit_kwards)
+            # save the training and validation loss history
 
-        plt.figure(figsize=(5, 5))
-        mod.plot_validation_history(0)
-        plt.tight_layout()
-        save_plot(fig_path, filename='re_training_and_cv_history',
-                  extension=export_args['plot_extension'])
-        if verbose:
-            plt.show()
-        plt.close()
+            plt.figure(figsize=(5, 5))
+            mod.plot_validation_history(0)
+            plt.tight_layout()
+            save_plot(fig_path, filename='re_training_and_cv_history',
+                      extension=export_args['plot_extension'])
+            if verbose:
+                plt.show()
+            plt.close()
+        else:
+            file_path = f'{fit_kwards["checkpoint_dir"]}/{posterior_args["mean_field_slot"]}_{new_n_epochs}.ckp'
+            if os.path.exists(file_path):
+                mod.load_checkpoint(file_path)
 
     ####### Evaluate stability of training #######
     if train_args['n_restarts'] > 1:
