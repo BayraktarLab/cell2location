@@ -242,7 +242,9 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
             plt.close()
         else:
             file_path = f'{train_args["checkpoint_dir"]}/{posterior_args["mean_field_slot"]}_{new_n_epochs}.ckp'
-            if os.path.exists(file_path):
+            if verbose:
+                print(f'### Loading checkpoint before overfitting: {posterior_args["mean_field_slot"]}_{new_n_epochs}.ckp ###')
+            if file_path in os.listdir(train_args["checkpoint_dir"]):
                 mod.load_checkpoint(file_path)
 
     ####### Evaluate stability of training #######
