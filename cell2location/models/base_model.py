@@ -407,7 +407,9 @@ class BaseModel():
 
     def factor_expressed_plot(self, shape_cut=4, rate_cut=15,
                               sample_type='post_sample_means',
-                              shape='cell_fact_mu_hyp', rate='cell_fact_sd_hyp'):
+                              shape='cell_fact_shape_hyp', rate='cell_fact_rate_hyp',
+                              shape_lab='cell_factors, Gamma shape', rate_lab='cell_factors, Gamma rate',
+                              invert_selection=False):
         r"""Show which factors are expressed on a scatterplot of their regularising priors
 
         :param shape_cut: Gamma shape cutoff below which factors are expressed
@@ -415,18 +417,28 @@ class BaseModel():
         :param sample_type: which posterior summary to look at, default 'post_sample_means'
         :param shape: parameter name for the Gamma shape of each factor, default 'cell_fact_mu_hyp'
         :param rate: parameter name for the Gamma rate of each factor, default 'cell_fact_sd_hyp'
+        :param shape_lab: axis label for shape
+        :param rate_lab: axis label for rate
+        :param invert_selection: if values below cutoffs are for not expressed, set invert_selection to True.
         """
 
         # Expression shape and rate across cells
         shape = self.samples[sample_type][shape]
         rate = self.samples[sample_type][rate]
         plt.scatter(shape, rate);
-        plt.xlabel('cell_factors, Gamma shape')
-        plt.ylabel('cell_factors, Gamma rate')
+        plt.xlabel(shape_lab)
+        plt.ylabel(rate_lab)
         plt.vlines(shape_cut, 0, rate_cut)
         plt.hlines(rate_cut, 0, shape_cut)
-        plt.text(shape_cut - 0.5 * shape_cut, rate_cut - 0.5 * rate_cut, 'expressed')
-        plt.text(shape_cut + 0.1 * shape_cut, rate_cut + 0.1 * rate_cut, 'not expressed')
+
+        low_lab = high_lab = 'expressed'
+        if not invert_selection:
+            high_lab = f'not {high_lab}'
+        else:
+            low_lab = f'not {low_lab}'
+
+        plt.text(shape_cut - 0.5 * shape_cut, rate_cut - 0.5 * rate_cut, low_lab)
+        plt.text(shape_cut + 0.1 * shape_cut, rate_cut + 0.1 * rate_cut, high_lab)
 
         return {'shape': shape, 'rate': rate,
                 'shape_cut': shape_cut, 'rate_cut': rate_cut}
