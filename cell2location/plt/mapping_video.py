@@ -196,21 +196,26 @@ def plot_spatial(spot_factors_df, coords, text=None,
     return fig
 
 
-def plot_contours(spot_factors_df, coords, text=None,
-                  circle_diameter=4, alpha_scaling=0.6,
-                  col_breaks=(0.1, 100, 1000, 3000),
-                  max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
-                  max_color_quantile=0.95,
-                  show_img=True, img=None, img_alpha=1,
-                  plot_contour=False,
-                  save_path=None, save_name='', save_extension='png',
-                  save_facecolor='black',
-                  show_fig=True, lim=None,
-                  fontsize=12, adjust_text=False,
-                  plt_axis='off', axis_y_flipped=True, x_y_labels=('', ''),
-                  crop_x=None, crop_y=None, text_box_alpha=0.9,
-                  reorder_cmap=range(7), overwrite_color=None):
-    r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation. 
+def plot_spatial(spot_factors_df, coords, text=None,
+                 circle_diameter=4,
+                 alpha_scaling=0.6,
+                 max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
+                 max_color_quantile=0.95,
+                 show_img=True,
+                 img=None,
+                 img_alpha=1,
+                 adjust_text=False,
+                 plt_axis='off',
+                 axis_y_flipped=True,
+                 x_y_labels=('', ''),
+                 crop_x=None,
+                 crop_y=None,
+                 text_box_alpha=0.9,
+                 reorder_cmap=range(7),
+                 overwrite_color=None,
+                 labels=None,
+                 style='fast'):
+    r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
     :param spot_factors_df: pd.DataFrame - spot locations of cell types, only 6 cell types allowed
@@ -218,34 +223,33 @@ def plot_contours(spot_factors_df, coords, text=None,
     :param text: pd.DataFrame - with x, y coordinates, text to be printed
     :param circle_diameter: diameter of circles
     :param alpha_scaling: adjust color alpha
-    :param col_breaks: contour plot levels
     :param max_col: crops the colorscale maximum value for each column in spot_factors_df.
     :param max_color_quantile: crops the colorscale at x quantile of the data.
     :param show_img: show image?
-    :param img: numpy array representing a tissue image. 
+    :param img: numpy array representing a tissue image.
         If not provided a black background image is used.
     :param img_alpha: transparency of the image
-    :param plot_contour: boolean, whether to plot contours (not implemented yet).
-    :param save_path: if not None - directory where to save images, otherwise the plot is shown.
-    :param save_name: file name when saving the plot
-    :param save_extension: file extension when saving the plot
-    :param show_fig: boolean, show figure?
-    :param lim: x and y max limits on the plot. Minimum is always set to 0, if `lim` is None maximum 
+    :param lim: x and y max limits on the plot. Minimum is always set to 0, if `lim` is None maximum
         is set to image height and width. If 'no_limit' then no limit is set.
-    :param fontsize: text fontsize
     :param adjust_text: move text label to prevent overlap
     :param plt_axis: show axes?
     :param axis_y_flipped: flip y axis to match coordinates of the plotted image
     :param reorder_cmap: reorder colors to make sure you get the right color for each category
     """
 
+    # TODO add parameter description
+
     if spot_factors_df.shape[1] > 7:
         raise ValueError('Maximum of 7 cell types / factors can be plotted at the moment')
 
     def create_colormap(R, G, B):
+        white_spacing = 50
+
         N = 255
-        alphas = np.concatenate([np.zeros(55),
-                                 np.linspace(0, 1.0, 255 - 55)])
+        M = 3
+        N = M * N
+        alphas = np.concatenate([[0] * white_spacing * M,
+                                 np.linspace(0, 1.0, (255 - white_spacing) * M)])
 
         vals = np.ones((N, 4))
         vals[:, 0] = np.linspace(1, R / 255, N)
@@ -262,12 +266,7 @@ def plot_contours(spot_factors_df, coords, text=None,
     GreenCM = create_colormap(0, 158, 115)
     GreyCM = create_colormap(200, 200, 200)
     WhiteCM = create_colormap(50, 50, 50)
-
-    PurpleCM = plt.cm.get_cmap('Purples')
-    PurpleCM._init()
-    alphas = np.concatenate([np.zeros(59),
-                             np.linspace(0, 1.0, 259 - 59)])
-    PurpleCM._lut[:, -1] = alphas
+    PurpleCM = create_colormap(63, 0, 125)
 
     cmaps = [YellowCM,
              RedCM,
@@ -279,128 +278,95 @@ def plot_contours(spot_factors_df, coords, text=None,
 
     cmaps = [cmaps[i] for i in reorder_cmap]
 
-    # modify shape of alpha scaling
-    alpha_scaling = alpha_scaling * np.ones_like(max_col)
+    with mpl.style.context(style):
 
-    fig = plt.figure()
+        fig = plt.figure()
 
-    # pick spot weights from just one sample
-    weights = spot_factors_df.values.copy()
+        gs = GridSpec(nrows=len(labels) + 2, ncols=2, width_ratios=[1, 0.15],
+                      height_ratios=[1, *[0.2] * len(labels), 1], hspace=1.5, wspace=0.0)
 
-    # plot tissue image
-    # plot tissue image
-    if img is not None and show_img:
-        plt.imshow(img, aspect='equal', alpha=img_alpha)
-        img_lim_0, img_lim_1 = img.shape[:2]
+        ax = fig.add_subplot(gs[:, 0], aspect='equal', rasterized=True)
+        ax.set_xlabel(x_y_labels[0])
+        ax.set_ylabel(x_y_labels[1])
 
-    elif show_img:
-        if len(coords.shape) == 3:
-            xy = coords.max((0, 1))
-        else:
-            xy = coords.max(0)
+        cbar_axes = [fig.add_subplot(gs[i, 1]) for i in range(len(labels) + 2)]
+        cbar_axes[0].set_visible(False)
+        cbar_axes[-1].set_visible(False)
 
-        img = np.zeros((int(xy[1]), int(xy[0]), 3))
-        plt.imshow(img, aspect='equal', alpha=img_alpha)
+        if img is not None and show_img:
+            ax.imshow(img, aspect='equal', alpha=img_alpha, origin='lower')
 
-    else:
-        if len(coords.shape) == 3:
-            xy = coords.max((0, 1))
-        else:
-            xy = coords.max(0)
+        # crop images in needed
+        if crop_x is not None:
+            ax.set_xlim(crop_x[0], crop_x[1])
+        if crop_y is not None:
+            ax.set_ylim(crop_y[0], crop_y[1])
 
         if axis_y_flipped:
-            img_lim_0 = int(xy[1])
-            img_lim_1 = int(xy[0])
-        else:
-            img_lim_0 = int(xy[0])
-            img_lim_1 = int(xy[1])
+            ax.invert_yaxis()
 
-    # plot spots as circles
-    c_ord = list(np.arange(0, weights.shape[1])) + list(np.linspace(start=weights.shape[1] - 1,
-                                                                    stop=0, num=weights.shape[1],
-                                                                    dtype=int))
+        if plt_axis == 'off':
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            ax.tick_params(bottom=False, labelbottom=False,
+                           left=False, labelleft=False)
 
-    for c in c_ord:
+        # pick spot weights from just one sample
+        weights = spot_factors_df.values.copy()
 
-        min_color_intensity = weights[:, c].min()
-        max_color_intensity = np.min([np.quantile(weights[:, c], max_color_quantile),
-                                      max_col[c]])
+        # plot spots as circles
+        c_ord = list(np.arange(0, weights.shape[1]))
 
-        rgb_function = get_rgb_function(cmap=cmaps[c],
-                                        min_value=min_color_intensity,
-                                        max_value=max_color_intensity)
+        for c in c_ord:
 
-        if len(coords.shape) == 3:
-            coords_s = coords[c, :, :]
-        else:
-            coords_s = coords
+            min_color_intensity = weights[:, c].min()
+            max_color_intensity = np.min([np.quantile(weights[:, c], max_color_quantile),
+                                          max_col[c]])
 
-        color = rgb_function(weights[:, c])
+            rgb_function = get_rgb_function(cmap=cmaps[c],
+                                            min_value=min_color_intensity,
+                                            max_value=max_color_intensity)
 
-        if overwrite_color is not None:
-            color = overwrite_color * alpha_scaling[c]
+            if len(coords.shape) == 3:
+                coords_s = coords[c, :, :]
+            else:
+                coords_s = coords
 
-        color[:, 3] = color[:, 3] * alpha_scaling[c]
+            color = rgb_function(weights[:, c])
+            color[:, 3] = color[:, 3] * alpha_scaling
 
-        plt.scatter(x=coords_s[:, 0], y=coords_s[:, 1],
-                    c=color, s=circle_diameter ** 2)
+            ax.scatter(x=coords_s[:, 0], y=coords_s[:, 1],
+                       c=color, s=circle_diameter ** 2, label=labels[c])
 
-    # plot_contours
-    if plot_contour:
-        # TODO: first, compute a 2d histogram, next plot contours
-        raise ValueError('plotting contours is not implemented yet (useful for showing density in scRNA-seq)')
+            norm = mpl.colors.Normalize(vmin=min_color_intensity, vmax=max_color_intensity)
 
-    # add text
-    if text is not None:
-        bbox_props = dict(boxstyle="round", ec="0.5",
-                          alpha=text_box_alpha, fc="w")
-        texts = []
-        for x, y, s in zip(np.array(text.iloc[:, 0].values).flatten(),
-                           np.array(text.iloc[:, 1].values).flatten(),
-                           text.iloc[:, 2].tolist()):
-            texts.append(plt.text(x, y, s,
-                                  ha="center", va="bottom",
-                                  bbox=bbox_props))
+            cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
+                          int(max_color_intensity)]
 
-        if adjust_text:
-            from adjustText import adjust_text
-            adjust_text(texts, arrowprops=dict(arrowstyle="->", color='w', lw=0.5))
+            cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
+                                orientation='horizontal', extend='both', ticks=cbar_ticks)
 
-    plt.xlabel(x_y_labels[0])
-    plt.ylabel(x_y_labels[1])
+            cbar.ax.tick_params(labelsize=12)
+            max_color = rgb_function(max_color_intensity / 1.5)
+            cbar.ax.set_title(labels[c], size=17, y=1.15, color=max_color, alpha=1)
 
-    if lim == 'no_limit':
-        pass
-    elif lim is None:
-        plt.xlim(0, img_lim_0)
-        if axis_y_flipped:
-            plt.ylim(img_lim_1, 0)
-        else:
-            plt.ylim(0, img_lim_1)
-    else:
-        plt.xlim(0, lim[0])
-        if axis_y_flipped:
-            plt.ylim(lim[1], 0)
-        else:
-            plt.ylim(0, lim[1])
+        # add text
+        if text is not None:
+            bbox_props = dict(boxstyle="round", ec="0.5",
+                              alpha=text_box_alpha, fc="w")
+            texts = []
+            for x, y, s in zip(np.array(text.iloc[:, 0].values).flatten(),
+                               np.array(text.iloc[:, 1].values).flatten(),
+                               text.iloc[:, 2].tolist()):
+                texts.append(ax.text(x, y, s,
+                                     ha="center", va="bottom",
+                                     bbox=bbox_props))
 
-    plt.gca().axis(plt_axis)
+            if adjust_text:
+                from adjustText import adjust_text
+                adjust_text(texts, arrowprops=dict(arrowstyle="->", color='w', lw=0.5))
 
-    # crop images in needed
-    if crop_x is not None:
-        plt.xlim(crop_x[0], crop_x[1])
-    if crop_y is not None:
-        plt.ylim(crop_y[0], crop_y[1])
-
-    if show_fig:
-        plt.show()
-
-    if save_path is not None:
-        plt.savefig(f'{save_path}density_maps_{save_name}.{save_extension}',
-                    bbox_inches='tight', facecolor=save_facecolor)
-
-    fig.clear()
-    plt.close(fig)
+    return fig
 
 
 def interpolate_coord(start=10, end=5, steps=100, accel_power=3,
