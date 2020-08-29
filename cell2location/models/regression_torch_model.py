@@ -122,11 +122,12 @@ class RegressionTorchModel(TorchModel):
         plt.title('Gene expression level (hierarchical)')
         plt.tight_layout()
 
-    def sample2df(self, gene_node_name='gene_factors'):
+    def sample2df(self, gene_node_name='gene_factors', sample_type='means'):
         r""" Export cell factors as Pandas data frames.
 
         :param node_name: name of the cell factor model parameter to be exported
         :param gene_node_name: name of the gene factor model parameter to be exported
+        :param sample_type: type of posterior sample (means, q05, q95, sds)
         :return: 8 Pandas dataframes added to model object:
                  .covariate_effects, .covariate_effects_sd, .covariate_effects_q05, .covariate_effects_q95
                  .sample_effects, .sample_effects_sd, .sample_effects_q05, .sample_effects_q95
@@ -135,18 +136,18 @@ class RegressionTorchModel(TorchModel):
         # export parameters for covariate effects
         cov_ind = ~ self.which_sample
         self.covariate_effects = \
-            pd.DataFrame.from_records(self.samples['post_sample_means'][gene_node_name][cov_ind, :].T,
+            pd.DataFrame.from_records(self.samples['post_sample_'+sample_type][gene_node_name][cov_ind, :].T,
                                       index=self.var_names,
-                                      columns=['mean_' + 'cov_effect_' + i for i in self.fact_names[cov_ind]])
+                                      columns=[sample_type + '_cov_effect_' + i for i in self.fact_names[cov_ind]])
 
         # export parameters for sample effects
         sample_ind = self.which_sample
         self.sample_effects = \
-            pd.DataFrame.from_records(self.samples['post_sample_means'][gene_node_name][sample_ind, :].T,
+            pd.DataFrame.from_records(self.samples['post_sample_'+sample_type][gene_node_name][sample_ind, :].T,
                                       index=self.var_names,
-                                      columns=['mean_' + 'sample_effect' + i for i in self.fact_names[sample_ind]])
+                                      columns=[sample_type + '_sample_effect' + i for i in self.fact_names[sample_ind]])
 
-    def annotate_cell_adata(self, adata):
+    def annotate_cell_adata(self, adata, use_raw=True):
         r""" Add covariate and sample coefficients to anndata.var
 
         :param adata: anndata object to annotate
@@ -156,12 +157,17 @@ class RegressionTorchModel(TorchModel):
         if self.cell_factors_df is None:
             self.sample2df()
 
+        if use_raw is True:
+            var_index = adata.raw.var.index
+        else:
+            var_index = adata.var.index
+
         ### Covariate effect
         # add gene factors to adata
-        adata.var[self.covariate_effects.columns] = self.covariate_effects.loc[adata.var.index, :]
+        adata.var[self.covariate_effects.columns] = self.covariate_effects.loc[var_index, :]
 
         ### Sample effects
         # add gene factors to adata
-        adata.var[self.sample_effects.columns] = self.sample_effects.loc[adata.var.index, :]
+        adata.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
 
         return (adata)
