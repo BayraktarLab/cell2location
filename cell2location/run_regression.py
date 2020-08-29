@@ -131,6 +131,10 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         fit_kwards['n'] = train_args['n_restarts']
     if train_args['l2_weight'] is not None:
         fit_kwards['l2_weight'] = train_args['l2_weight']
+    if train_args['use_raw'] is True:
+        train_args['var_names'] = sc_data.var_names
+    else:
+        train_args['var_names'] = sc_data.raw.var_names
 
     train_args['checkpoint_dir'] = f'{export_args["path"]}/checkpoints'
     if train_args['checkpoints'] is not None:
@@ -149,7 +153,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     mod = Model(cell2covar=cell2covar,
                 X_data=X_data,
                 n_iter=train_args['n_epochs'], learning_rate=train_args['learning_rate'],
-                var_names=sc_data.var_names,
+                var_names=train_args['var_names'],
                 minibatch_size=train_args['minibatch_size'], minibatch_seed=train_args['minibatch_seed'],
                 use_average_as_initial_value=train_args['use_average_as_initial_value'],
                 verbose=False,
