@@ -158,16 +158,27 @@ class RegressionTorchModel(TorchModel):
             self.sample2df()
 
         if use_raw is True:
+
             var_index = adata.raw.var.index
+
+            ### Covariate effect
+            # add gene factors to adata
+            adata.raw.var[self.covariate_effects.columns] = self.covariate_effects.loc[var_index, :]
+
+            ### Sample effects
+            # add gene factors to adata
+            adata.raw.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
+
         else:
+            
             var_index = adata.var.index
 
-        ### Covariate effect
-        # add gene factors to adata
-        adata.var[self.covariate_effects.columns] = self.covariate_effects.loc[var_index, :]
+            ### Covariate effect
+            # add gene factors to adata
+            adata.var[self.covariate_effects.columns] = self.covariate_effects.loc[var_index, :]
 
-        ### Sample effects
-        # add gene factors to adata
-        adata.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
+            ### Sample effects
+            # add gene factors to adata
+            adata.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
 
         return (adata)
