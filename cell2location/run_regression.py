@@ -295,7 +295,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     # convert additive sample and covariate effects to pd.DataFrame
     mod.sample2df()
     # annotate single cell data object
-    sc_data = mod.(sc_data, use_raw=train_argannotate_cell_adatas['use_raw'])
+    sc_data = mod.annotate_cell_adata(sc_data, use_raw=train_args['use_raw'])
 
     # save
     mod.covariate_effects.to_csv(path + 'covariate_effects.csv')
