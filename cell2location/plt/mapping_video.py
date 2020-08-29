@@ -544,7 +544,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     #### start saving plots ####
     # plot UMAP with no changes
     for i0 in range(step_n[0]):
-        plot_contours(cell_fact_df,
+        plot_spatial(cell_fact_df,
                       coords=umap_coord,
                       circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
                       img=sc_img, img_alpha=1, plot_contour=False,
@@ -556,7 +556,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot evolving UMAP from cells to averages
     for i1 in tqdm(range(step_n[1])):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_contours(ann_no_other,
+        plot_spatial(ann_no_other,
                       coords=moving_averages1[:, i1, :, :],
                       circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
                       img=sc_img, img_alpha=1, plot_contour=False,
@@ -568,7 +568,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot averages
     for i2 in range(step_n[2]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_contours(ann_no_other,
+        plot_spatial(ann_no_other,
                       coords=moving_averages1[:, i1 + 1, :, :],
                       text=aver_coord[['x', 'y', 'column']],
                       circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
@@ -582,7 +582,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot averages & fade-in histology image
     for i22 in range(step_n[3]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_contours(ann_no_other,
+        plot_spatial(ann_no_other,
                       coords=moving_averages1[:, i1 + 1, :, :],
                       text=aver_coord[['x', 'y', 'column']],
                       circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
@@ -595,7 +595,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
 
     # plot evolving UMAP from cells to averages
     for i3 in tqdm(range(step_n[4])):
-        plot_contours(sel_clust_df,
+        plot_spatial(sel_clust_df,
                       coords=moving_averages2[:, i3, :, :],
                       circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
                       img=sp_img, img_alpha=img_alpha, plot_contour=False,
@@ -605,7 +605,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
 
     # plot a few final images
     for i4 in range(step_n[5]):
-        plot_contours(sel_clust_df,
+        plot_spatial(sel_clust_df,
                       coords=moving_averages2[:, i3 + 1, :, :],
                       circle_diameter=circ_diam2[i3 + 1],
                       alpha_scaling=sp_alpha,
