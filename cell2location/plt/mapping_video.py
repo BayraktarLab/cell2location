@@ -23,6 +23,52 @@ def get_rgb_function(cmap, min_value, max_value):
     return func
 
 
+def rgb_to_ryb(rgb):
+    rgb_r, rgb_g, rgb_b = [x for x in rgb]
+
+    white = min(rgb_r, rgb_g, rgb_b)
+    black = min(1 - rgb_r, 1 - rgb_g, 1 - rgb_b)
+    (rgb_r, rgb_g, rgb_b) = (x - white for x in (rgb_r, rgb_g, rgb_b))
+
+    yellow = min(rgb_r, rgb_g)
+    ryb_r = rgb_r - yellow
+    ryb_y = (yellow + rgb_g) / 2
+    ryb_b = (rgb_b + rgb_g - yellow) / 2
+
+    norm = 0
+    if max(rgb_r, rgb_g, rgb_b) != 0:
+        norm = max(ryb_r, ryb_y, ryb_b) / max(rgb_r, rgb_g, rgb_b)
+    ryb_r = ryb_r / norm if norm > 0 else ryb_r
+    ryb_y = ryb_y / norm if norm > 0 else ryb_y
+    ryb_b = ryb_b / norm if norm > 0 else ryb_b
+
+    (ryb_r, ryb_y, ryb_b) = (x + black for x in (ryb_r, ryb_y, ryb_b))
+    return np.array([x for x in (ryb_r, ryb_y, ryb_b)])
+
+
+def ryb_to_rgb(ryb):
+    ryb_r, ryb_y, ryb_b = [x for x in ryb]
+
+    black = min(ryb_r, ryb_y, ryb_b)
+    white = min(1 - ryb_r, 1 - ryb_y, 1 - ryb_b)
+    (ryb_r, ryb_y, ryb_b) = (x - black for x in (ryb_r, ryb_y, ryb_b))
+
+    green = min(ryb_y, ryb_b)
+    rgb_r = ryb_r + ryb_y - green
+    rgb_g = ryb_y + green
+    rgb_b = 2 * (ryb_b - green)
+
+    norm = 0
+    if max(ryb_r, ryb_y, ryb_b) != 0:
+        norm = max(rgb_r, rgb_g, rgb_b) / max(ryb_r, ryb_y, ryb_b)
+    rgb_r = rgb_r / norm if norm > 0 else rgb_r
+    rgb_g = rgb_g / norm if norm > 0 else rgb_g
+    rgb_b = rgb_b / norm if norm > 0 else rgb_b
+
+    (rgb_r, rgb_g, rgb_b) = (x + white for x in (rgb_r, rgb_g, rgb_b))
+    return np.array([x for x in (rgb_r, rgb_g, rgb_b)])
+
+
 def plot_spatial(spot_factors_df, coords, text=None,
                  circle_diameter=4,
                  alpha_scaling=0.6,
@@ -252,9 +298,11 @@ def plot_spatial(spot_factors_df, coords, text=None,
                                  np.linspace(0, 1.0, (255 - white_spacing) * M)])
 
         vals = np.ones((N, 4))
-        vals[:, 0] = np.linspace(1, R / 255, N)
-        vals[:, 1] = np.linspace(1, G / 255, N)
-        vals[:, 2] = np.linspace(1, B / 255, N)
+        #         vals[:, 0] = np.linspace(1, R / 255, N)
+        #         vals[:, 1] = np.linspace(1, G / 255, N)
+        #         vals[:, 2] = np.linspace(1, B / 255, N)
+        for i, color in enumerate([R, G, B]):
+            vals[:, i] = color / 255
         vals[:, 3] = alphas
 
         return ListedColormap(vals)
@@ -312,15 +360,18 @@ def plot_spatial(spot_factors_df, coords, text=None,
                            left=False, labelleft=False)
 
         # pick spot weights from just one sample
-        weights = spot_factors_df.values.copy()
+        counts = spot_factors_df.values.copy()
 
         # plot spots as circles
-        c_ord = list(np.arange(0, weights.shape[1]))
+        c_ord = list(np.arange(0, counts.shape[1]))
+
+        colors = np.zeros((*counts.shape, 4))
+        weights = np.zeros(counts.shape)
 
         for c in c_ord:
 
-            min_color_intensity = weights[:, c].min()
-            max_color_intensity = np.min([np.quantile(weights[:, c], max_color_quantile),
+            min_color_intensity = counts[:, c].min()
+            max_color_intensity = np.min([np.quantile(counts[:, c], max_color_quantile),
                                           max_col[c]])
 
             rgb_function = get_rgb_function(cmap=cmaps[c],
@@ -332,11 +383,8 @@ def plot_spatial(spot_factors_df, coords, text=None,
             else:
                 coords_s = coords
 
-            color = rgb_function(weights[:, c])
+            color = rgb_function(counts[:, c])
             color[:, 3] = color[:, 3] * alpha_scaling
-
-            ax.scatter(x=coords_s[:, 0], y=coords_s[:, 1],
-                       c=color, s=circle_diameter ** 2, label=labels[c])
 
             norm = mpl.colors.Normalize(vmin=min_color_intensity, vmax=max_color_intensity)
 
@@ -349,6 +397,32 @@ def plot_spatial(spot_factors_df, coords, text=None,
             cbar.ax.tick_params(labelsize=12)
             max_color = rgb_function(max_color_intensity / 1.5)
             cbar.ax.set_title(labels[c], size=17, y=1.15, color=max_color, alpha=1)
+
+            colors[:, c] = color
+            weights[:, c] = np.clip(counts[:, c] / max_color_intensity, 0, 1)
+            weights[:, c][counts[:, c] < min_color_intensity] = 0
+
+        colors_ryb = np.zeros((*weights.shape, 3))
+
+        for i in range(colors.shape[0]):
+            for j in range(colors.shape[1]):
+                colors_ryb[i, j] = rgb_to_ryb(colors[i, j, :3])
+
+        def kernel(w):
+            return (w) ** 2
+
+        kernel_weights = kernel(weights[:, :, np.newaxis])
+        weighted_colors_ryb = (colors_ryb * kernel_weights).sum(axis=1) / kernel_weights.sum(axis=1)
+
+        weighted_colors = np.zeros((weights.shape[0], 4))
+
+        for i in range(colors.shape[0]):
+            weighted_colors[i, :3] = ryb_to_rgb(weighted_colors_ryb[i])
+
+        weighted_colors[:, 3] = colors[:, :, 3].max(axis=1)
+
+        ax.scatter(x=coords[:, 0], y=coords[:, 1],
+                   c=weighted_colors, s=circle_diameter ** 2, label=labels[c])
 
         # add text
         if text is not None:
