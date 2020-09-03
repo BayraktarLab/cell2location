@@ -79,188 +79,17 @@ def plot_spatial(spot_factors_df, coords, text=None,
                  img_alpha=1,
                  adjust_text=False,
                  plt_axis='off',
-                 axis_y_flipped=False,
-                 x_y_labels=('', ''),
-                 crop_x=None,
-                 crop_y=None,
-                 text_box_alpha=0.9,
-                 reorder_cmap=range(7),
-                 overwrite_color=None,
-                 labels=None,
-                 style='fast'):
-    r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
-      This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
-      'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
-    :param spot_factors_df: pd.DataFrame - spot locations of cell types, only 6 cell types allowed
-    :param coords: np.ndarray - x and y coordinates (in columns) to be used for ploting spots
-    :param text: pd.DataFrame - with x, y coordinates, text to be printed
-    :param circle_diameter: diameter of circles
-    :param alpha_scaling: adjust color alpha
-    :param max_col: crops the colorscale maximum value for each column in spot_factors_df.
-    :param max_color_quantile: crops the colorscale at x quantile of the data.
-    :param show_img: show image?
-    :param img: numpy array representing a tissue image.
-        If not provided a black background image is used.
-    :param img_alpha: transparency of the image
-    :param lim: x and y max limits on the plot. Minimum is always set to 0, if `lim` is None maximum
-        is set to image height and width. If 'no_limit' then no limit is set.
-    :param adjust_text: move text label to prevent overlap
-    :param plt_axis: show axes?
-    :param axis_y_flipped: flip y axis to match coordinates of the plotted image
-    :param reorder_cmap: reorder colors to make sure you get the right color for each category
-    """
-
-    # TODO add parameter description
-
-    if spot_factors_df.shape[1] > 7:
-        raise ValueError('Maximum of 7 cell types / factors can be plotted at the moment')
-
-    def create_colormap(R, G, B):
-        white_spacing = 50
-
-        N = 255
-        M = 3
-        N = M * N
-        alphas = np.concatenate([[0] * white_spacing * M,
-                                 np.linspace(0, 1.0, (255 - white_spacing) * M)])
-
-        vals = np.ones((N, 4))
-        vals[:, 0] = np.linspace(1, R / 255, N)
-        vals[:, 1] = np.linspace(1, G / 255, N)
-        vals[:, 2] = np.linspace(1, B / 255, N)
-        vals[:, 3] = alphas
-
-        return ListedColormap(vals)
-
-    # Create linearly scaled colormaps
-    YellowCM = create_colormap(240, 228, 66)
-    RedCM = create_colormap(213, 94, 0)
-    BlueCM = create_colormap(86, 180, 233)
-    GreenCM = create_colormap(0, 158, 115)
-    GreyCM = create_colormap(200, 200, 200)
-    WhiteCM = create_colormap(50, 50, 50)
-    PurpleCM = create_colormap(63, 0, 125)
-
-    cmaps = [YellowCM,
-             RedCM,
-             BlueCM,
-             GreenCM,
-             PurpleCM,
-             GreyCM,
-             WhiteCM]
-
-    cmaps = [cmaps[i] for i in reorder_cmap]
-
-    with mpl.style.context(style):
-
-        fig = plt.figure()
-
-        gs = GridSpec(nrows=len(labels) + 2, ncols=2, width_ratios=[1, 0.15],
-                      height_ratios=[1, *[0.2] * len(labels), 1], hspace=1.5, wspace=0.0)
-
-        ax = fig.add_subplot(gs[:, 0], aspect='equal', rasterized=True)
-        ax.set_xlabel(x_y_labels[0])
-        ax.set_ylabel(x_y_labels[1])
-
-        cbar_axes = [fig.add_subplot(gs[i, 1]) for i in range(len(labels) + 2)]
-        cbar_axes[0].set_visible(False)
-        cbar_axes[-1].set_visible(False)
-
-        if img is not None and show_img:
-            ax.imshow(img, aspect='equal', alpha=img_alpha)
-
-        # crop images in needed
-        if crop_x is not None:
-            ax.set_xlim(crop_x[0], crop_x[1])
-        if crop_y is not None:
-            ax.set_ylim(crop_y[0], crop_y[1])
-
-        if axis_y_flipped:
-            ax.invert_yaxis()
-
-        if plt_axis == 'off':
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-            ax.tick_params(bottom=False, labelbottom=False,
-                           left=False, labelleft=False)
-
-        # pick spot weights from just one sample
-        weights = spot_factors_df.values.copy()
-
-        # plot spots as circles
-        c_ord = list(np.arange(0, weights.shape[1]))
-
-        for c in c_ord:
-
-            min_color_intensity = weights[:, c].min()
-            max_color_intensity = np.min([np.quantile(weights[:, c], max_color_quantile),
-                                          max_col[c]])
-
-            rgb_function = get_rgb_function(cmap=cmaps[c],
-                                            min_value=min_color_intensity,
-                                            max_value=max_color_intensity)
-
-            if len(coords.shape) == 3:
-                coords_s = coords[c, :, :]
-            else:
-                coords_s = coords
-
-            color = rgb_function(weights[:, c])
-            color[:, 3] = color[:, 3] * alpha_scaling
-
-            ax.scatter(x=coords_s[:, 0], y=coords_s[:, 1],
-                       c=color, s=circle_diameter ** 2, label=labels[c])
-
-            norm = mpl.colors.Normalize(vmin=min_color_intensity, vmax=max_color_intensity)
-
-            cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
-                          int(max_color_intensity)]
-
-            cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
-                                orientation='horizontal', extend='both', ticks=cbar_ticks)
-
-            cbar.ax.tick_params(labelsize=12)
-            max_color = rgb_function(max_color_intensity / 1.5)
-            cbar.ax.set_title(labels[c], size=17, y=1.15, color=max_color, alpha=1)
-
-        # add text
-        if text is not None:
-            bbox_props = dict(boxstyle="round", ec="0.5",
-                              alpha=text_box_alpha, fc="w")
-            texts = []
-            for x, y, s in zip(np.array(text.iloc[:, 0].values).flatten(),
-                               np.array(text.iloc[:, 1].values).flatten(),
-                               text.iloc[:, 2].tolist()):
-                texts.append(ax.text(x, y, s,
-                                     ha="center", va="bottom",
-                                     bbox=bbox_props))
-
-            if adjust_text:
-                from adjustText import adjust_text
-                adjust_text(texts, arrowprops=dict(arrowstyle="->", color='w', lw=0.5))
-
-    return fig
-
-
-def plot_spatial(spot_factors_df, coords, text=None,
-                 circle_diameter=4,
-                 alpha_scaling=0.6,
-                 max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
-                 max_color_quantile=0.95,
-                 show_img=True,
-                 img=None,
-                 img_alpha=1,
-                 adjust_text=False,
-                 plt_axis='off',
                  axis_y_flipped=True,
                  x_y_labels=('', ''),
                  crop_x=None,
                  crop_y=None,
                  text_box_alpha=0.9,
                  reorder_cmap=range(7),
-                 overwrite_color=None,
                  labels=None,
-                 style='fast'):
+                 style='fast',
+                 colorbar_position='bottom',
+                 colorbar_label_kw={}.copy(),
+                 colorbar_shape={}.copy()):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
@@ -281,6 +110,10 @@ def plot_spatial(spot_factors_df, coords, text=None,
     :param plt_axis: show axes?
     :param axis_y_flipped: flip y axis to match coordinates of the plotted image
     :param reorder_cmap: reorder colors to make sure you get the right color for each category
+    :param colorbar_position: 'bottom', 'right' or None
+    :param colorbar_label_kw: dict that will be forwarded to ax.set_label()
+    :param colorbar_shape: dict {'vertical_gaps': 1.5, 'horizontal_gaps': 1.5,
+                                    'width': 0.2, 'height': 0.2}, not obligatory to contain all params
     """
 
     # TODO add parameter description
@@ -293,14 +126,14 @@ def plot_spatial(spot_factors_df, coords, text=None,
 
         N = 255
         M = 3
-        N = M * N
-        alphas = np.concatenate([[0] * white_spacing * M,
-                                 np.linspace(0, 1.0, (255 - white_spacing) * M)])
 
-        vals = np.ones((N, 4))
-        #         vals[:, 0] = np.linspace(1, R / 255, N)
-        #         vals[:, 1] = np.linspace(1, G / 255, N)
-        #         vals[:, 2] = np.linspace(1, B / 255, N)
+        alphas = np.concatenate([[0] * white_spacing * M,
+                                 np.linspace(0, 1.0, (N - white_spacing) * M)])
+
+        vals = np.ones((N * M, 4))
+        #         vals[:, 0] = np.linspace(1, R / 255, N * M)
+        #         vals[:, 1] = np.linspace(1, G / 255, N * M)
+        #         vals[:, 2] = np.linspace(1, B / 255, N * M)
         for i, color in enumerate([R, G, B]):
             vals[:, i] = color / 255
         vals[:, 3] = alphas
@@ -314,7 +147,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
     GreenCM = create_colormap(0, 158, 115)
     GreyCM = create_colormap(200, 200, 200)
     WhiteCM = create_colormap(50, 50, 50)
-    PurpleCM = create_colormap(63, 0, 125)
+    PurpleCM = create_colormap(90, 20, 165)
 
     cmaps = [YellowCM,
              RedCM,
@@ -330,16 +163,41 @@ def plot_spatial(spot_factors_df, coords, text=None,
 
         fig = plt.figure()
 
-        gs = GridSpec(nrows=len(labels) + 2, ncols=2, width_ratios=[1, 0.15],
-                      height_ratios=[1, *[0.2] * len(labels), 1], hspace=1.5, wspace=0.0)
+        if colorbar_position == 'right':
+            shape = {'vertical_gaps': 1.5, 'horizontal_gaps': 0, 'width': 0.15, 'height': 0.2}
+            shape = {**shape, **colorbar_shape}
 
-        ax = fig.add_subplot(gs[:, 0], aspect='equal', rasterized=True)
+            gs = GridSpec(nrows=len(labels) + 2, ncols=2, width_ratios=[1, shape['width']],
+                          height_ratios=[1, *[shape['height']] * len(labels), 1],
+                          hspace=shape['vertical_gaps'], wspace=shape['horizontal_gaps'])
+            ax = fig.add_subplot(gs[:, 0], aspect='equal', rasterized=True)
+            cbar_axes = [fig.add_subplot(gs[i, 1]) for i in range(len(labels) + 2)]
+            cbar_axes[0].set_visible(False)
+            cbar_axes[-1].set_visible(False)
+
+        if colorbar_position == 'bottom':
+            shape = {'vertical_gaps': 0.3, 'horizontal_gaps': 0.6, 'width': 0.2, 'height': 0.035}
+            shape = {**shape, **colorbar_shape}
+            ncols = round(len(labels) / 2 + 0.1) + 2
+
+            gs = GridSpec(nrows=3, ncols=ncols, width_ratios=[0.3, *[shape['width']] * (ncols - 2), 0.3],
+                          height_ratios=[1, shape['height'], shape['height']],
+                          hspace=shape['vertical_gaps'], wspace=shape['horizontal_gaps'])
+            ax = fig.add_subplot(gs[0, :], aspect='equal', rasterized=True)
+            cbar_axes = [fig.add_subplot(gs[1, i]) for i in range(ncols)]
+            cbar_axes += [fig.add_subplot(gs[2, i]) for i in range(ncols)]
+            cbar_axes.pop(ncols).set_visible(False)
+            cbar_axes.pop(ncols - 1).set_visible(False)
+            if len(labels) % 2 == 1:
+                cbar_axes[-2].set_visible(False)
+            cbar_axes[0].set_visible(False)
+            cbar_axes[-1].set_visible(False)
+
+        if colorbar_position == None:
+            ax = fig.add_subplot(aspect='equal', rasterized=True)
+
         ax.set_xlabel(x_y_labels[0])
         ax.set_ylabel(x_y_labels[1])
-
-        cbar_axes = [fig.add_subplot(gs[i, 1]) for i in range(len(labels) + 2)]
-        cbar_axes[0].set_visible(False)
-        cbar_axes[-1].set_visible(False)
 
         if img is not None and show_img:
             ax.imshow(img, aspect='equal', alpha=img_alpha, origin='lower')
@@ -388,15 +246,17 @@ def plot_spatial(spot_factors_df, coords, text=None,
 
             norm = mpl.colors.Normalize(vmin=min_color_intensity, vmax=max_color_intensity)
 
-            cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
-                          int(max_color_intensity)]
+            if colorbar_position != None:
+                cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
+                              int(max_color_intensity)]
 
-            cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
-                                orientation='horizontal', extend='both', ticks=cbar_ticks)
+                cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
+                                    orientation='horizontal', extend='both', ticks=cbar_ticks)
 
-            cbar.ax.tick_params(labelsize=12)
-            max_color = rgb_function(max_color_intensity / 1.5)
-            cbar.ax.set_title(labels[c], size=17, y=1.15, color=max_color, alpha=1)
+                cbar.ax.tick_params(labelsize=12)
+                max_color = rgb_function(max_color_intensity / 1.5)
+                cbar.ax.set_title(labels[c],
+                                  {**{'size': 20, 'y': 1.25, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
 
             colors[:, c] = color
             weights[:, c] = np.clip(counts[:, c] / max_color_intensity, 0, 1)
@@ -619,71 +479,71 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot UMAP with no changes
     for i0 in range(step_n[0]):
         plot_spatial(cell_fact_df,
-                      coords=umap_coord,
-                      circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
-                      img=sc_img, img_alpha=1, plot_contour=False,
-                      # determine max color level using data quantiles
-                      max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
-                      save_path=save_path, save_name=str(i0 + 1),  # axis_y_flipped=False,
-                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                     coords=umap_coord,
+                     circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
+                     img=sc_img, img_alpha=1, plot_contour=False,
+                     # determine max color level using data quantiles
+                     max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
+                     save_path=save_path, save_name=str(i0 + 1),  # axis_y_flipped=False,
+                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
 
     # plot evolving UMAP from cells to averages
     for i1 in tqdm(range(step_n[1])):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         plot_spatial(ann_no_other,
-                      coords=moving_averages1[:, i1, :, :],
-                      circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
-                      img=sc_img, img_alpha=1, plot_contour=False,
-                      # determine max color level using data quantiles
-                      max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
-                      save_path=save_path, save_name=str(i0 + i1 + 2),  # axis_y_flipped=False,
-                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                     coords=moving_averages1[:, i1, :, :],
+                     circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
+                     img=sc_img, img_alpha=1, plot_contour=False,
+                     # determine max color level using data quantiles
+                     max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
+                     save_path=save_path, save_name=str(i0 + i1 + 2),  # axis_y_flipped=False,
+                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
 
     # plot averages
     for i2 in range(step_n[2]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         plot_spatial(ann_no_other,
-                      coords=moving_averages1[:, i1 + 1, :, :],
-                      text=aver_coord[['x', 'y', 'column']],
-                      circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                      img=sc_img, img_alpha=1, plot_contour=False,
-                      # determine max color level using data quantiles
-                      max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
-                      save_path=save_path, save_name=str(i0 + i1 + i2 + 3),  # axis_y_flipped=False,
-                      show_fig=False, fontsize=fontsize,
-                      adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
+                     coords=moving_averages1[:, i1 + 1, :, :],
+                     text=aver_coord[['x', 'y', 'column']],
+                     circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
+                     img=sc_img, img_alpha=1, plot_contour=False,
+                     # determine max color level using data quantiles
+                     max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
+                     save_path=save_path, save_name=str(i0 + i1 + i2 + 3),  # axis_y_flipped=False,
+                     show_fig=False, fontsize=fontsize,
+                     adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
 
     # plot averages & fade-in histology image
     for i22 in range(step_n[3]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         plot_spatial(ann_no_other,
-                      coords=moving_averages1[:, i1 + 1, :, :],
-                      text=aver_coord[['x', 'y', 'column']],
-                      circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                      img=sp_img, img_alpha=img_alpha_seq[i22], plot_contour=False,
-                      # determine max color level using data quantiles
-                      max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
-                      save_path=save_path, save_name=str(i0 + i1 + i2 + i22 + 4),
-                      show_fig=False, fontsize=fontsize,
-                      adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
+                     coords=moving_averages1[:, i1 + 1, :, :],
+                     text=aver_coord[['x', 'y', 'column']],
+                     circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
+                     img=sp_img, img_alpha=img_alpha_seq[i22], plot_contour=False,
+                     # determine max color level using data quantiles
+                     max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
+                     save_path=save_path, save_name=str(i0 + i1 + i2 + i22 + 4),
+                     show_fig=False, fontsize=fontsize,
+                     adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
 
     # plot evolving UMAP from cells to averages
     for i3 in tqdm(range(step_n[4])):
         plot_spatial(sel_clust_df,
-                      coords=moving_averages2[:, i3, :, :],
-                      circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
-                      img=sp_img, img_alpha=img_alpha, plot_contour=False,
-                      max_color_quantile=step_quantile[4],
-                      save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 5),
-                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                     coords=moving_averages2[:, i3, :, :],
+                     circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
+                     img=sp_img, img_alpha=img_alpha, plot_contour=False,
+                     max_color_quantile=step_quantile[4],
+                     save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 5),
+                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
 
     # plot a few final images
     for i4 in range(step_n[5]):
         plot_spatial(sel_clust_df,
-                      coords=moving_averages2[:, i3 + 1, :, :],
-                      circle_diameter=circ_diam2[i3 + 1],
-                      alpha_scaling=sp_alpha,
-                      img=sp_img, img_alpha=img_alpha, plot_contour=False,
-                      max_color_quantile=step_quantile[5],
-                      save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 6),
-                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                     coords=moving_averages2[:, i3 + 1, :, :],
+                     circle_diameter=circ_diam2[i3 + 1],
+                     alpha_scaling=sp_alpha,
+                     img=sp_img, img_alpha=img_alpha, plot_contour=False,
+                     max_color_quantile=step_quantile[5],
+                     save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 6),
+                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
