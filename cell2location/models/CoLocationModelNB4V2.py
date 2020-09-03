@@ -326,6 +326,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
                    * self.samples['post_sample_means']['gene_level'].T
                    + self.samples['post_sample_means']['gene_add'].T
                    + self.samples['post_sample_means']['spot_add'])
+        self.alpha = 1 / (self.samples['post_sample_means']['gene_E'].T * self.samples['post_sample_means']['gene_E'].T)
 
     def plot_posterior_vs_dataV1(self):
         """ """
