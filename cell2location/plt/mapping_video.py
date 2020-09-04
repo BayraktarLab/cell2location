@@ -89,7 +89,8 @@ def plot_spatial(spot_factors_df, coords, text=None,
                  style='fast',
                  colorbar_position='bottom',
                  colorbar_label_kw={}.copy(),
-                 colorbar_shape={}.copy()):
+                 colorbar_shape={}.copy(),
+                 colorbar_tick_size=12):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
@@ -114,6 +115,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
     :param colorbar_label_kw: dict that will be forwarded to ax.set_label()
     :param colorbar_shape: dict {'vertical_gaps': 1.5, 'horizontal_gaps': 1.5,
                                     'width': 0.2, 'height': 0.2}, not obligatory to contain all params
+    :param colorbar_tick_size: colorbar ticks label size
     """
 
     # TODO add parameter description
@@ -253,10 +255,10 @@ def plot_spatial(spot_factors_df, coords, text=None,
                 cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
                                     orientation='horizontal', extend='both', ticks=cbar_ticks)
 
-                cbar.ax.tick_params(labelsize=12)
+                cbar.ax.tick_params(labelsize=colorbar_tick_size)
                 max_color = rgb_function(max_color_intensity / 1.5)
                 cbar.ax.set_title(labels[c],
-                                  {**{'size': 20, 'y': 1.25, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
+                                  {**{'size': 20, 'y': 1, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
 
             colors[:, c] = color
             weights[:, c] = np.clip(counts[:, c] / max_color_intensity, 0, 1)
