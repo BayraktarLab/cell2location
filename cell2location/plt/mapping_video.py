@@ -72,8 +72,8 @@ def ryb_to_rgb(ryb):
 def plot_spatial(spot_factors_df, coords, text=None,
                  circle_diameter=4,
                  alpha_scaling=0.6,
-                 max_col=(5000, 5000, 5000, 5000, 5000, 5000, 5000),
-                 max_color_quantile=0.95,
+                 max_col=(np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf),
+                 max_color_quantile=0.98,
                  show_img=True,
                  img=None,
                  img_alpha=1,
@@ -347,7 +347,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                        sc_accel_decel=True, sp_accel_decel=False,
                        sc_jitter=None, sp_jitter=None,
                        save_path='./results/mouse_viseum_snrna/std_model/mapping_video/',
-                       crop_x=None, crop_y=None):
+                       crop_x=None, crop_y=None, save_extension='png'):
     r"""Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
         We use linear interpolation of UMAP and spot coordinates to create movement.
     :param adata_vis: anndata with Visium data (including spatial slot in `.obsm`)
@@ -480,14 +480,16 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     #### start saving plots ####
     # plot UMAP with no changes
     for i0 in range(step_n[0]):
-        plot_spatial(cell_fact_df,
+        fig = plot_spatial(cell_fact_df,
                      coords=umap_coord,
                      circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1, plot_contour=False,
+                     img=sc_img, img_alpha=1,
                      # determine max color level using data quantiles
                      max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
-                     save_path=save_path, save_name=str(i0 + 1),  # axis_y_flipped=False,
+                     save_path=save_path, save_name=str(),  # axis_y_flipped=False,
                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
+        fig.savefig(f'{save_path}cell_maps_{i0 + 1}.{save_extension}',
+                    bbox_inches='tight')
 
     # plot evolving UMAP from cells to averages
     for i1 in tqdm(range(step_n[1])):
@@ -495,7 +497,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         plot_spatial(ann_no_other,
                      coords=moving_averages1[:, i1, :, :],
                      circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1, plot_contour=False,
+                     img=sc_img, img_alpha=1,
                      # determine max color level using data quantiles
                      max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
                      save_path=save_path, save_name=str(i0 + i1 + 2),  # axis_y_flipped=False,
@@ -508,7 +510,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                      coords=moving_averages1[:, i1 + 1, :, :],
                      text=aver_coord[['x', 'y', 'column']],
                      circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1, plot_contour=False,
+                     img=sc_img, img_alpha=1,
                      # determine max color level using data quantiles
                      max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
                      save_path=save_path, save_name=str(i0 + i1 + i2 + 3),  # axis_y_flipped=False,
@@ -522,7 +524,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                      coords=moving_averages1[:, i1 + 1, :, :],
                      text=aver_coord[['x', 'y', 'column']],
                      circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                     img=sp_img, img_alpha=img_alpha_seq[i22], plot_contour=False,
+                     img=sp_img, img_alpha=img_alpha_seq[i22],
                      # determine max color level using data quantiles
                      max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
                      save_path=save_path, save_name=str(i0 + i1 + i2 + i22 + 4),
@@ -534,7 +536,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         plot_spatial(sel_clust_df,
                      coords=moving_averages2[:, i3, :, :],
                      circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
-                     img=sp_img, img_alpha=img_alpha, plot_contour=False,
+                     img=sp_img, img_alpha=img_alpha,
                      max_color_quantile=step_quantile[4],
                      save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 5),
                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
@@ -545,7 +547,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                      coords=moving_averages2[:, i3 + 1, :, :],
                      circle_diameter=circ_diam2[i3 + 1],
                      alpha_scaling=sp_alpha,
-                     img=sp_img, img_alpha=img_alpha, plot_contour=False,
+                     img=sp_img, img_alpha=img_alpha,
                      max_color_quantile=step_quantile[5],
                      save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 6),
                      show_fig=False, crop_x=crop_x, crop_y=crop_y)
