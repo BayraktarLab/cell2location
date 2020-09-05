@@ -90,7 +90,8 @@ def plot_spatial(spot_factors_df, coords, text=None,
                  colorbar_position='bottom',
                  colorbar_label_kw={}.copy(),
                  colorbar_shape={}.copy(),
-                 colorbar_tick_size=12):
+                 colorbar_tick_size=12,
+                 colorbar_grid=None):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
@@ -116,6 +117,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
     :param colorbar_shape: dict {'vertical_gaps': 1.5, 'horizontal_gaps': 1.5,
                                     'width': 0.2, 'height': 0.2}, not obligatory to contain all params
     :param colorbar_tick_size: colorbar ticks label size
+    :param colorbar_grid: tuple of colorbar grid (rows, columns)
     """
 
     # TODO add parameter description
@@ -166,37 +168,51 @@ def plot_spatial(spot_factors_df, coords, text=None,
         fig = plt.figure()
 
         if colorbar_position == 'right':
+
+            if colorbar_grid is None:
+                colorbar_grid = (len(labels), 1)
+
             shape = {'vertical_gaps': 1.5, 'horizontal_gaps': 0, 'width': 0.15, 'height': 0.2}
             shape = {**shape, **colorbar_shape}
 
-            gs = GridSpec(nrows=len(labels) + 2, ncols=2, width_ratios=[1, shape['width']],
-                          height_ratios=[1, *[shape['height']] * len(labels), 1],
+            gs = GridSpec(nrows=colorbar_grid[0] + 2, ncols=colorbar_grid[1] + 1,
+                          width_ratios=[1, *[shape['width']] * colorbar_grid[1]],
+                          height_ratios=[1, *[shape['height']] * colorbar_grid[0], 1],
                           hspace=shape['vertical_gaps'], wspace=shape['horizontal_gaps'])
             ax = fig.add_subplot(gs[:, 0], aspect='equal', rasterized=True)
-            cbar_axes = [fig.add_subplot(gs[i, 1]) for i in range(len(labels) + 2)]
-            cbar_axes[0].set_visible(False)
-            cbar_axes[-1].set_visible(False)
 
         if colorbar_position == 'bottom':
+            if colorbar_grid is None:
+                if len(labels) <= 3:
+                    colorbar_grid = (1, len(labels))
+                else:
+                    n_rows = round(len(labels) / 3 + 0.5 - 1e-9)
+                    colorbar_grid = (n_rows, 3)
+
             shape = {'vertical_gaps': 0.3, 'horizontal_gaps': 0.6, 'width': 0.2, 'height': 0.035}
             shape = {**shape, **colorbar_shape}
-            ncols = round(len(labels) / 2 + 0.1) + 2
 
-            gs = GridSpec(nrows=3, ncols=ncols, width_ratios=[0.3, *[shape['width']] * (ncols - 2), 0.3],
-                          height_ratios=[1, shape['height'], shape['height']],
+            gs = GridSpec(nrows=colorbar_grid[0] + 1, ncols=colorbar_grid[1] + 2,
+                          width_ratios=[0.3, *[shape['width']] * colorbar_grid[1], 0.3],
+                          height_ratios=[1, *[shape['height']] * colorbar_grid[0]],
                           hspace=shape['vertical_gaps'], wspace=shape['horizontal_gaps'])
-            ax = fig.add_subplot(gs[0, :], aspect='equal', rasterized=True)
-            cbar_axes = [fig.add_subplot(gs[1, i]) for i in range(ncols)]
-            cbar_axes += [fig.add_subplot(gs[2, i]) for i in range(ncols)]
-            cbar_axes.pop(ncols).set_visible(False)
-            cbar_axes.pop(ncols - 1).set_visible(False)
-            if len(labels) % 2 == 1:
-                cbar_axes[-2].set_visible(False)
-            cbar_axes[0].set_visible(False)
-            cbar_axes[-1].set_visible(False)
 
-        if colorbar_position == None:
+            ax = fig.add_subplot(gs[0, :], aspect='equal', rasterized=True)
+
+        if colorbar_position is None:
             ax = fig.add_subplot(aspect='equal', rasterized=True)
+
+        if colorbar_position is not None:
+            print(gs)
+            cbar_axes = []
+            for row in range(1, colorbar_grid[0] + 1):
+                for column in range(1, colorbar_grid[1] + 1):
+                    cbar_axes.append(fig.add_subplot(gs[row, column]))
+
+            n_excess = colorbar_grid[0] * colorbar_grid[1] - len(labels)
+            if n_excess > 0:
+                for i in range(1, n_excess + 1):
+                    cbar_axes[-i].set_visible(False)
 
         ax.set_xlabel(x_y_labels[0])
         ax.set_ylabel(x_y_labels[1])
@@ -252,7 +268,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
                 cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
                               int(max_color_intensity)]
 
-                cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c + 1],
+                cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c],
                                     orientation='horizontal', extend='both', ticks=cbar_ticks)
 
                 cbar.ax.tick_params(labelsize=colorbar_tick_size)
