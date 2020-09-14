@@ -145,13 +145,13 @@ def plot_spatial(spot_factors_df, coords, text=None,
         return ListedColormap(vals)
 
     # Create linearly scaled colormaps
-    YellowCM = create_colormap(240, 228, 66)
-    RedCM = create_colormap(213, 94, 0)
-    BlueCM = create_colormap(86, 180, 233)
-    GreenCM = create_colormap(0, 158, 115)
-    GreyCM = create_colormap(200, 200, 200)
-    WhiteCM = create_colormap(50, 50, 50)
-    PurpleCM = create_colormap(90, 20, 165)
+    YellowCM = create_colormap(240, 228, 66) # #F0E442 ['#F0E442', '#D55E00', '#56B4E9', '#009E73', '#5A14A5', '#C8C8C8', '#323232']
+    RedCM = create_colormap(213, 94, 0) # #D55E00
+    BlueCM = create_colormap(86, 180, 233) # #56B4E9
+    GreenCM = create_colormap(0, 158, 115) # #009E73
+    GreyCM = create_colormap(200, 200, 200) # #C8C8C8
+    WhiteCM = create_colormap(50, 50, 50) # #323232
+    PurpleCM = create_colormap(90, 20, 165) # #5A14A5
 
     cmaps = [YellowCM,
              RedCM,
