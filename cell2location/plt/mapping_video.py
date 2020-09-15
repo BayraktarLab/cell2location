@@ -265,8 +265,15 @@ def plot_spatial(spot_factors_df, coords, text=None,
             norm = mpl.colors.Normalize(vmin=min_color_intensity, vmax=max_color_intensity)
 
             if colorbar_position != None:
-                cbar_ticks = [int(min_color_intensity), int(np.mean([min_color_intensity, max_color_intensity])),
-                              int(max_color_intensity)]
+                cbar_ticks = [min_color_intensity,
+                              np.mean([min_color_intensity, max_color_intensity]),
+                              max_color_intensity]
+                cbar_ticks = np.array(cbar_ticks)
+
+                if max_color_intensity > 13:
+                    cbar_ticks = cbar_ticks.astype(np.int32)
+                else:
+                    cbar_ticks = cbar_ticks.round(1)
 
                 cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmaps[c]), cax=cbar_axes[c],
                                     orientation='horizontal', extend='both', ticks=cbar_ticks)
