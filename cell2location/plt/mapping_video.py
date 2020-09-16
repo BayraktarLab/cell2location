@@ -71,7 +71,7 @@ def ryb_to_rgb(ryb):
 
 def plot_spatial(spot_factors_df, coords, text=None,
                  circle_diameter=4,
-                 alpha_scaling=0.6,
+                 alpha_scaling=1,
                  max_col=(np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf),
                  max_color_quantile=0.98,
                  show_img=True,
@@ -203,7 +203,6 @@ def plot_spatial(spot_factors_df, coords, text=None,
             ax = fig.add_subplot(aspect='equal', rasterized=True)
 
         if colorbar_position is not None:
-            print(gs)
             cbar_axes = []
             for row in range(1, colorbar_grid[0] + 1):
                 for column in range(1, colorbar_grid[1] + 1):
