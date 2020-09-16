@@ -143,7 +143,7 @@ class BaseModel():
 
         plt.imshow(img)
 
-        plt.title('Training initialisation ' + name1 + ' vs ' + name2)
+        plt.title(f'Training initialisation \n {name1} vs {name2}')
         plt.xlabel(name2)
         plt.ylabel(name1)
 
