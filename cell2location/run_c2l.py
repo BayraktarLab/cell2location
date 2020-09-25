@@ -17,6 +17,7 @@ from os import mkdir
 from cell2location.cluster_averages import get_cluster_averages
 from cell2location.cluster_averages import select_features
 import cell2location.plt as c2lpl
+from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 
 def save_plot(path, filename, extension='png'):
@@ -280,6 +281,9 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     else:
         readable_var_name_col = None
 
+    if train_args['minibatch_size'] is not None:
+        model_kwargs['minibatch_size'] = train_args['readable_var_name_col']
+
     ####### Creating model #######
     if verbose:
         print('### Creating model ### - time ' + str(np.around((time.time() - start) / 60, 2)) + ' min')
@@ -293,7 +297,6 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                 obs_names=sp_data.obs_names,
                 fact_names=fact_names,
                 sample_id=sp_data.obs[train_args['sample_name_col']],
-                minibatch_size=train_args['minibatch_size'],
                 **model_kwargs)
 
     ####### Print run name #######
@@ -335,14 +338,19 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
     elif train_args['mode'] == 'tracking':
         mod.verbose = False
-        mod.track_parameters(n=train_args['n_restarts'],
-                             every=train_args['tracking_every'], n_samples=train_args['tracking_n_samples'],
-                             n_type=train_args['n_type'],
-                             df_node_name1='nUMI_factors', df_node_df_name1='spot_factors_df',
-                             df_prior_node_name1='spot_fact_mu_hyp', df_prior_node_name2='spot_fact_sd_hyp',
-                             mu_node_name='mu', data_node='X_data',
-                             extra_df_parameters=['spot_add'],
-                             sample_type='post_sample_means')
+        if isinstance(mod, Pymc3LocModel):
+            mod.track_parameters(n=train_args['n_restarts'],
+                                 every=train_args['tracking_every'], n_samples=train_args['tracking_n_samples'],
+                                 n_type=train_args['n_type'],
+                                 df_node_name1='nUMI_factors', df_node_df_name1='spot_factors_df',
+                                 df_prior_node_name1='spot_fact_mu_hyp', df_prior_node_name2='spot_fact_sd_hyp',
+                                 mu_node_name='mu', data_node='X_data',
+                                 extra_df_parameters=['spot_add'],
+                                 sample_type='post_sample_means')
+
+        else:  # TODO add isinstance(mod, PyroModel)
+            mod.fit_advi_iterative(n=train_args['n_restarts'], method=train_args['method'],
+                                   n_type=train_args['n_type'], progressbar=verbose, tracking=True)
 
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
@@ -485,7 +493,6 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                 adata_vis_pl = sp_data.copy()
                 clust_names_orig = ['mean_nUMI_factors' + i for i in sp_data.uns['mod']['fact_names']]
                 clust_names = sp_data.uns['mod']['fact_names']
-
 
                 adata_vis_pl.obs[clust_names] = adata_vis_pl.obs[clust_names_orig]
                 fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
