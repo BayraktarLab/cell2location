@@ -350,7 +350,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
         else:  # TODO add isinstance(mod, PyroModel)
             mod.fit_advi_iterative(n=train_args['n_restarts'], method=train_args['method'],
-                                   n_type=train_args['n_type'], progressbar=verbose, tracking=True)
+                                   n_type=train_args['n_type'], tracking=True)
 
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
@@ -481,6 +481,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
             if sc_spatial_present:
 
                 sc.settings.figdir = fig_path + 'spatial/'
+                os.makedirs(fig_path + 'spatial/', exist_ok=True)
                 facecolor = rcParams["axes.facecolor"]
                 rcParams["axes.facecolor"] = "black"
 
@@ -499,21 +500,28 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                     color=clust_names, ncols=5, library_id=s_spatial,
                                     size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                                     vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                    save=f"W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
-                                    show=show_locations,
-                                    return_fig=True
+                                    return_fig=True,
+                                    show=False
                                     )
+
+                fig.savefig(f"{fig_path}/spatial/W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                            f".{export_args['plot_extension']}",
+                            dpi=180, bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
+                if show_locations:
+                    plt.show()
 
                 fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
                                     color=clust_names, ncols=5, library_id=s_spatial,
                                     size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                                     vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                    save=f"histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                     show=False,
                                     return_fig=True
                                     )
+                fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                            f".{export_args['plot_extension']}",
+                            dpi=180, bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -528,10 +536,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                     color=clust_names, ncols=5, library_id=s_spatial,
                                     size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
                                     vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                    save=f"W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                     show=False,
                                     return_fig=True
                                     )
+                fig.savefig(f"{fig_path}/spatial/W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}."
+                            f"{export_args['plot_extension']}",
+                            dpi=180, bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -539,10 +549,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                     color=clust_names, ncols=5, library_id=s_spatial,
                                     size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
                                     vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                    save=f"histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                     show=False,
                                     return_fig=True
                                     )
+                fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                            f".{export_args['plot_extension']}",
+                            dpi=180, bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -559,10 +571,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                         size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                         alpha_img=0,
                                         vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        save=f"W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                         show=False,
                                         return_fig=True
                                         )
+                    fig.savefig(f"{fig_path}/spatial/W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}"
+                                f".{export_args['plot_extension']}",
+                                dpi=180, bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -571,10 +585,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                         size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                         alpha_img=1,
                                         vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        save=f"histo_W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                         show=False,
                                         return_fig=True
                                         )
+                    fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}"
+                                f".{export_args['plot_extension']}",
+                                dpi=180, bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -590,10 +606,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                         size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                         alpha_img=0,
                                         vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        save=f"W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                         show=False,
                                         return_fig=True
                                         )
+                    fig.savefig(f"{fig_path}/spatial/W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}"
+                                f".{export_args['plot_extension']}",
+                                dpi=180, bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -602,10 +620,12 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                                         size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                         alpha_img=1,
                                         vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        save=f"histo_W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
                                         show=False,
                                         return_fig=True
                                         )
+                    fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}"
+                                f".{export_args['plot_extension']}",
+                                dpi=180, bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
