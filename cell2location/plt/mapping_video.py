@@ -99,6 +99,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
     :param coords: np.ndarray - x and y coordinates (in columns) to be used for ploting spots
     :param text: pd.DataFrame - with x, y coordinates, text to be printed
     :param circle_diameter: diameter of circles
+    :param labels: list of strings, labels of cell types
     :param alpha_scaling: adjust color alpha
     :param max_col: crops the colorscale maximum value for each column in spot_factors_df.
     :param max_color_quantile: crops the colorscale at x quantile of the data.
@@ -118,6 +119,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
                                     'width': 0.2, 'height': 0.2}, not obligatory to contain all params
     :param colorbar_tick_size: colorbar ticks label size
     :param colorbar_grid: tuple of colorbar grid (rows, columns)
+
     """
 
     # TODO add parameter description
@@ -145,13 +147,14 @@ def plot_spatial(spot_factors_df, coords, text=None,
         return ListedColormap(vals)
 
     # Create linearly scaled colormaps
-    YellowCM = create_colormap(240, 228, 66) # #F0E442 ['#F0E442', '#D55E00', '#56B4E9', '#009E73', '#5A14A5', '#C8C8C8', '#323232']
-    RedCM = create_colormap(213, 94, 0) # #D55E00
-    BlueCM = create_colormap(86, 180, 233) # #56B4E9
-    GreenCM = create_colormap(0, 158, 115) # #009E73
-    GreyCM = create_colormap(200, 200, 200) # #C8C8C8
-    WhiteCM = create_colormap(50, 50, 50) # #323232
-    PurpleCM = create_colormap(90, 20, 165) # #5A14A5
+    YellowCM = create_colormap(240, 228, 66)  # #F0E442 ['#F0E442', '#D55E00', '#56B4E9',
+    # '#009E73', '#5A14A5', '#C8C8C8', '#323232']
+    RedCM = create_colormap(213, 94, 0)  # #D55E00
+    BlueCM = create_colormap(86, 180, 233)  # #56B4E9
+    GreenCM = create_colormap(0, 158, 115)  # #009E73
+    GreyCM = create_colormap(200, 200, 200)  # #C8C8C8
+    WhiteCM = create_colormap(50, 50, 50)  # #323232
+    PurpleCM = create_colormap(90, 20, 165)  # #5A14A5
 
     cmaps = [YellowCM,
              RedCM,
@@ -253,11 +256,6 @@ def plot_spatial(spot_factors_df, coords, text=None,
                                             min_value=min_color_intensity,
                                             max_value=max_color_intensity)
 
-            if len(coords.shape) == 3:
-                coords_s = coords[c, :, :]
-            else:
-                coords_s = coords
-
             color = rgb_function(counts[:, c])
             color[:, 3] = color[:, 3] * alpha_scaling
 
@@ -293,7 +291,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
                 colors_ryb[i, j] = rgb_to_ryb(colors[i, j, :3])
 
         def kernel(w):
-            return (w) ** 2
+            return w ** 2
 
         kernel_weights = kernel(weights[:, :, np.newaxis])
         weighted_colors_ryb = (colors_ryb * kernel_weights).sum(axis=1) / kernel_weights.sum(axis=1)
@@ -503,13 +501,13 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot UMAP with no changes
     for i0 in range(step_n[0]):
         fig = plot_spatial(cell_fact_df,
-                     coords=umap_coord,
-                     circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1,
-                     # determine max color level using data quantiles
-                     max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
-                     save_path=save_path, save_name=str(),  # axis_y_flipped=False,
-                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                           coords=umap_coord,
+                           circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
+                           img=sc_img, img_alpha=1,
+                           # determine max color level using data quantiles
+                           max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
+                           save_path=save_path, save_name=str(),  # axis_y_flipped=False,
+                           show_fig=False, crop_x=crop_x, crop_y=crop_y)
         fig.savefig(f'{save_path}cell_maps_{i0 + 1}.{save_extension}',
                     bbox_inches='tight')
 
