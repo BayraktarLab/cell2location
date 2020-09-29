@@ -26,17 +26,7 @@ bash Miniconda3-latest-Linux-x86_64.sh
 
 Install packages needed for pymc3 and scanpy to work
 
-### Method 1: Create environment from file
-
-Create `cellpymc` environment from file
-
-```bash
-conda env create -f environment.yml
-```
-
-This will install all the conda and pip required packages.
-
-### Method 2: Create conda environment manually
+### Method 1: Create conda environment manually
 
 Create conda environment with the required packages
 
@@ -51,6 +41,18 @@ Do not install pymc3 and theano with conda because it will not use the system cu
 ```bash
 pip install plotnine pymc3 torch pyro-ppl
 ```
+
+### Method 2: Create environment from file
+
+Create `cellpymc` environment from file
+
+```bash
+git clone https://github.com/BayraktarLab/cell2location.git
+cd cell2location
+conda env create -f environment.yml
+```
+
+This will install all the conda and pip required packages.
 
 ## Install `cell2location` package
 
