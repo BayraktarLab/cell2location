@@ -282,7 +282,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         readable_var_name_col = None
 
     if train_args['minibatch_size'] is not None:
-        model_kwargs['minibatch_size'] = train_args['readable_var_name_col']
+        model_kwargs['minibatch_size'] = train_args['minibatch_size']
 
     ####### Creating model #######
     if verbose:
