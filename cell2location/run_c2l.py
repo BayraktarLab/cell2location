@@ -663,7 +663,7 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
                 if show_locations:
                     print(p)
     except Exception as e:
-        print('Some error in plotting with scanpy or `cell2location.plt.plot_factor_spatial()`\n ' + str(e))
+        print('Some error in plotting with scanpy or `cell2location.plt.plot_factor_spatial()`\n ' + repr(e))
 
     if verbose:
         print('### Done ### - time ' + res_dict['run_time'])
