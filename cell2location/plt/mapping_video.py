@@ -91,7 +91,8 @@ def plot_spatial(spot_factors_df, coords, text=None,
                  colorbar_label_kw={}.copy(),
                  colorbar_shape={}.copy(),
                  colorbar_tick_size=12,
-                 colorbar_grid=None):
+                 colorbar_grid=None,
+                 image_cmap='Greys_r'):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
@@ -119,6 +120,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
                                     'width': 0.2, 'height': 0.2}, not obligatory to contain all params
     :param colorbar_tick_size: colorbar ticks label size
     :param colorbar_grid: tuple of colorbar grid (rows, columns)
+    :param image_cmap: matplotlib colormap for grayscale image
 
     """
 
@@ -220,7 +222,7 @@ def plot_spatial(spot_factors_df, coords, text=None,
         ax.set_ylabel(x_y_labels[1])
 
         if img is not None and show_img:
-            ax.imshow(img, aspect='equal', alpha=img_alpha, origin='lower')
+            ax.imshow(img, aspect='equal', alpha=img_alpha, origin='lower', cmap=image_cmap)
 
         # crop images in needed
         if crop_x is not None:
