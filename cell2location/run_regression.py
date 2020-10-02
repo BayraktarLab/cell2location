@@ -105,7 +105,7 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     model_kwargs['sample_id'] = train_args['sample_name_col']
 
     if train_args['readable_var_name_col'] is not None:
-        model_kwargs['var_names_read'] = sc_data.obs[train_args['readable_var_name_col']]
+        model_kwargs['var_names_read'] = sc_data.var[train_args['readable_var_name_col']]
     else:
         model_kwargs['var_names_read'] = None
 
@@ -184,9 +184,8 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
         print('### Training model to determine n_epochs with CV ###')
     if train_args['mode'] == 'normal':
         mod.fit_advi_iterative(**fit_kwards)
-
     elif train_args['mode'] == 'tracking':
-        raise ValueError('tracking training not implemented yet')
+        mod.fit_advi_iterative(tracking=True, **fit_kwards)
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
 
