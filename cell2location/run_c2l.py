@@ -18,6 +18,7 @@ from cell2location.cluster_averages import get_cluster_averages
 from cell2location.cluster_averages import select_features
 import cell2location.plt as c2lpl
 from cell2location.models.pymc3_loc_model import Pymc3LocModel
+import cell2location.models as models
 
 
 def save_plot(path, filename, extension='png'):
@@ -29,7 +30,7 @@ def save_plot(path, filename, extension='png'):
     # plt.close()
 
 
-def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
+def run_cell2location(sc_data, sp_data, model_name=None,
                       verbose=True, show_locations=False, return_all=True,
                       summ_sc_data_args={'cluster_col': "annotation_1"},
                       train_args={'n_iter': 20000, 'learning_rate': 0.005,
@@ -66,7 +67,9 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
     sp_data :
         anndata object with spatial data, variable names should match sc_data
     model_name :
-        model name as a string (the default is CoLocationModelNB4V2). See cell2location/models.
+        model class object or None. If none, the default single-sample or multi-sample model is selected
+        depending on the number of samples detected in in the sp_data.obs columns
+        specified by `train_args['sample_name_col']`.
     verbose :
         boolean, print diagnostic messages? (Default value = True)
     show_locations :
@@ -197,13 +200,6 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
 
     sp_data = sp_data.copy()
 
-    # import the specied version of the model
-    if type(model_name) is str:
-        import cell2location.models as models
-        Model = getattr(models, model_name)
-    else:
-        Model = model_name
-
     ####### Summarising single cell clusters #######
     if verbose:
         print('### Summarising single cell clusters ###')
@@ -285,6 +281,19 @@ def run_cell2location(sc_data, sp_data, model_name='CoLocationModelNB4V2',
         model_kwargs['minibatch_size'] = train_args['minibatch_size']
 
     ####### Creating model #######
+    # choose model when not specified
+    if model_name is None:
+        sample_name = sp_data.obs[train_args['sample_name_col']]
+        sample_n = len(np.unique(sample_name))
+        if sample_n == 1:
+            Model = models.CoLocationModelNB4V2
+        elif sample_n > 1:
+            Model = models.CoLocationModelNB4E6V2
+        else:
+            ValueError("train_args['sample_name_col'] point to invalid column")
+    else:  # use supplied class
+        Model = model_name
+
     if verbose:
         print('### Creating model ### - time ' + str(np.around((time.time() - start) / 60, 2)) + ' min')
     mod = Model(cell_state_mat, X_data,
