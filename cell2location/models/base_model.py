@@ -350,7 +350,8 @@ class BaseModel():
                            figsize=(15, 7),
                            cluster_factors=False, cluster_genes=True,
                            cmap='viridis', title='',
-                           fact_filt=None, fun_type='heatmap'):
+                           fact_filt=None, fun_type='heatmap',
+                           return_linkage=False):
         r""" Plot gene loadings as a heatmap
 
         :param sel_var_names: list of variable names to select
@@ -383,7 +384,7 @@ class BaseModel():
         key_markers = key_markers.loc[sel_var_names, :]  # reorder
 
         clustermap(key_markers, cluster_rows=cluster_genes,
-                   cluster_cols=cluster_factors,
+                   cluster_cols=cluster_factors, return_linkage=return_linkage,
                    figure_size=figsize, cmap=cmap, title=title, fun_type=fun_type)
 
     def plot_loading_distribution(self, loadings_name='gene_factors',
