@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import cell2location.plt as c2lpl
+import cell2location.models as models
 
 
 def save_plot(path, filename, extension='png'):
@@ -25,7 +25,7 @@ def save_plot(path, filename, extension='png'):
     # plt.close()
 
 
-def run_regression(sc_data, model_name='RegressionNBV4Torch',
+def run_regression(sc_data, model_name=None,
                    verbose=True, return_all=True,
                    train_args={'covariate_col_names': [None], 'sample_name_col': None,
                                'tech_name_col': None, 'stratify_cv': None,
@@ -40,6 +40,15 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
                                 'run_name_suffix': ''}):
     r""" Run regression model: train, evaluate using cross-validation, choose training time that prevents over-fitting,
      evaluate the quality of experiment and technology correction, save, export results and save diagnostic plots
+
+    Parameters
+    ----------
+    sc_data :
+        anndata object with single cell / nucleus data
+    model_name :
+        model class object or None. If none, the default model is selected:
+        If `train_args['tech_name_col']` is not provided RegressionNBV2Torch model is used,
+        if `train_args['tech_name_col']` is specified RegressionNBV4Torch model is used.
 
     Returns
         -------
@@ -83,13 +92,6 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     start = time.time()
 
     sc_data = sc_data.copy()
-
-    # import the specied version of the model
-    if type(model_name) is str:
-        import cell2location.models as models
-        Model = getattr(models, model_name)
-    else:
-        Model = model_name
 
     ####### Preparing data #######
 
@@ -149,6 +151,16 @@ def run_regression(sc_data, model_name='RegressionNBV4Torch',
     ####### Creating model #######
     if verbose:
         print('### Creating model ### - time ' + str(np.around((time.time() - start) / 60, 2)) + ' min')
+
+    ####### Creating model #######
+    # choose model when not specified
+    if model_name is None:
+        if train_args['tech_name_col'] is None:
+            Model = models.RegressionNBV2Torch
+        else:
+            Model = models.RegressionNBV4Torch
+    else:  # use supplied class
+        Model = model_name
 
     mod = Model(cell2covar=cell2covar,
                 X_data=X_data,
