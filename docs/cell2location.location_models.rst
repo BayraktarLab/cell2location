@@ -1,4 +1,4 @@
-Models
+Location Models (spatial mapping)
 ============================
 
 
