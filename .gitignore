@@ -29,6 +29,7 @@ var/
 .Rproj.user
 .ipynb_checkpoints
 .Rhistory
+.idea/
 
 */_build
 
