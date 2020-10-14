@@ -21,6 +21,7 @@ Welcome to cell2location's documentation!
    :maxdepth: 1
    :caption: Notebooks:
 
+   notebooks/cell2location_estimating_signatures
    notebooks/cell2location_short_demo
    notebooks/cell2location_short_demo_downstream
 
