@@ -1,4 +1,4 @@
-Regresion Models (estimating signatures)
+Regresion Models (estimating reference signatures)
 ============================
 
 RegressionGeneBackgroundCoverageTorch
