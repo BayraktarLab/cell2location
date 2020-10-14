@@ -362,7 +362,7 @@ def run_regression(sc_data, model_name=None,
 
         mean_total_count = pd.Series(mean_total_count, index=sc_data.obs[train_args['sample_name_col']].unique())
         # name and order samples the same way as in the model:
-        mean_total_count.index = [f'mean_sample_effect{train_args["sample_name_col"]}_{i}'
+        mean_total_count.index = [f'means_sample_effect{train_args["sample_name_col"]}_{i}'
                                   for i in mean_total_count.index]
         mean_total_count = mean_total_count[mod.sample_effects.columns]
 
