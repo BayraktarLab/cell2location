@@ -8,7 +8,7 @@ def setup_package():
     install_requires = ['pymc3', 'torch', 'theano', 'pygpu', 'numpy', 'pandas', 'scanpy', 'plotnine']
     metadata = dict(
         name='cell2location',
-        version='0.01',
+        version='0.02',
         description='cell2location: High-throughput spatial mapping of cell types',
         url='https://github.com/BayraktarLab/cell2location',
         author='Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Artem Lomakin, Alexander Aivazidis, Mika Jain',
