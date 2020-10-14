@@ -22,22 +22,22 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
     
     .. math::
-        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_eg)
+        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_{e,g})
     
-    The containment prior on overdispersion :math:`\alpha_eg` parameter is used
+    The containment prior on overdispersion :math:`\alpha_{e,g}` parameter is used
     (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
     
     The spatial expression levels of genes :math:`\mu_{s,g}` in the rate space are modelled
     as the sum of five non-negative components:
     
     .. math::
-        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{eg}
+        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{e,g}
     
     Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
     :math:`g_{f,g}` denotes the regulatory programmes :math:`f` of each gene :math:`g` - input to the model;
     :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
     in the global expression estimates between technologies;
-    :math:`l_{s}` and :math:`s_{eg}` are additive components that capture additive background variation
+    :math:`l_{s}` and :math:`s_{e,g}` are additive components that capture additive background variation
     that is not explained by the bi-variate decomposition.
     
     The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale and account for correlation of programs
