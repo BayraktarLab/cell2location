@@ -7,8 +7,16 @@ Welcome to cell2location's documentation!
 =========================================
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Tutorials:
+
+   notebooks/cell2location_estimating_signatures
+   notebooks/cell2location_short_demo
+   notebooks/cell2location_short_demo_downstream
+
+.. toctree::
    :maxdepth: 4
-   :caption: Content:
+   :caption: API:
 
    cell2location
    cell2location.location_models
@@ -16,16 +24,6 @@ Welcome to cell2location's documentation!
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Notebooks:
-
-   notebooks/cell2location_estimating_signatures
-   notebooks/cell2location_short_demo
-   notebooks/cell2location_short_demo_downstream
-
 
 Indices and tables
 ==================
