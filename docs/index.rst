@@ -10,11 +10,11 @@ Welcome to cell2location's documentation!
    :maxdepth: 4
    :caption: Content:
 
+   cell2location
    cell2location.models
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region
-   cell2location
 
 
 .. toctree::
