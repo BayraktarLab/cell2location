@@ -286,9 +286,9 @@ def run_cell2location(sc_data, sp_data, model_name=None,
         sample_name = sp_data.obs[train_args['sample_name_col']]
         sample_n = len(np.unique(sample_name))
         if sample_n == 1:
-            Model = models.CoLocationModelNB4V2
+            Model = models.LocationModelLinearDependentW
         elif sample_n > 1:
-            Model = models.CoLocationModelNB4E6V2
+            Model = models.LocationModelLinearDependentWMultiExperiment
         else:
             ValueError("train_args['sample_name_col'] point to invalid column")
     else:  # use supplied class

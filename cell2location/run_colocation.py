@@ -30,7 +30,7 @@ def save_plot(path, filename, extension='png'):
     # plt.close()
 
 
-def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedCombination_sklearnNMF',
+def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklearnNMF',
                    verbose=True, return_all=True,
                    train_args={'n_fact': [30], 'n_iter': 20000,
                     'sample_name_col': None,

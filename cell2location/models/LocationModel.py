@@ -12,7 +12,7 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 
 # defining the model itself
-class LocationModelNB4V7_V4_V4(Pymc3LocModel):
+class LocationModel(Pymc3LocModel):
     r"""Provided here as a 'base' model for completeness.
 
     Parameters
@@ -42,7 +42,7 @@ class LocationModelNB4V7_V4_V4(Pymc3LocModel):
     -------
 
     """
-
+# LocationModelNB4V7_V4_V4
     def __init__(
             self,
             cell_state_mat: np.ndarray,
