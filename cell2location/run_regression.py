@@ -156,9 +156,9 @@ def run_regression(sc_data, model_name=None,
     # choose model when not specified
     if model_name is None:
         if train_args['tech_name_col'] is None:
-            Model = models.RegressionNBV2Torch
+            Model = models.RegressionGeneBackgroundCoverageTorch
         else:
-            Model = models.RegressionNBV4Torch
+            Model = models.RegressionGeneBackgroundCoverageGeneTechnologyTorch
     else:  # use supplied class
         Model = model_name
 

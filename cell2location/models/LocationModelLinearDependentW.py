@@ -12,7 +12,7 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 
 # defining the model itself
-class CoLocationModelNB4V2(Pymc3LocModel):
+class LocationModelLinearDependentW(Pymc3LocModel):
     r"""Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved rate :math:`mu` and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
@@ -120,7 +120,7 @@ class CoLocationModelNB4V2(Pymc3LocModel):
     -------
 
     """
-
+# CoLocationModelNB4V2
     def __init__(
             self,
             cell_state_mat: np.ndarray,

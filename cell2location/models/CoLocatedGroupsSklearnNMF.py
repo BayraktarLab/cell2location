@@ -11,7 +11,7 @@ from cell2location.models.base_model import BaseModel
 
 
 # defining the model itself
-class CoLocatedCombination_sklearnNMF(BaseModel):
+class CoLocatedGroupsSklearnNMF(BaseModel):
     r"""Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF.
     
     This model takes the absolute cell density inferred by CoLocationModelNB4V2 as input
