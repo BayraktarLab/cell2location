@@ -11,7 +11,8 @@ Welcome to cell2location's documentation!
    :caption: Content:
 
    cell2location
-   cell2location.models
+   cell2location.location_models
+   cell2location.regression_models
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region
