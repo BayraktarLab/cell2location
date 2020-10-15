@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'cell2location'
-copyright = '2020, vkl'  # TODO
-author = 'vkl'
+copyright = '2020, Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Artem Lomakin, Alexander Aivazidis, Mika Jain'
+author = 'Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Artem Lomakin, Alexander Aivazidis, Mika Jain'
 
 # -- General configuration ---------------------------------------------------
 
