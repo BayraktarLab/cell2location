@@ -440,6 +440,8 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                     'export_args': export_args, 'run_name': run_name,
                     'run_time': str(np.around((time.time() - start) / 60, 2)) + ' min'}
         pickle.dump(res_dict, file=open(path + 'model_.p', "wb"))
+        # add model for returning
+        res_dict['mod'] = mod
 
     ####### Plotting #######
     if verbose:
