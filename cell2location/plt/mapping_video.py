@@ -69,14 +69,14 @@ def ryb_to_rgb(ryb):
     return np.array([x for x in (rgb_r, rgb_g, rgb_b)])
 
 
-def plot_spatial(spot_factors_df, coords, text=None,
-                 circle_diameter=4,
-                 alpha_scaling=1,
+def plot_spatial(spot_factors_df, coords, labels, text=None,
+                 circle_diameter=4.0,
+                 alpha_scaling=1.0,
                  max_col=(np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf),
                  max_color_quantile=0.98,
                  show_img=True,
                  img=None,
-                 img_alpha=1,
+                 img_alpha=1.0,
                  adjust_text=False,
                  plt_axis='off',
                  axis_y_flipped=True,
@@ -85,7 +85,6 @@ def plot_spatial(spot_factors_df, coords, text=None,
                  crop_y=None,
                  text_box_alpha=0.9,
                  reorder_cmap=range(7),
-                 labels=None,
                  style='fast',
                  colorbar_position='bottom',
                  colorbar_label_kw={}.copy(),
@@ -115,6 +114,11 @@ def plot_spatial(spot_factors_df, coords, text=None,
     :param plt_axis: show axes?
     :param axis_y_flipped: flip y axis to match coordinates of the plotted image
     :param reorder_cmap: reorder colors to make sure you get the right color for each category
+
+    :param style: plot style (matplolib.style.context):
+        'fast' - white background & dark text;
+        'fast' - black background & white text;
+
     :param colorbar_position: 'bottom', 'right' or None
     :param colorbar_label_kw: dict that will be forwarded to ax.set_label()
     :param colorbar_shape: dict {'vertical_gaps': 1.5, 'horizontal_gaps': 1.5,
@@ -357,21 +361,36 @@ def interpolate_coord(start=10, end=5, steps=100, accel_power=3,
     return seq
 
 
+def expand_1by1(df):
+    col6 = [df.copy() for i in range(df.shape[1])]
+    index = df.index.astype(str)
+    columns = df.columns
+    for i in range(len(col6)):
+        col6_1 = col6[i]
+
+        col6_1_new = np.zeros_like(col6_1)
+        col6_1_new[:, i] = col6_1[col6_1.columns[i]].values
+
+        col6_1_new = pd.DataFrame(col6_1_new, index=index + str(i), columns=columns)
+        col6[i] = col6_1_new
+
+    return pd.concat(col6, axis=0)
+
 def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
-                       sel_clust, sel_clust_col,
-                       sample_id='s144600', sc_img=None,
-                       sp_img=None, sp_img_scaling_fac=1,
+                       sel_clust, sel_clust_col, sample_id,
+                       sc_img=None, sp_img=None, sp_img_scaling_fac=1,
                        adata_cluster_col='annotation_1', cell_fact_df=None,
                        step_n=[20, 100, 15, 45, 80, 30], step_quantile=[1, 1, 1, 1, 0.95, 0.95],
                        sc_point_size=1, aver_point_size=20, sp_point_size=5,
-                       fontsize=15, adjust_text=False,
+                       label_clusters=False, style='dark_background', adjust_text=False,
                        sc_alpha=0.6, sp_alpha=0.8, img_alpha=0.8,
                        sc_power=20, sp_power=20,
                        sc_accel_power=3, sp_accel_power=3,
                        sc_accel_decel=True, sp_accel_decel=False,
                        sc_jitter=None, sp_jitter=None,
                        save_path='./results/mouse_viseum_snrna/std_model/mapping_video/',
-                       crop_x=None, crop_y=None, save_extension='png'):
+                       crop_x=None, crop_y=None, save_extension='png',
+                       colorbar_shape={'vertical_gaps': 1.8}):
     r"""Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
         We use linear interpolation of UMAP and spot coordinates to create movement.
     :param adata_vis: anndata with Visium data (including spatial slot in `.obsm`)
@@ -505,73 +524,108 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot UMAP with no changes
     for i0 in range(step_n[0]):
         fig = plot_spatial(cell_fact_df,
-                           coords=umap_coord,
+                           coords=umap_coord, labels=cell_fact_df.columns,
                            circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
-                           img=sc_img, img_alpha=1,
+                           img=sc_img, img_alpha=1, style=style,
                            # determine max color level using data quantiles
                            max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
-                           save_path=save_path, save_name=str(),  # axis_y_flipped=False,
-                           show_fig=False, crop_x=crop_x, crop_y=crop_y)
+                           crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
         fig.savefig(f'{save_path}cell_maps_{i0 + 1}.{save_extension}',
                     bbox_inches='tight')
+        fig.clear()
 
     # plot evolving UMAP from cells to averages
     for i1 in tqdm(range(step_n[1])):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_spatial(ann_no_other,
-                     coords=moving_averages1[:, i1, :, :],
-                     circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1,
-                     # determine max color level using data quantiles
-                     max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
-                     save_path=save_path, save_name=str(i0 + i1 + 2),  # axis_y_flipped=False,
-                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
+        ann_no_other = expand_1by1(ann_no_other)
+        coord = np.concatenate(moving_averages1[:, i1, :, :], axis=0)
+
+        fig = plot_spatial(ann_no_other,
+                           coords=coord, labels=ann_no_other.columns,
+                           circle_diameter=circ_diam1[i1], alpha_scaling=sc_alpha,
+                           img=sc_img, img_alpha=1, style=style,
+                           # determine max color level using data quantiles
+                           max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
+                           crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
+        fig.savefig(f'{save_path}cell_maps_{i0 + i1 + 2}.{save_extension}',
+                    bbox_inches='tight')
+        fig.clear()
 
     # plot averages
+    if label_clusters:
+        label_clusters = aver_coord[['x', 'y', 'column']]
+    else:
+        label_clusters = None
     for i2 in range(step_n[2]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_spatial(ann_no_other,
-                     coords=moving_averages1[:, i1 + 1, :, :],
-                     text=aver_coord[['x', 'y', 'column']],
-                     circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                     img=sc_img, img_alpha=1,
-                     # determine max color level using data quantiles
-                     max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
-                     save_path=save_path, save_name=str(i0 + i1 + i2 + 3),  # axis_y_flipped=False,
-                     show_fig=False, fontsize=fontsize,
-                     adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
+        ann_no_other = expand_1by1(ann_no_other)
+        coord = np.concatenate(moving_averages1[:, i1 + 1, :, :], axis=0)
+
+        fig = plot_spatial(ann_no_other,
+                           coords=coord, labels=ann_no_other.columns,
+                           text=label_clusters,
+                           circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
+                           img=sc_img, img_alpha=1, style=style,
+                           # determine max color level using data quantiles
+                           max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
+                           crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
+        fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + 3}.{save_extension}',
+                    bbox_inches='tight')
+        fig.clear()
 
     # plot averages & fade-in histology image
     for i22 in range(step_n[3]):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
-        plot_spatial(ann_no_other,
-                     coords=moving_averages1[:, i1 + 1, :, :],
-                     text=aver_coord[['x', 'y', 'column']],
-                     circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
-                     img=sp_img, img_alpha=img_alpha_seq[i22],
-                     # determine max color level using data quantiles
-                     max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
-                     save_path=save_path, save_name=str(i0 + i1 + i2 + i22 + 4),
-                     show_fig=False, fontsize=fontsize,
-                     adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y)
+        ann_no_other = expand_1by1(ann_no_other)
+        coord = np.concatenate(moving_averages1[:, i1 + 1, :, :], axis=0)
 
-    # plot evolving UMAP from cells to averages
+        fig = plot_spatial(ann_no_other,
+                           coords=coord, labels=ann_no_other.columns,
+                           text=label_clusters,
+                           circle_diameter=circ_diam1[i1 + 1], alpha_scaling=sc_alpha,
+                           img=sp_img, img_alpha=img_alpha_seq[i22], style=style,
+                           # determine max color level using data quantiles
+                           max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
+                           adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
+        fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i22 + 4}.{save_extension}',
+                    bbox_inches='tight')
+        fig.clear()
+
+    # plot evolving from averages to spatial locations
     for i3 in tqdm(range(step_n[4])):
-        plot_spatial(sel_clust_df,
-                     coords=moving_averages2[:, i3, :, :],
-                     circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
-                     img=sp_img, img_alpha=img_alpha,
-                     max_color_quantile=step_quantile[4],
-                     save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + 5),
-                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
+
+        sel_clust_df_1 = expand_1by1(sel_clust_df)
+        coord = np.concatenate(moving_averages2[:, i3, :, :], axis=0)
+
+        fig = plot_spatial(sel_clust_df_1,
+                           coords=coord, labels=sel_clust_df.columns,
+                           circle_diameter=circ_diam2[i3], alpha_scaling=sp_alpha,
+                           img=sp_img, img_alpha=img_alpha, style=style,
+                           max_color_quantile=step_quantile[4],
+                           crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
+        fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i2 + i3 + 5}.{save_extension}',
+                    bbox_inches='tight')
+        fig.clear()
 
     # plot a few final images
     for i4 in range(step_n[5]):
-        plot_spatial(sel_clust_df,
-                     coords=moving_averages2[:, i3 + 1, :, :],
-                     circle_diameter=circ_diam2[i3 + 1],
-                     alpha_scaling=sp_alpha,
-                     img=sp_img, img_alpha=img_alpha,
-                     max_color_quantile=step_quantile[5],
-                     save_path=save_path, save_name=str(i0 + i1 + i2 + i2 + i3 + i4 + 6),
-                     show_fig=False, crop_x=crop_x, crop_y=crop_y)
+
+        sel_clust_df_1 = expand_1by1(sel_clust_df)
+        coord = np.concatenate(moving_averages2[:, i3 + 1, :, :], axis=0)
+
+        fig = plot_spatial(sel_clust_df_1,
+                           coords=coord, labels=sel_clust_df.columns,
+                           circle_diameter=circ_diam2[i3 + 1],
+                           alpha_scaling=sp_alpha,
+                           img=sp_img, img_alpha=img_alpha, style=style,
+                           max_color_quantile=step_quantile[5],
+                           crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
+                           colorbar_shape=colorbar_shape)
+        fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i2 + i3 + i4 + 6}.{save_extension}',
+                    bbox_inches='tight')
+        fig.clear()
