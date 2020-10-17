@@ -161,53 +161,6 @@ class LocationModel(Pymc3LocModel):
             self.nUMI_factors = pm.Deterministic('nUMI_factors',
                                                  (self.spot_factors * (self.gene_factors * self.gene_level).sum(0)))
 
-    def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
-        r"""Plot the histogram of log10 of the sum across w_sf for each location
-
-        Parameters
-        ----------
-        fact_name :
-            parameter of the model to use plot (Default value = 'nUMI_factors')
-
-        """
-
-        plt.hist(np.log10(self.samples['post_sample_means'][fact_name].sum(1)), bins=50)
-        plt.xlabel('Biological spot nUMI (log10)')
-        plt.title('Biological spot nUMI')
-        plt.tight_layout()
-
-    def plot_spot_add(self):
-        """Plot the histogram of log10 of additive location background."""
-
-        plt.hist(np.log10(self.samples['post_sample_means']['spot_add'][:, 0]), bins=50)
-        plt.xlabel('UMI unexplained by biological factors')
-        plt.title('Additive technical spot nUMI')
-        plt.tight_layout()
-
-    def plot_gene_E(self):
-        """Plot the histogram of 1 / sqrt(overdispersion alpha)"""
-
-        plt.hist((self.samples['post_sample_means']['gene_E'][:, 0]), bins=50)
-        plt.xlabel('E_g overdispersion parameter')
-        plt.title('E_g overdispersion parameter')
-        plt.tight_layout()
-
-    def plot_gene_add(self):
-        """Plot the histogram of additive gene background."""
-
-        plt.hist((self.samples['post_sample_means']['gene_add'][:, 0]), bins=50)
-        plt.xlabel('S_g additive background noise parameter')
-        plt.title('S_g additive background noise parameter')
-        plt.tight_layout()
-
-    def plot_gene_level(self):
-        """Plot the histogram of log10 of M_g change in sensitivity between technologies."""
-
-        plt.hist(np.log10(self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
-        plt.xlabel('M_g expression level scaling parameter')
-        plt.title('M_g expression level scaling parameter')
-        plt.tight_layout()
-
     def compute_expected(self):
         r"""Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
         the model learned expression pattern of all genes in the data.
@@ -220,8 +173,4 @@ class LocationModel(Pymc3LocModel):
                    * self.samples['post_sample_means']['gene_level'].T
                    + self.samples['post_sample_means']['gene_add'].T
                    + self.samples['post_sample_means']['spot_add'])
-
-    def plot_posterior_vs_dataV1(self):
-        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
-                                    cell_fact_name='spot_factors_scaled')
 
