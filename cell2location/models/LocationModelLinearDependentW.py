@@ -186,7 +186,7 @@ class LocationModelLinearDependentW(Pymc3LocModel):
                 n_g_prior = self.n_genes
             self.gene_level_alpha_hyp = pm.Gamma('gene_level_alpha_hyp',
                                                  mu=shape, sigma=np.sqrt(shape_var),
-                                                 shape=(n_g_prior, 1))
+                                                    shape=(n_g_prior, 1))
             self.gene_level_beta_hyp = pm.Gamma('gene_level_beta_hyp',
                                                 mu=rate, sigma=np.sqrt(rate_var),
                                                 shape=(n_g_prior, 1))
@@ -223,6 +223,7 @@ class LocationModelLinearDependentW(Pymc3LocModel):
                                               sigma=np.sqrt(cell_number_prior['factors_per_combs'] \
                                                             / cell_number_prior['factors_mean_var_ratio']),
                                               shape=(self.n_comb, 1))
+
             c2f_shape = self.factors_per_combs / np.array(self.n_fact).reshape((1, 1))
             self.comb2fact = pm.Gamma('comb2fact', alpha=c2f_shape, beta=self.factors_per_combs,
                                       shape=(self.n_comb, self.n_fact))
