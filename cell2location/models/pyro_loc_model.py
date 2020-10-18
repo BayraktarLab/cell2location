@@ -55,7 +55,7 @@ class PyroLocModel(PyroModel):
         r""" Evaluate stability in factor contributions to spots.
         """
 
-        self.b_evaluate_stability(node='spot_factors', n_samples=n_samples, align=align)
+        self.b_evaluate_stability(node='spot_factors', n_samples=n_samples, align=align, transpose=False)
 
     def sample2df(self, node_name='nUMI_factors'):
         r""" Export spot factors as Pandas data frames.
