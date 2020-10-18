@@ -169,8 +169,8 @@ class NegativeBinomial(Distribution):
                     "The value argument must be within the support of the distribution",
                     UserWarning,
                 )
-        #return log_nb_positive(value, mu=self.mu, theta=self.theta, eps=self._eps)
-        return log_nb_pymc3(value, mu=self.mu, alpha=self.theta, eps=self._eps)
+        return log_nb_positive(value, mu=self.mu, theta=self.theta, eps=self._eps)
+        #return log_nb_pymc3(value, mu=self.mu, alpha=self.theta, eps=self._eps)
 
     def _gamma(self):
         concentration = self.theta
