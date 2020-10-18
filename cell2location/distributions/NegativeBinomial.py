@@ -5,10 +5,10 @@ import warnings
 import torch
 from torch.distributions import (
     constraints,
-    Distribution,
-    Poisson
+    Distribution
 )
 from pyro.distributions import Gamma
+from pyro.distributions import Poisson
 from torch.distributions.utils import (
     broadcast_all,
     probs_to_logits,
@@ -70,7 +70,7 @@ def log_nb_pymc3(value, mu, alpha, eps=1e-8):
 
     # Return Poisson when alpha gets very large.
     return torch.where(torch.gt(alpha, 1e10),
-                       Poisson.log_prob(value, mu),
+                       (mu.log() * value) - mu - (value + 1).lgamma(),
                        negbinom)
 
 
@@ -169,8 +169,8 @@ class NegativeBinomial(Distribution):
                     "The value argument must be within the support of the distribution",
                     UserWarning,
                 )
-        return log_nb_positive(value, mu=self.mu, theta=self.theta, eps=self._eps)
-        # return log_nb_pymc3(value, mu=self.mu, alpha=self.theta, eps=self._eps)
+        #return log_nb_positive(value, mu=self.mu, theta=self.theta, eps=self._eps)
+        return log_nb_pymc3(value, mu=self.mu, alpha=self.theta, eps=self._eps)
 
     def _gamma(self):
         concentration = self.theta
