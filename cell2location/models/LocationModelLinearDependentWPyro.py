@@ -1,72 +1,19 @@
 ########----------------########
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pyro
 import pyro.distributions as dist
 import torch
 from pyro import poutine
 
 from cell2location.models.pyro_loc_model import PyroLocModel
-
-
-def Gamma(mu=None, sigma=None, alpha=None, beta=None, shape=None):
-    r"""
-    Function that converts
-    :param mu:
-    :param sigma:
-    :param alpha:
-    :param beta:
-    :param shape:
-    :return:
-    """
-    if alpha is not None and beta is not None:
-        pass
-    elif mu is not None and sigma is not None:
-        alpha = mu ** 2 / sigma ** 2
-        beta = mu / sigma ** 2
-    else:
-        raise ValueError('Define (mu and var) or (alpha and beta).')
-    if shape is None:
-        alpha = torch.tensor(alpha)
-        beta = torch.tensor(beta)
-    else:
-        alpha = torch.ones(shape) * alpha
-        beta = torch.ones(shape) * beta
-    return dist.Gamma(alpha, beta)
+from cell2location.distributions.Gamma import Gamma
+from cell2location.distributions.NegativeBinomial import NegativeBinomial
 
 
 def rand_tensor(shape, mean, sigma):
     r""" Helper for initializing variational parameters
     """
     return mean * torch.ones(shape) + sigma * torch.randn(shape)
-
-
-def _convert_mean_disp_to_counts_logits(mu, theta, eps=1e-6):
-    r"""NB parameterizations conversion  - Copied over from scVI
-        :param mu: mean of the NB distribution.
-        :param theta: inverse overdispersion.
-        :param eps: constant used for numerical log stability.
-        :return: the number of failures until the experiment is stopped
-            and the success probability.
-    """
-    assert (mu is None) == (
-            theta is None
-    ), "If using the mu/theta NB parameterization, both parameters must be specified"
-    logits = (mu + eps).log() - (theta + eps).log()
-    total_count = theta
-    return total_count, logits
-
-
-def _convert_counts_logits_to_mean_disp(total_count, logits):
-    """NB parameterizations conversion  - Copied over from scVI
-        :param total_count: Number of failures until the experiment is stopped.
-        :param logits: success logits.
-        :return: the mean and inverse overdispersion of the NB distribution.
-    """
-    theta = total_count
-    mu = logits.exp() * theta
-    return mu, theta
 
 
 ########-------- defining the model itself - pyro -------- ########
@@ -336,15 +283,12 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         self.mu_biol = torch.matmul(self.spot_factors[idx], self.gene_factors.T) * self.gene_level.T \
                        + self.gene_add.T + self.spot_add[idx]
         self.theta = torch.ones([1, 1]) / (self.gene_E.T * self.gene_E.T)
-        # convert mean and overdispersion to total count and logits (input to NB)
-        self.total_count, self.logits = _convert_mean_disp_to_counts_logits(self.mu_biol, self.theta,
-                                                                            eps=1e-8)
 
         # =====================DATA likelihood ======================= #
         # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
         self.data_target = pyro.sample('data_target',
-                                       dist.NegativeBinomial(total_count=self.total_count,
-                                                             logits=self.logits),
+                                       NegativeBinomial(mu=self.mu_biol,
+                                                        theta=self.theta),
                                        obs=x_data)
 
         # =====================Compute nUMI from each factor in spots  ======================= #
