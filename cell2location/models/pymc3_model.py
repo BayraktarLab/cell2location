@@ -490,17 +490,27 @@ class Pymc3Model(BaseModel):
             for i in tqdm(range(n_batches-1)):
                 # sample remaining batches
                 post_samples_1 = self.mean_field[mean_field_slot].sample(batch_size)
+
+                try:
+                    variable_names = post_samples_1.keys()
+                except Exception as e:
+                    variable_names = post_samples_1.varnames
+
                 # concatenate batches
                 post_samples = {k: np.concatenate((post_samples[k], post_samples_1[k]), axis=0)
-                                for k in post_samples_1.varnames}
+                                for k in variable_names}
 
+            try:
+                variable_names = post_samples.keys()
+            except Exception as e:
+                variable_names = post_samples.varnames
 
-            self.samples['post_sample_means'] = {v: post_samples[v].mean(axis=0) for v in post_samples.keys()}
+            self.samples['post_sample_means'] = {v: post_samples[v].mean(axis=0) for v in variable_names}
             self.samples['post_sample_q05'] = {v: np.quantile(post_samples[v], 0.05, axis=0) for v in
-                                               post_samples.keys()}
+                                               variable_names}
             self.samples['post_sample_q95'] = {v: np.quantile(post_samples[v], 0.95, axis=0) for v in
-                                               post_samples.keys()}
-            self.samples['post_sample_sds'] = {v: post_samples[v].std(axis=0) for v in post_samples.keys()}
+                                               variable_names}
+            self.samples['post_sample_sds'] = {v: post_samples[v].std(axis=0) for v in variable_names}
 
             if (save_samples):
                 self.samples['post_samples'] = post_samples
@@ -749,20 +759,26 @@ class Pymc3Model(BaseModel):
                                              save_samples=False,
                                              mean_field_slot=list(self.mean_field.keys())[0]);
         post_samples = post_samples['post_sample_means']
+
+        try:
+            variable_names = post_samples.keys()
+        except Exception as e:
+            variable_names = post_samples.varnames
+
         post_samples = {v: np.array([post_samples[v] for i in self.mean_field.keys()])
-                        for v in post_samples.keys()}
+                        for v in variable_names}
 
         for i, n in enumerate(list(self.mean_field.keys())[1:]):
 
             sample = self.sample_posterior(node='all', n_samples=n_samples,
                                            save_samples=False, mean_field_slot=n);
-            for k in post_samples.keys():
+            for k in variable_names:
                 post_samples[k][i + 1] = sample['post_sample_means'][k]
 
-        self.samples = {'post_sample_means': {v: post_samples[v].mean(axis=0) for v in post_samples.keys()},
-                        'post_sample_q05': {v: np.quantile(post_samples[v], 0.05, axis=0) for v in post_samples.keys()},
-                        'post_sample_q95': {v: np.quantile(post_samples[v], 0.95, axis=0) for v in post_samples.keys()},
-                        'post_sample_sds': {v: post_samples[v].std(axis=0) for v in post_samples.keys()}}
+        self.samples = {'post_sample_means': {v: post_samples[v].mean(axis=0) for v in variable_names},
+                        'post_sample_q05': {v: np.quantile(post_samples[v], 0.05, axis=0) for v in variable_names},
+                        'post_sample_q95': {v: np.quantile(post_samples[v], 0.95, axis=0) for v in variable_names},
+                        'post_sample_sds': {v: post_samples[v].std(axis=0) for v in variable_names}}
 
         if save_samples:
             self.samples['post_samples'] = post_samples
