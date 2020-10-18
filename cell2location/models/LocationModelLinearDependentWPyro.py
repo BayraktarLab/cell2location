@@ -7,10 +7,19 @@ import pyro.distributions as dist
 import torch
 from pyro import poutine
 
-from cell2location.models.pyro_model import PyroModel
+from cell2location.models.pyro_loc_model import PyroLocModel
 
 
 def Gamma(mu=None, sigma=None, alpha=None, beta=None, shape=None):
+    r"""
+    Function that converts
+    :param mu:
+    :param sigma:
+    :param alpha:
+    :param beta:
+    :param shape:
+    :return:
+    """
     if alpha is not None and beta is not None:
         pass
     elif mu is not None and sigma is not None:
@@ -61,28 +70,113 @@ def _convert_counts_logits_to_mean_disp(total_count, logits):
 
 
 ########-------- defining the model itself - pyro -------- ########
-class LocationModelLinearDependentWPyro(PyroModel):
-    r"""LocationModelPyro2NB4V7_V4_V4 Cell location model with E_g overdispersion &
-    NB likelihood defined by total_count and logits
-         - similar to LocationModelNB4V7_V4_V4
-         pymc3 NB parametrisation of pytorch but overdisp priors as described here https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/
-    :param cell_state_mat: Pandas data frame with gene signatures - genes in row, cell states or factors in columns
-    :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
-    :param learning_rate: ADAM learning rate for optimising Variational inference objective
-    :param n_iter: number of training iterations
-    :param total_grad_norm_constraint: gradient constraints in optimisation
-    :param gene_level_prior: prior on change in sensitivity between single cell and spatial (mean),
-                                how much it varies across cells (sd),
-                                and how certain we are in those numbers (mean_var_ratio)
-                                 - by default the variance in our prior of mean and sd is equal to the mean and sd
-                                 descreasing this number means having higher uncertainty about your prior
-    :param cell_number_prior: prior on cell density parameter:
-                                cells_per_spot - what is the number of cells you expect per location?
-                                factors_per_spot - what is the number of cell types
-                                                        / number of factors expressed per location?
-                                cells_mean_var_ratio, factors_mean_var_ratio - uncertainty in both prior
-                                                        expressed as a mean/var ratio, numbers < 1 mean high uncertainty
-    :param phi_hyp_prior: prior on overdispersion parameter, rate of exponential distribution over phi / theta
+class LocationModelLinearDependentWPyro(PyroLocModel):
+    r"""Cell2location models the elements of :math:`D` as Negative Binomial distributed,
+    given an unobserved rate :math:`mu` and a gene-specific over-dispersion parameter :math:`\alpha_g`
+    which describes variance in expression of individual genes that is not explained by the regulatory programs:
+
+    .. math::
+        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_g)
+
+    The containment prior on overdispersion :math:`\alpha_g` parameter is used
+    (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
+
+    The spatial expression levels of genes :math:`\mu_{s,g}` in the rate space are modelled
+    as the sum of five non-negative components:
+
+    .. math::
+        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{g}
+
+    Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
+    :math:`g_{f,g}` denotes the regulatory programmes :math:`f` of each gene :math:`g` - input to the model;
+    :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
+    in the global expression estimates between technologies;
+    :math:`l_{s}` and :math:`s_{g}` are additive components that capture additive background variation
+    that is not explained by the bi-variate decomposition.
+
+    The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale and account for correlation of programs
+    across locations with similar cell composition. This is done by inferring a hierarchical prior representing
+    the co-located cell type combinations.
+
+    This prior is specified using 3 `cell_number_prior` input parameters:
+
+    * **cells_per_spot** is derived from examining the paired histology image to get an idea about
+      the average nuclei count per location.
+
+    * **factors_per_spot** reflects the number of regulatory programmes / cell types you expect to find in each location.
+
+    * **combs_per_spot** prior tells the model how much co-location signal to expect between the programmes / cell types.
+
+    A number close to `factors_per_spot` tells that all cell types have independent locations,
+    and a number close 1 tells that each cell type is co-located with `factors_per_spot` other cell types.
+    Choosing a number halfway in-between is a sensible default: some cell types are co-located with others but some stand alone.
+
+    The prior distribution on :math:`m_{g}` is informed by the expected change in sensitivity from single cell to spatial
+    technology, and is specified in `gene_level_prior`.
+
+    Note
+    ----
+        `gene_level_prior` and `cell_number_prior` determine the absolute scale of :math:`w_{s,f}` density across locations,
+        but have a very limited effect on the absolute count of mRNA molecules attributed to each cell type.
+        Comparing your prior on **cells_per_spot** to average nUMI in the reference and spatial data helps to choose
+        the gene_level_prior and guide the model to learn :math:`w_{s,f}` close to the true cell count.
+
+    Parameters
+    ----------
+    cell_state_mat :
+        Pandas data frame with gene programmes - genes in rows, cell types / factors in columns
+    X_data :
+        Numpy array of gene expression (cols) in spatial locations (rows)
+    n_comb :
+        The number of co-located cell type combinations (in the prior).
+        The model is fairly robust to this choice when the prior has low effect on location weights W
+        (`spot_fact_mean_var_ratio` parameter is low), but please use the default unless know what you are doing (Default: 50)
+    n_iter :
+        number of training iterations
+    learning_rate, data_type, total_grad_norm_constraint, ...:
+        See parent class BaseModel for details.
+    gene_level_prior :
+        prior on change in sensitivity between single cell and spatial technology (**mean**),
+        how much individual genes deviate from that (**sd**),
+
+        * **mean** a good choice of this prior for 10X Visium data and 10X Chromium reference is between 1/3 and 1 depending
+          on how well each experiment worked. A good choice for SmartSeq 2 reference is around ~ 1/10.
+        * **sd** a good choice of this prior is **mean** / 2.
+          Avoid setting **sd** >= **mean** because it puts a lot of weight on 0.
+    gene_level_var_prior :
+        Certainty in the gene_level_prior (mean_var_ratio)
+        - by default the variance in our prior of mean and sd is equal to the mean and sd
+        decreasing this number means having higher uncertainty in the prior
+    cell_number_prior :
+        prior on cell density parameter:
+
+        * **cells_per_spot** - what is the average number of cells you expect per location? This could also be the nuclei
+          count from the paired histology image segmentation.
+        * **factors_per_spot** - what is the number of cell types
+          number of factors expressed per location?
+        * **combs_per_spot** - what is the average number of factor combinations per location?
+          a number halfway in-between `factors_per_spot` and 1 is a sensible default
+          Low numbers mean more factors are co-located with other factors.
+    cell_number_var_prior :
+        Certainty in the cell_number_prior (cells_mean_var_ratio, factors_mean_var_ratio,
+        combs_mean_var_ratio)
+        - by default the variance in the value of this prior is equal to the value of this itself.
+        decreasing this number means having higher uncertainty in the prior
+    phi_hyp_prior :
+        prior on NB alpha overdispersion parameter, the rate of exponential distribution over alpha.
+        This is a containment prior so low values mean low deviation from the mean of NB distribution.
+
+        * **mu** average prior
+        * **sd** standard deviation in this prior
+        When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
+    spot_fact_mean_var_ratio :
+        the parameter that controls the strength of co-located cell combination prior on
+        :math:`w_{s,f}` density across locations. It is expressed as mean / variance ratio with low values corresponding to
+        a weakly informative prior. Use the default value of 0.5 unless you know what you are doing.
+
+    Returns
+    -------
+
     """
 
     def __init__(
@@ -113,24 +207,13 @@ class LocationModelLinearDependentWPyro(PyroModel):
     ):
 
         ############# Initialise parameters ################
-        super().__init__(X_data, cell_state_mat.shape[1],
-                         data_type, n_iter,
-                         learning_rate, total_grad_norm_constraint,
-                         use_cuda, verbose, var_names, var_names_read,
-                         obs_names, fact_names, sample_id, minibatch_size,
-                         minibatch_seed)
+        super().__init__(cell_state_mat=cell_state_mat, X_data=X_data,
+                         data_type=data_type, n_iter=n_iter,
+                         learning_rate=learning_rate, total_grad_norm_constraint=total_grad_norm_constraint,
+                         use_cuda=use_cuda, verbose=verbose, var_names=var_names, var_names_read=var_names_read,
+                         obs_names=obs_names, fact_names=fact_names, sample_id=sample_id,
+                         minibatch_size=minibatch_size, minibatch_seed=minibatch_seed)
 
-        self.cell_state_mat = cell_state_mat
-        # Pass data to pyro / pytorch
-        self.cell_state = torch.tensor(cell_state_mat.astype(self.data_type))  # .double()
-        if self.use_cuda:
-            # move tensors and modules to CUDA
-            self.cell_state = self.cell_state.cuda()
-
-        for k in gene_level_var_prior.keys():
-            gene_level_prior[k] = gene_level_var_prior[k]
-
-        self.gene_level_prior = gene_level_prior
         self.phi_hyp_prior = phi_hyp_prior
         self.n_comb = n_comb
         self.spot_fact_mean_var_ratio = spot_fact_mean_var_ratio
@@ -140,6 +223,10 @@ class LocationModelLinearDependentWPyro(PyroModel):
         for k in cell_number_var_prior.keys():
             cell_number_prior[k] = cell_number_var_prior[k]
         self.cell_number_prior = cell_number_prior
+
+        for k in gene_level_var_prior.keys():
+            gene_level_prior[k] = gene_level_var_prior[k]
+        self.gene_level_prior = gene_level_prior
 
     ############# Define the model ################
     def model(self, x_data, idx=None):
@@ -264,110 +351,18 @@ class LocationModelLinearDependentWPyro(PyroModel):
         nUMI = (self.spot_factors * (self.gene_factors * self.gene_level).sum(0))
         self.nUMI_factors = pyro.deterministic('nUMI_factors', nUMI)
 
-    def plot_posterior_vs_dataV1(self):
-        self.plot_posterior_vs_data(gene_fact_name='gene_factors',
-                                    cell_fact_name='spot_factors_scaled')
-
-    def plot_biol_spot_nUMI(self, fact_name='nUMI_factors'):
-        plt.hist(np.log10(self.samples['post_sample_means'][fact_name].sum(1)), bins=50)
-        plt.xlabel('Biological spot nUMI (log10)')
-        plt.title('Biological spot nUMI')
-        plt.tight_layout()
-
-    def plot_spot_add(self):
-        plt.hist(np.log10(self.samples['post_sample_means']['spot_add'][:, 0]), bins=50)
-        plt.xlabel('UMI unexplained by biological factors')
-        plt.title('Additive technical spot nUMI')
-        plt.tight_layout()
-
-    def plot_gene_E(self):
-        plt.hist((self.samples['post_sample_means']['gene_E'][:, 0]), bins=50)
-        plt.xlabel('E_g overdispersion parameter')
-        plt.title('E_g overdispersion parameter')
-        plt.tight_layout()
-
-    def plot_gene_add(self):
-        plt.hist((self.samples['post_sample_means']['gene_add'][:, 0]), bins=50)
-        plt.xlabel('S_g additive background noise parameter')
-        plt.title('S_g additive background noise parameter')
-        plt.tight_layout()
-
-    def plot_gene_level(self):
-        plt.hist((self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
-        plt.xlabel('M_g expression level scaling parameter')
-        plt.title('M_g expression level scaling parameter')
-        plt.tight_layout()
-
     def compute_expected(self):
-        r""" Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well the model learned expression pattern of all genes in the data.
+        r"""Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
+            the model learned expression pattern of all genes in the data.
         """
 
         # compute the poisson rate
         self.mu = (np.dot(self.samples['post_sample_means']['spot_factors'],
-                          self.samples['post_sample_means']['gene_factors'].T) \
-                   * self.samples['post_sample_means']['gene_level'].T \
-                   + self.samples['post_sample_means']['gene_add'].T \
-                   + self.samples['post_sample_means']['spot_add'])  # \
-
-    # * self.samples['post_sample_means']['gene_E']
-
-    def evaluate_stability(self, n_samples=1000, align=False):
-        r""" Evaluate stability in factor contributions to spots.
-        """
-
-        self.b_evaluate_stability(node='spot_factors', n_samples=n_samples, align=align)
-
-    def sample2df(self, node_name='nUMI_factors'):
-        r""" Export spot factors as Pandas data frames.
-        :param node_name: name of the model parameter to be exported
-        :return: 4 Pandas dataframes added to model object:
-                 .spot_factors_df, .spot_factors_sd, .spot_factors_q05, .spot_factors_q95
-        """
-
-        if len(self.samples) == 0:
-            raise ValueError(
-                'Please run `.sample_posterior()` first to generate samples & summarise posterior of each parameter')
-
-        self.spot_factors_df = \
-            pd.DataFrame.from_records(self.samples['post_sample_means'][node_name],
-                                      index=self.obs_names,
-                                      columns=['mean_' + node_name + i for i in self.fact_names])
-
-        self.spot_factors_sd = \
-            pd.DataFrame.from_records(self.samples['post_sample_sds'][node_name],
-                                      index=self.obs_names,
-                                      columns=['sd_' + node_name + i for i in self.fact_names])
-
-        self.spot_factors_q05 = \
-            pd.DataFrame.from_records(self.samples['post_sample_q05'][node_name],
-                                      index=self.obs_names,
-                                      columns=['q05_' + node_name + i for i in self.fact_names])
-
-        self.spot_factors_q95 = \
-            pd.DataFrame.from_records(self.samples['post_sample_q95'][node_name],
-                                      index=self.obs_names,
-                                      columns=['q95_' + node_name + i for i in self.fact_names])
-
-    def annotate_spot_adata(self, adata):
-        r""" Add spot factors to anndata.obs
-        :param adata: anndata object to annotate
-        :return: updated anndata object
-        """
-
-        if self.spot_factors_df is None:
-            self.sample2df()
-
-        # add cell factors to adata
-        adata.obs[self.spot_factors_df.columns] = self.spot_factors_df.loc[adata.obs.index, :]
-
-        # add cell factor sd to adata
-        adata.obs[self.spot_factors_sd.columns] = self.spot_factors_sd.loc[adata.obs.index, :]
-
-        # add cell factor 5% and 95% quantiles to adata
-        adata.obs[self.spot_factors_q05.columns] = self.spot_factors_q05.loc[adata.obs.index, :]
-        adata.obs[self.spot_factors_q95.columns] = self.spot_factors_q95.loc[adata.obs.index, :]
-
-        return adata
+                          self.samples['post_sample_means']['gene_factors'].T)
+                   * self.samples['post_sample_means']['gene_level'].T
+                   + self.samples['post_sample_means']['gene_add'].T
+                   + self.samples['post_sample_means']['spot_add'])
+        self.alpha = 1 / (self.samples['post_sample_means']['gene_E'].T * self.samples['post_sample_means']['gene_E'].T)
 
     def step_train(self, name, x_data, extra_data):
         idx = extra_data.get('idx')
