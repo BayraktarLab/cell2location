@@ -241,14 +241,14 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
                                                                  / self.cell_number_prior['factors_mean_var_ratio']),
                                                    shape=(self.n_comb, 1)))
 
-        c2f_shape = self.factors_per_combs / self.n_fact
+        c2f_shape = self.factors_per_combs / torch.tensor(self.n_fact)
         self.comb2fact = pyro.sample('comb2fact',
                                      Gamma(alpha=c2f_shape,
                                            beta=self.factors_per_combs,
                                            shape=(self.n_comb, self.n_fact)))
 
         spot_factors_mu = self.combs_factors @ self.comb2fact
-        spot_factors_sigma = torch.sqrt(self.combs_factors @ self.comb2fact / self.spot_fact_mean_var_ratio)
+        spot_factors_sigma = torch.sqrt(spot_factors_mu / self.spot_fact_mean_var_ratio)
 
         self.spot_factors = pyro.sample('spot_factors',
                                         Gamma(mu=spot_factors_mu,
