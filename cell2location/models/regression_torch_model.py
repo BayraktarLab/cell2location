@@ -76,7 +76,7 @@ class RegressionTorchModel(TorchModel):
         self.cell_factors_df = None
         self.minibatch_size = minibatch_size
         self.minibatch_seed = minibatch_seed
-        self.n_cells_total = self.n_cells
+        self.n_cells_total = self.n_obs
         self.which_sample = self.fact_names.isin(cell2sample_df.columns)
         self.n_samples = np.sum(self.which_sample)
         self.n_covar = self.n_fact - self.n_samples
@@ -90,8 +90,8 @@ class RegressionTorchModel(TorchModel):
         self.cell2sample_covar_mat = cell2sample_covar_df.values
 
         # find mean and variance for each gene
-        self.gene_mean = (self.X_data + self.prior_eps).mean(0).astype(self.data_type).reshape((1, self.n_genes))
-        self.noise_gene_mean = (self.gene_mean / 10).astype(self.data_type).reshape((1, self.n_genes))
+        self.gene_mean = (self.X_data + self.prior_eps).mean(0).astype(self.data_type).reshape((1, self.n_var))
+        self.noise_gene_mean = (self.gene_mean / 10).astype(self.data_type).reshape((1, self.n_var))
         self.prior_gene_mean = np.concatenate([self.noise_gene_mean, self.gene_mean], axis=0)
 
         self.stratify_cv = stratify_cv

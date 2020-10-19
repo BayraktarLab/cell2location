@@ -99,7 +99,7 @@ class LocationModel(Pymc3LocModel):
                                                 shape=(1, 1))
 
             self.gene_level = pm.Gamma('gene_level', self.gene_level_alpha_hyp,
-                                       self.gene_level_beta_hyp, shape=(self.n_genes, 1))
+                                       self.gene_level_beta_hyp, shape=(self.n_var, 1))
 
             # scale cell state factors by gene_level
             self.gene_factors = pm.Deterministic('gene_factors', self.cell_state)
@@ -113,36 +113,36 @@ class LocationModel(Pymc3LocModel):
                                            mu=cell_number_prior['cells_per_spot'],
                                            sigma=np.sqrt(cell_number_prior['cells_per_spot'] \
                                                          / cell_number_prior['cells_mean_var_ratio']),
-                                           shape=(self.n_cells, 1))
+                                           shape=(self.n_obs, 1))
             self.factors_per_spot = pm.Gamma('factors_per_spot',
                                              mu=cell_number_prior['factors_per_spot'],
                                              sigma=np.sqrt(cell_number_prior['factors_per_spot'] \
                                                            / cell_number_prior['factors_mean_var_ratio']),
-                                             shape=(self.n_cells, 1))
+                                             shape=(self.n_obs, 1))
 
             shape = self.factors_per_spot / np.array(self.n_fact).reshape((1, 1))
             rate = tt.ones((1, 1)) / self.cells_per_spot * self.factors_per_spot
             self.spot_factors = pm.Gamma('spot_factors', alpha=shape, beta=rate,
-                                         shape=(self.n_cells, self.n_fact))
+                                         shape=(self.n_obs, self.n_fact))
 
             # =====================Spot-specific additive component======================= #
             # molecule contribution that cannot be explained by cell state signatures
             # these counts are distributed between all genes not just expressed genes
             self.spot_add_hyp = pm.Gamma('spot_add_hyp', 1, 0.1, shape=2)
             self.spot_add = pm.Gamma('spot_add', self.spot_add_hyp[0],
-                                     self.spot_add_hyp[1], shape=(self.n_cells, 1))
+                                     self.spot_add_hyp[1], shape=(self.n_obs, 1))
 
             # =====================Gene-specific additive component ======================= #
             # per gene molecule contribution that cannot be explained by cell state signatures
             # these counts are distributed equally between all spots (e.g. background, free-floating RNA)
             self.gene_add_hyp = pm.Gamma('gene_add_hyp', 1, 1, shape=2)
             self.gene_add = pm.Gamma('gene_add', self.gene_add_hyp[0],
-                                     self.gene_add_hyp[1], shape=(self.n_genes, 1))
+                                     self.gene_add_hyp[1], shape=(self.n_var, 1))
 
             # =====================Gene-specific overdispersion ======================= #
             self.phi_hyp = pm.Gamma('phi_hyp', mu=phi_hyp_prior['mean'],
                                     sigma=phi_hyp_prior['sd'], shape=(1, 1))
-            self.gene_E = pm.Exponential('gene_E', self.phi_hyp, shape=(self.n_genes, 1))
+            self.gene_E = pm.Exponential('gene_E', self.phi_hyp, shape=(self.n_var, 1))
 
             # =====================Expected expression ======================= #
             # expected expression

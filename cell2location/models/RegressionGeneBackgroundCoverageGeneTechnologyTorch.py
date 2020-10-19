@@ -235,11 +235,11 @@ class RegressionGeneBackgroundCoverageGeneTechnologyTorch(RegressionTorchModel):
         self.extra_data['cell2tech'] = self.cell2tech_mat
 
         ############# Define the model ################
-        self.model = RegressionGeneBackgroundCoverageGeneTechnologyTorchModule(self.n_cells, self.n_genes,
-                                               self.n_fact, self.n_tech,
-                                               self.clust_average_mat,
-                                               which_sample=self.which_sample,
-                                               data_type=self.data_type)
+        self.model = RegressionGeneBackgroundCoverageGeneTechnologyTorchModule(self.n_obs, self.n_var,
+                                                                               self.n_fact, self.n_tech,
+                                                                               self.clust_average_mat,
+                                                                               which_sample=self.which_sample,
+                                                                               data_type=self.data_type)
 
     # =====================DATA likelihood loss function======================= #
     # define cost function 

@@ -190,7 +190,7 @@ class Pymc3Model(BaseModel):
             s = theano.shared(np.array(learning_rate).astype(self.data_type))
 
             def reduce_rate(a, h, i):
-                s.set_value(np.array(learning_rate / ((i / self.n_cells) + 1) ** .7).astype(self.data_type))
+                s.set_value(np.array(learning_rate / ((i / self.n_obs) + 1) ** .7).astype(self.data_type))
 
             optimiser = pm.adam(learning_rate=s)
             callbacks = [reduce_rate, CheckParametersConvergence()]
@@ -310,7 +310,7 @@ class Pymc3Model(BaseModel):
             s = theano.shared(np.array(learning_rate).astype(self.data_type))
 
             def reduce_rate(a, h, i):
-                s.set_value(np.array(learning_rate / ((i / self.n_cells) + 1) ** .7).astype(self.data_type))
+                s.set_value(np.array(learning_rate / ((i / self.n_obs) + 1) ** .7).astype(self.data_type))
 
             optimiser = pm.adam(learning_rate=s)
             callbacks = [reduce_rate, CheckParametersConvergence()]
