@@ -11,7 +11,7 @@ def setup_package():
         version='0.02',
         description='cell2location: High-throughput spatial mapping of cell types',
         url='https://github.com/BayraktarLab/cell2location',
-        author='Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Artem Lomakin, Alexander Aivazidis, Mika Jain',
+        author='Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Artem Lomakin, Alexander Aivazidis',
         author_email='vitalii.kleshchevnikov@sanger.ac.uk',
         license='Apache License, Version 2.0',
         packages=find_packages(),
