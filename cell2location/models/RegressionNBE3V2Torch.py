@@ -198,10 +198,10 @@ class RegressionNBE3V2Torch(RegressionTorchModel):
 
         ############# Define the model ################
 
-        self.model = RegressionNBE3V2TorchModule(self.n_cells, self.n_genes,
-                                               self.n_fact, self.clust_average_mat,
-                                               which_sample=self.which_sample,
-                                               data_type=self.data_type)
+        self.model = RegressionNBE3V2TorchModule(self.n_obs, self.n_var,
+                                                 self.n_fact, self.clust_average_mat,
+                                                 which_sample=self.which_sample,
+                                                 data_type=self.data_type)
 
     # =====================DATA likelihood loss function======================= #
     # define cost function 

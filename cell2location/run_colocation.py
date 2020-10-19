@@ -146,10 +146,10 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
 
         ####### Print run name #######
         run_name = str(mod.__class__.__name__) + '_' + str(mod.n_fact) + 'combinations_' \
-                   + str(mod.n_cells) + 'locations_' + str(mod.n_genes) + 'factors' \
+                   + str(mod.n_obs) + 'locations_' + str(mod.n_var) + 'factors' \
                    + export_args['run_name_suffix']
         path_name = str(mod.__class__.__name__) + '_' \
-                    + str(mod.n_cells) + 'locations_' + str(mod.n_genes) + 'factors' \
+                    + str(mod.n_obs) + 'locations_' + str(mod.n_var) + 'factors' \
                     + export_args['run_name_suffix']
 
         print('### Analysis name: ' + run_name)  # analysis name is always printed
@@ -280,7 +280,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
                                fact_filt=mod.fact_filt,
                                loadings_attr='cell_type_fractions',
                                gene_fact_name='cell_type_fractions',
-                               cmap='RdPu', figsize=[5 + 0.12 * mod.n_fact, 5 + 0.1 * mod.n_genes])
+                               cmap='RdPu', figsize=[5 + 0.12 * mod.n_fact, 5 + 0.1 * mod.n_var])
 
         save_plot(fig_path, filename=f'n_fact{mod.n_fact}',
                   extension=export_args['plot_extension'])

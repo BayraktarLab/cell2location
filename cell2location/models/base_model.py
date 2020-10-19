@@ -44,8 +44,8 @@ class BaseModel():
         # Initialise parameters
         self.X_data = X_data
         self.n_fact = n_fact
-        self.n_genes = X_data.shape[1]
-        self.n_cells = X_data.shape[0]
+        self.n_var = X_data.shape[1]
+        self.n_obs = X_data.shape[0]
         self.data_type = data_type
         self.n_iter = n_iter
         self.learning_rate = learning_rate
@@ -60,8 +60,8 @@ class BaseModel():
 
         # add essential annotations
         if var_names is None:
-            self.var_names = pd.Series(['g_' + str(i) for i in range(self.n_genes)],
-                                       index=['g_' + str(i) for i in range(self.n_genes)])
+            self.var_names = pd.Series(['g_' + str(i) for i in range(self.n_var)],
+                                       index=['g_' + str(i) for i in range(self.n_var)])
         else:
             self.var_names = pd.Series(var_names,
                                        index=var_names)
@@ -72,8 +72,8 @@ class BaseModel():
             self.var_names_read = pd.Series(var_names_read, index=self.var_names)
 
         if obs_names is None:
-            self.obs_names = pd.Series(['c_' + str(i) for i in range(self.n_cells)],
-                                       index=['c_' + str(i) for i in range(self.n_cells)])
+            self.obs_names = pd.Series(['c_' + str(i) for i in range(self.n_obs)],
+                                       index=['c_' + str(i) for i in range(self.n_obs)])
         else:
             self.obs_names = pd.Series(obs_names, index=obs_names)
 
@@ -83,7 +83,7 @@ class BaseModel():
             self.fact_names = pd.Series(fact_names)
 
         if sample_id is None:
-            self.sample_id = pd.Series(['sample' for i in range(self.n_cells)],
+            self.sample_id = pd.Series(['sample' for i in range(self.n_obs)],
                                        index=self.obs_names)
         else:
             self.sample_id = pd.Series(sample_id, index=self.obs_names)

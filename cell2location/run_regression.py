@@ -173,7 +173,7 @@ def run_regression(sc_data, model_name=None,
 
     ####### Print run name #######
     run_name = str(mod.__class__.__name__) + '_' + str(mod.n_fact) + 'covariates_' \
-               + str(mod.n_cells) + 'cells_' + str(mod.n_genes) + 'genes' \
+               + str(mod.n_obs) + 'cells_' + str(mod.n_var) + 'genes' \
                + export_args['run_name_suffix']
 
     print('### Analysis name: ' + run_name)  # analysis name is always printed

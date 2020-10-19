@@ -192,7 +192,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         if len(n_g_prior) == 0:
             n_g_prior = 1
         else:
-            n_g_prior = self.n_genes
+            n_g_prior = self.n_var
 
         self.gene_level_alpha_hyp = pyro.sample('gene_level_alpha_hyp',
                                                 Gamma(mu=shape,
@@ -207,7 +207,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         self.gene_level = pyro.sample('gene_level',
                                       Gamma(alpha=self.gene_level_alpha_hyp,
                                             beta=self.gene_level_beta_hyp,
-                                            shape=(self.n_genes, 1)))
+                                            shape=(self.n_var, 1)))
 
         # scale cell state factors by gene_level
         self.gene_factors = pyro.deterministic('gene_factors', self.cell_state)
@@ -219,13 +219,13 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
                                           Gamma(mu=self.cell_number_prior['cells_per_spot'],
                                                 sigma=np.sqrt(self.cell_number_prior['cells_per_spot'] \
                                                               / self.cell_number_prior['cells_mean_var_ratio']),
-                                                shape=(self.n_cells, 1)))
+                                                shape=(self.n_obs, 1)))
 
         self.comb_per_spot = pyro.sample('combs_per_spot',
                                          Gamma(mu=self.cell_number_prior['combs_per_spot'],
                                                sigma=np.sqrt(self.cell_number_prior['combs_per_spot'] \
                                                              / self.cell_number_prior['combs_mean_var_ratio']),
-                                               shape=(self.n_cells, 1)))
+                                               shape=(self.n_obs, 1)))
 
         shape = self.comb_per_spot / self.n_comb
         rate = torch.ones([1, 1]) / self.cells_per_spot * self.comb_per_spot
@@ -233,7 +233,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         self.combs_factors = pyro.sample('combs_factors',
                                          Gamma(alpha=shape,
                                                beta=rate,
-                                               shape=(self.n_cells, self.n_comb)))
+                                               shape=(self.n_obs, self.n_comb)))
 
         self.factors_per_combs = pyro.sample('factors_per_combs',
                                              Gamma(mu=self.cell_number_prior['factors_per_combs'],
@@ -260,7 +260,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         self.spot_add_hyp = pyro.sample('spot_add_hyp', Gamma(alpha=1, beta=1, shape=2))
         self.spot_add = pyro.sample('spot_add', Gamma(alpha=self.spot_add_hyp[0],
                                                       beta=self.spot_add_hyp[1],
-                                                      shape=(self.n_cells, 1)))
+                                                      shape=(self.n_obs, 1)))
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by cell state signatures
@@ -268,7 +268,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         self.gene_add_hyp = pyro.sample('gene_add_hyp', Gamma(alpha=1, beta=1, shape=2))
         self.gene_add = pyro.sample('gene_add', Gamma(alpha=self.gene_add_hyp[0],
                                                       beta=self.gene_add_hyp[1],
-                                                      shape=(self.n_genes, 1)))
+                                                      shape=(self.n_var, 1)))
 
         # =====================Gene-specific overdispersion ======================= #
         self.phi_hyp = pyro.sample('phi_hyp',
@@ -276,7 +276,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
                                          sigma=self.phi_hyp_prior['sd'],
                                          shape=(1, 1)))
 
-        self.gene_E = pyro.sample('gene_E', dist.Exponential(torch.ones([self.n_genes, 1]) * self.phi_hyp[0, 0]))
+        self.gene_E = pyro.sample('gene_E', dist.Exponential(torch.ones([self.n_var, 1]) * self.phi_hyp[0, 0]))
 
         # =====================Expected expression ======================= #
         # expected expression
