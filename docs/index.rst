@@ -24,6 +24,7 @@ Welcome to cell2location's documentation!
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region
+   cell2location.location_models_pyro
 
 Indices and tables
 ==================
