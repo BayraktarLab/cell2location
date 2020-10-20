@@ -1,6 +1,6 @@
 r"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
-    it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
-    across locations with similar cell composition, thus has reduced accuracy."""
+    it is identical to LocationModelLinearDependentWPyro but does not account for linear dependencies in abundance of programs
+    across locations with similar cell composition."""
 
 import numpy as np
 
@@ -35,17 +35,17 @@ class LocationModelPyro(PyroLocModel):
     learning_rate, data_type, total_grad_norm_constraint, ...:
         See parent class BaseModel for details.
     gene_level_prior :
-        see the description for CoLocationModelNB4V2
+        see the description for LocationModelLinearDependentWPyro
     gene_level_var_prior :
-        see the description for CoLocationModelNB4V2
+        see the description for LocationModelLinearDependentWPyro
     cell_number_prior :
-        see the description for CoLocationModelNB4V2, this model does not have **combs_per_spot**
+        see the description for LocationModelLinearDependentWPyro, this model does not have **combs_per_spot**
         parameter.
     cell_number_var_prior :
-        see the description for CoLocationModelNB4V2, this model does not have
+        see the description for LocationModelLinearDependentWPyro, this model does not have
         **combs_mean_var_ratio** parameter.
     phi_hyp_prior :
-        see the description for CoLocationModelNB4V2
+        see the description for LocationModelLinearDependentWPyro
 
     Returns
     -------
