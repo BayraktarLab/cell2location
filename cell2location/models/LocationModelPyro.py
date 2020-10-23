@@ -74,12 +74,12 @@ class LocationModelPyro(PyroLocModel):
     ):
 
         ############# Initialise parameters ################
-        super().__init__(X_data, cell_state_mat.shape[1],
-                         data_type, n_iter,
-                         learning_rate, total_grad_norm_constraint,
-                         use_cuda, verbose, var_names, var_names_read,
-                         obs_names, fact_names, sample_id, minibatch_size,
-                         minibatch_seed)
+        super().__init__(cell_state_mat=cell_state_mat, X_data=X_data,
+                         data_type=data_type, n_iter=n_iter,
+                         learning_rate=learning_rate, total_grad_norm_constraint=total_grad_norm_constraint,
+                         use_cuda=use_cuda, verbose=verbose, var_names=var_names, var_names_read=var_names_read,
+                         obs_names=obs_names, fact_names=fact_names, sample_id=sample_id,
+                         minibatch_size=minibatch_size, minibatch_seed=minibatch_seed)
 
         self.cell_state_mat = cell_state_mat
         # Pass data to pyro / pytorch
