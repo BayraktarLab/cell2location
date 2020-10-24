@@ -21,6 +21,7 @@ Welcome to cell2location's documentation!
    cell2location
    cell2location.location_models
    cell2location.regression_models
+   cell2location.downstream_models
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region

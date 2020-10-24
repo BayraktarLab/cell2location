@@ -26,14 +26,6 @@ LocationModel
    :undoc-members:
    :show-inheritance:
 
-CoLocatedGroupsSklearnNMF
-------------------------------------------------------------
-
-.. automodule:: cell2location.models.CoLocatedGroupsSklearnNMF
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 BaseModel
 ---------------------------------------
 

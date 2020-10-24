@@ -1,4 +1,4 @@
-Location Models pyro translation (spatial mapping)
+Pyro translation of Location Models (spatial mapping)
 ============================
 
 
