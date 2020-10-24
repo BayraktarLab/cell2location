@@ -3,6 +3,8 @@
 # Co-located cell type combination model
 # Doesn't learn the number of factors but is fast
 from .CoLocatedGroupsSklearnNMF import CoLocatedGroupsSklearnNMF
+from .ArchetypalAnalysis import ArchetypalAnalysis
+
 from .LocationModelLinearDependentW import LocationModelLinearDependentW
 from .LocationModelLinearDependentWMultiExperiment import LocationModelLinearDependentWMultiExperiment
 from .LocationModel import LocationModel
@@ -15,5 +17,5 @@ __all__ = [
     "LocationModel",
     "RegressionGeneBackgroundCoverageTorch",
     "RegressionGeneBackgroundCoverageGeneTechnologyTorch",
-    "CoLocatedGroupsSklearnNMF",
+    "CoLocatedGroupsSklearnNMF", "ArchetypalAnalysis"
 ]
