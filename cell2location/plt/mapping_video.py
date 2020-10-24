@@ -522,7 +522,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
 
     #### start saving plots ####
     # plot UMAP with no changes
-    for i0 in range(step_n[0]):
+    for i0 in tqdm(range(step_n[0])):
         fig = plot_spatial(cell_fact_df,
                            coords=umap_coord, labels=cell_fact_df.columns,
                            circle_diameter=sc_point_size, alpha_scaling=sc_alpha,
@@ -558,7 +558,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         label_clusters = aver_coord[['x', 'y', 'column']]
     else:
         label_clusters = None
-    for i2 in range(step_n[2]):
+    for i2 in tqdm(range(step_n[2])):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         ann_no_other = expand_1by1(ann_no_other)
         coord = np.concatenate(moving_averages1[:, i1 + 1, :, :], axis=0)
@@ -577,7 +577,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         fig.clear()
 
     # plot averages & fade-in histology image
-    for i22 in range(step_n[3]):
+    for i22 in tqdm(range(step_n[3])):
         ann_no_other = cell_fact_df[cell_fact_df.columns[cell_fact_df.columns != 'other']]
         ann_no_other = expand_1by1(ann_no_other)
         coord = np.concatenate(moving_averages1[:, i1 + 1, :, :], axis=0)
@@ -623,7 +623,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         fig.clear()
 
     # plot a few final images
-    for i4 in range(step_n[5]):
+    for i4 in tqdm(range(step_n[5])):
 
         dfs = []
         clusters = []
