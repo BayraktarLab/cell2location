@@ -401,7 +401,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                        sc_jitter=None, sp_jitter=None,
                        save_path='./results/mouse_viseum_snrna/std_model/mapping_video/',
                        crop_x=None, crop_y=None, save_extension='png',
-                       colorbar_shape={'vertical_gaps': 1.8}):
+                       colorbar_shape={'vertical_gaps': 2, 'horizontal_gaps': 0.13}):
     r"""Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
         We use linear interpolation of UMAP and spot coordinates to create movement.
     :param adata_vis: anndata with Visium data (including spatial slot in `.obsm`)
@@ -628,8 +628,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            img=sp_img, img_alpha=img_alpha, style=style,
                            max_color_quantile=step_quantile[4],
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape,
-                           scatter_mode='separate')
+                           colorbar_shape=colorbar_shape)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i2 + i3 + 5}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -637,13 +636,20 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
     # plot a few final images
     for i4 in range(step_n[5]):
 
-        sel_clust_df_1 = expand_1by1(sel_clust_df)
-        coord = np.concatenate(moving_averages2[:, i3 + 1, :, :], axis=0)
+        dfs = []
+        clusters = []
+        for i in range(sel_clust_df.shape[1]):
+            idx = (sel_clust_df.values.argmax(axis=1) == i)
+            dfs.append(moving_averages2[i, i3+1, idx, :])
+            clusters.append(sel_clust_df[idx])
+        # coord = moving_averages2[0, i3, :, :]
+        for d in dfs:
+            print(d.shape)
+        coord = np.concatenate(dfs, axis=0)
 
-        fig = plot_spatial(sel_clust_df_1,
+        fig = plot_spatial(pd.concat(clusters, axis=0),
                            coords=coord, labels=sel_clust_df.columns,
-                           circle_diameter=circ_diam2[i3 + 1],
-                           alpha_scaling=sp_alpha,
+                           circle_diameter=circ_diam2[i3+1], alpha_scaling=sp_alpha,
                            img=sp_img, img_alpha=img_alpha, style=style,
                            max_color_quantile=step_quantile[5],
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
