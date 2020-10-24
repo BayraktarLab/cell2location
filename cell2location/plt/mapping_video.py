@@ -92,8 +92,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
                  colorbar_tick_size=12,
                  colorbar_grid=None,
                  image_cmap='Greys_r',
-                 white_spacing=20,
-                 scatter_mode='normal'):
+                 white_spacing=20):
     r""" Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
       This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
       'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
@@ -115,8 +114,6 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
     :param plt_axis: show axes?
     :param axis_y_flipped: flip y axis to match coordinates of the plotted image
     :param reorder_cmap: reorder colors to make sure you get the right color for each category
-    :param scatter_mode: 'normal' to plot all positions together and 'separate' for plotting all classes separately
-        (needed for video generation)
 
     :param style: plot style (matplolib.style.context):
         'fast' - white background & dark text;
@@ -314,16 +311,8 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
 
         weighted_colors[:, 3] = colors[:, :, 3].max(axis=1)
 
-        if scatter_mode is 'normal':
-            ax.scatter(x=coords[:, 0], y=coords[:, 1],
-                       c=weighted_colors, s=circle_diameter ** 2)
-
-        elif scatter_mode is 'separate':
-            for c in c_ord:
-                idx = (weights.argmax(axis=1) == c)
-                print(weights.shape, idx.shape, coords.shape, weighted_colors.shape)
-                ax.scatter(x=coords[idx][:, 0], y=coords[idx][:, 1],
-                           c=weighted_colors[idx], s=circle_diameter ** 2)
+        ax.scatter(x=coords[:, 0], y=coords[:, 1],
+                   c=weighted_colors, s=circle_diameter ** 2)
 
         # add text
         if text is not None:
