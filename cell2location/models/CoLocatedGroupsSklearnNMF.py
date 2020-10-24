@@ -14,8 +14,8 @@ from cell2location.models.base_model import BaseModel
 class CoLocatedGroupsSklearnNMF(BaseModel):
     r"""Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF.
     
-    This model takes the absolute cell density inferred by CoLocationModelNB4V2 as input
-    to non-negative matrix factorisation to identify co-occuring cell type combinations or 'microenvironments'.
+    This model takes the absolute cell density inferred by cell2location as input
+    to non-negative matrix factorisation to identify groups of cell types with similar locations or 'tissue zones'.
     
     If you want to find the most disctinct cell type combinations, use a small number of factors.
     
@@ -62,12 +62,13 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
     ----
         So, the model reports the proportion of cells of each type that belong to each combination
         (parameter called 'cell_type_fractions').
-        For example, 81% of Astro_2 are found in fact_28. This way we are not biased by the absolute abundance of each cell type.
+        For example, 81% of Astro_2 are found in fact_28.
+        This way we account for the absolute abundance of each cell type.
 
     Parameters
     ----------
     n_fact :
-        Maximum number of cell type (regulatory programmes) combinations
+        Maximum number of cell type groups, or factors
     X_data :
         Numpy array of the cell abundance (cols) in locations (rows)
     n_iter :
