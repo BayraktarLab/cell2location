@@ -23,50 +23,54 @@ def get_rgb_function(cmap, min_value, max_value):
     return func
 
 
-def rgb_to_ryb(rgb):
-    rgb_r, rgb_g, rgb_b = [x for x in rgb]
 
+def rgb_to_ryb(rgb_r, rgb_g, rgb_b):
     white = min(rgb_r, rgb_g, rgb_b)
     black = min(1 - rgb_r, 1 - rgb_g, 1 - rgb_b)
-    (rgb_r, rgb_g, rgb_b) = (x - white for x in (rgb_r, rgb_g, rgb_b))
+    rgb_r = rgb_r - white
+    rgb_g = rgb_g - white
+    rgb_b = rgb_b - white
 
     yellow = min(rgb_r, rgb_g)
     ryb_r = rgb_r - yellow
     ryb_y = (yellow + rgb_g) / 2
     ryb_b = (rgb_b + rgb_g - yellow) / 2
 
-    norm = 0
     if max(rgb_r, rgb_g, rgb_b) != 0:
         norm = max(ryb_r, ryb_y, ryb_b) / max(rgb_r, rgb_g, rgb_b)
-    ryb_r = ryb_r / norm if norm > 0 else ryb_r
-    ryb_y = ryb_y / norm if norm > 0 else ryb_y
-    ryb_b = ryb_b / norm if norm > 0 else ryb_b
+        ryb_r = ryb_r / norm
+        ryb_y = ryb_y / norm
+        ryb_b = ryb_b / norm
 
-    (ryb_r, ryb_y, ryb_b) = (x + black for x in (ryb_r, ryb_y, ryb_b))
-    return np.array([x for x in (ryb_r, ryb_y, ryb_b)])
+    ryb_r = ryb_r + black
+    ryb_y = ryb_y + black
+    ryb_b = ryb_b + black
+    return np.array((ryb_r, ryb_y, ryb_b))
 
 
-def ryb_to_rgb(ryb):
-    ryb_r, ryb_y, ryb_b = [x for x in ryb]
 
+def ryb_to_rgb(ryb_r, ryb_y, ryb_b):
     black = min(ryb_r, ryb_y, ryb_b)
     white = min(1 - ryb_r, 1 - ryb_y, 1 - ryb_b)
-    (ryb_r, ryb_y, ryb_b) = (x - black for x in (ryb_r, ryb_y, ryb_b))
+    ryb_r = ryb_r - black
+    ryb_y = ryb_y - black
+    ryb_b = ryb_b - black
 
     green = min(ryb_y, ryb_b)
     rgb_r = ryb_r + ryb_y - green
     rgb_g = ryb_y + green
     rgb_b = 2 * (ryb_b - green)
 
-    norm = 0
     if max(ryb_r, ryb_y, ryb_b) != 0:
         norm = max(rgb_r, rgb_g, rgb_b) / max(ryb_r, ryb_y, ryb_b)
-    rgb_r = rgb_r / norm if norm > 0 else rgb_r
-    rgb_g = rgb_g / norm if norm > 0 else rgb_g
-    rgb_b = rgb_b / norm if norm > 0 else rgb_b
+        rgb_r = rgb_r / norm
+        rgb_g = rgb_g / norm
+        rgb_b = rgb_b / norm
 
-    (rgb_r, rgb_g, rgb_b) = (x + white for x in (rgb_r, rgb_g, rgb_b))
-    return np.array([x for x in (rgb_r, rgb_g, rgb_b)])
+    rgb_r = rgb_r + white
+    rgb_g = rgb_g + white
+    rgb_b = rgb_b + white
+    return np.array((rgb_r, rgb_g, rgb_b))
 
 
 def plot_spatial(spot_factors_df, coords, labels, text=None,
@@ -286,7 +290,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
                 cbar.ax.tick_params(labelsize=colorbar_tick_size)
                 max_color = rgb_function(max_color_intensity / 1.5)
                 cbar.ax.set_title(labels[c],
-                                  {**{'size': 20, 'y': 1, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
+                                  **{**{'size': 20, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
 
             colors[:, c] = color
             weights[:, c] = np.clip(counts[:, c] / max_color_intensity, 0, 1)
@@ -296,7 +300,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
 
         for i in range(colors.shape[0]):
             for j in range(colors.shape[1]):
-                colors_ryb[i, j] = rgb_to_ryb(colors[i, j, :3])
+                colors_ryb[i, j] = rgb_to_ryb(*colors[i, j, :3])
 
         def kernel(w):
             return w ** 2
@@ -307,7 +311,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
         weighted_colors = np.zeros((weights.shape[0], 4))
 
         for i in range(colors.shape[0]):
-            weighted_colors[i, :3] = ryb_to_rgb(weighted_colors_ryb[i])
+            weighted_colors[i, :3] = ryb_to_rgb(*weighted_colors_ryb[i])
 
         weighted_colors[:, 3] = colors[:, :, 3].max(axis=1)
 
@@ -607,8 +611,6 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
             dfs.append(moving_averages2[i, i3, idx, :])
             clusters.append(sel_clust_df[idx])
         # coord = moving_averages2[0, i3, :, :]
-        for d in dfs:
-            print(d.shape)
         coord = np.concatenate(dfs, axis=0)
 
         fig = plot_spatial(pd.concat(clusters, axis=0),
