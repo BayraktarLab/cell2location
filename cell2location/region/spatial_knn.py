@@ -73,6 +73,8 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
     :param n_sp_neighbors: how many spatially-adjacent neighbors to report for each spot (including the source spot).
      Use 7 for hexagonal grid.
     :param radius: Supersedes `n_sp_neighbors` - radius within which to report spatially-adjacent neighbors for each spot. Pick radius based on spot size.
+    :param include_source_location: include the observation itself into the list of neighbours.
+    :param sample_id: pd.Series or np.array listing sample membership for each observation (each row of coords).
     """
 
     # create and query spatial proximity tree within each sample
@@ -80,12 +82,15 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
         if include_source_location:
             coord_ind = np.zeros((coords.shape[0], n_sp_neighbors))
         else:
-            coord_ind = np.zeros((coords.shape[0], n_sp_neighbors-1))
+            coord_ind = np.zeros((coords.shape[0], n_sp_neighbors - 1))
     else:
         coord_ind = np.zeros(coords.shape[0])
 
-    for sam in sample_id.unique():
-        sam_ind = sample_id.isin([sam])
+    if sample_id is None:
+        sample_id = np.array(['sample' for i in range(coords.shape[0])])
+
+    for sam in np.unique(sample_id):
+        sam_ind = np.isin(sample_id, [sam])
         coord_tree = KDTree(coords[sam_ind, :])
         if radius is None:
             n_list = coord_tree.query(coords[sam_ind, :],
@@ -96,13 +101,14 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
                 coord_ind[sam_ind, :] = n_list
             else:
                 n_list_sel = n_list != np.arange(sam_ind.sum()).reshape(sam_ind.sum(), 1)
-                coord_ind[sam_ind, :] = n_list[n_list_sel].reshape((sam_ind.sum(), n_sp_neighbors-1))
+                coord_ind[sam_ind, :] = n_list[n_list_sel].reshape((sam_ind.sum(), n_sp_neighbors - 1))
 
         else:
             coord_ind[sam_ind] = coord_tree.query_radius(coords[sam_ind, :],
-                                                                       radius, count_only=False)
+                                                         radius, count_only=False)
 
     return coord_ind.astype(int)
+
 
 def sum_neighbours(X_data, neighbours):
     """
@@ -112,7 +118,8 @@ def sum_neighbours(X_data, neighbours):
     :param neighbours: numpy.ndarray with neigbour indices for each observation (observations * neigbours)
      """
 
-    return np.sum([X_data[neighbours[:,n], :] for n in range(neighbours.shape[1])], axis=0)
+    return np.sum([X_data[neighbours[:, n], :] for n in range(neighbours.shape[1])], axis=0)
+
 
 # ####################--------########################
 
