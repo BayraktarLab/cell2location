@@ -34,10 +34,10 @@ ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 
 # install cell2location and add cellpymc kernel for jupyter environment and
 RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" \ 
-    && /bin/bash -c "python -m ipykernel install --user --name cellpymc" 
+     && /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc"
 
 # copy notebooks to the image
-COPY docs/notebooks notebooks
+COPY notebooks /notebooks
 RUN /bin/bash -c "jupyter trust /notebooks/*.ipynb";
 
 # launch jupyter
@@ -45,4 +45,5 @@ CMD ["jupyter", "notebook", \
     "--notebook-dir=/notebooks", \
     "--NotebookApp.token='cell2loc'", \
     "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+
 EXPOSE 8888

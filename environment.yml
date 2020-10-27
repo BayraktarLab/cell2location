@@ -9,6 +9,8 @@ dependencies:
   - numpy >= 1.18.5
   - pandas >= 1.0.4
   - jupyter >= 1.0.0
+  - jupyterlab >= 2.2.9
+  - ipykernel >= 5.3.4
   - leidenalg >= 0.8.0
   - python-igraph >= 0.8.2
   - nose >= 1.3.7
