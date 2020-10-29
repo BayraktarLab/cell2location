@@ -34,7 +34,7 @@ ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 
 # install cell2location and add cellpymc kernel for jupyter environment and
 RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" \ 
-     && /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc"
+     && /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc --display-name='Container (cellpymc)'" 
 
 # copy notebooks to the image
 COPY notebooks /notebooks
