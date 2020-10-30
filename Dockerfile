@@ -37,7 +37,7 @@ RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.
      && /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc --display-name='Container (cellpymc)'" 
 
 # copy notebooks to the image
-COPY notebooks /notebooks
+COPY docs/notebooks/ /notebooks
 RUN /bin/bash -c "jupyter trust /notebooks/*.ipynb";
 
 # launch jupyter
