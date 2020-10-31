@@ -12,6 +12,7 @@ RUN apt-get update \
         unzip \
         g++ \
         wget \
+        vim \
         ca-certificates \
         git \
     && apt-get clean \
@@ -20,21 +21,30 @@ RUN apt-get update \
 # see http://bugs.python.org/issue19846
 ENV LANG C.UTF-8
 
+# cuda v
+RUN echo "cuda_v=-10.2" >> ~/.bashrc
+# add CUDA specifications for GPU nodes
+RUN echo "export PATH=/usr/local/cuda$cuda_v/bin:$PATH" >> ~/.bashrc
+RUN echo "export LD_LIBRARY_PATH=/usr/local/cuda$cuda_v/lib64:$LD_LIBRARY_PATH" >> ~/.bashrc
+RUN echo "export CUDA_HOME=/usr/local/cuda$cuda_v" >> ~/.bashrc
+RUN echo "export CUDA_PATH=$CUDA_HOME" >> ~/.bashrc
+
 # install miniconda3 - https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html
 RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
     && /bin/bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh
+RUN /opt/conda/condabin/conda init bash
 
 # create conda environment yaml file
 COPY environment.yml /tmp/
 RUN /opt/conda/condabin/conda env create -f /tmp/environment.yml \
-    && echo "source activate cellpymc" >> ~/.bashrc \
+    && echo "conda activate cellpymc" >> ~/.bashrc \
     && /opt/conda/condabin/conda clean --all --yes --quiet
 ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 
-# install cell2location and add cellpymc kernel for jupyter environment and
-RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" \ 
-    && /bin/bash -c "python -m ipykernel install --user --name cellpymc --display-name "Container (cellpymc)"" 
+# install cell2location and add cellpymc kernel for jupyter environment 
+RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" 
+RUN python -m ipykernel install --user --name cellpymc --display-name "Container (cellpymc)"
 
 # copy notebooks to the image
 COPY docs/notebooks notebooks
@@ -44,5 +54,5 @@ RUN /bin/bash -c "jupyter trust /notebooks/*.ipynb";
 CMD ["jupyter", "notebook", \
     "--notebook-dir=/notebooks", \
     "--NotebookApp.token='cell2loc'", \
-    "--ip=0.0.0.0", "--port=7777", "--no-browser", "--allow-root"]
-EXPOSE 7777
+    "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+EXPOSE 8888
