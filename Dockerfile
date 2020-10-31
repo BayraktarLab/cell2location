@@ -1,7 +1,7 @@
 # base image maintained by the NVIDIA CUDA Installer Team - https://hub.docker.com/r/nvidia/cuda/
 FROM nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
 
-LABEL version="0.01"
+LABEL version="0.03"
 LABEL maintainer="Vitalii Kleshchevnikov <vitalii.kleshchevnikov@sanger.ac.uk>"
 LABEL description="High-throughput spatial mapping of cell types."
 
@@ -34,7 +34,7 @@ ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
 
 # install cell2location and add cellpymc kernel for jupyter environment and
 RUN /bin/bash -c "pip install git+https://github.com/BayraktarLab/cell2location.git" \ 
-    && /bin/bash -c "python -m ipykernel install --user --name cellpymc" 
+    && /bin/bash -c "python -m ipykernel install --user --name cellpymc --display-name "Container (cellpymc)"" 
 
 # copy notebooks to the image
 COPY docs/notebooks notebooks
@@ -44,5 +44,5 @@ RUN /bin/bash -c "jupyter trust /notebooks/*.ipynb";
 CMD ["jupyter", "notebook", \
     "--notebook-dir=/notebooks", \
     "--NotebookApp.token='cell2loc'", \
-    "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
-EXPOSE 8888
+    "--ip=0.0.0.0", "--port=7777", "--no-browser", "--allow-root"]
+EXPOSE 7777
