@@ -35,7 +35,7 @@ class LocationModelLinearDependentWPyro(PyroLocModel):
         \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{g}
 
     Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
-    :math:`g_{f,g}` denotes the regulatory programmes :math:`f` of each gene :math:`g` - input to the model;
+    :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g` - input to the model;
     :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
     in the global expression estimates between technologies;
     :math:`l_{s}` and :math:`s_{g}` are additive components that capture additive background variation
