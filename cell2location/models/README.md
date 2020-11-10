@@ -1,34 +1,40 @@
-<!-- #region -->
 ### The models are defined as python classes with the following inheritance structure to allow methods to be reused:
 
-'- BaseModel - methods needed for Pymc3, Torch and other implementations
+'- BaseModel - Methods needed for Pymc3, Pytorch and pyro implementations
 
-'-- Pymc3Model - methods for any Pymc3 model
+'-- Pymc3Model - Methods for Pymc3 models
 
-'--- Pymc3LocModel - methods for location models (fixed gene loadings (columns), inferring weights for locations (rows))
+'--- Pymc3LocModel - Methods for Pymc3 location models: fixed gene weights (2nd dimension), estimating weights for observations (1st dimension).
 
-'---- CoLocationModelNB4V2 - 
+'---- LocationModelLinearDependentW - Main cell2location model that accounts for similarity in locations of cell types.
 
-'---- LocationModelNB4V7_V4_V4
+'---- LocationModelLinearDependentWMultiExperiment - Extention of the main cell2location model to joint modelling of multiple spatial experiments.
+
+'---- LocationModel - Simplified model that models cell type locations as independent.
+
+  
+
+'-- CoLocatedCombination_sklearnNMF - Class that provides methods for analysing the cell type abundance estimated by cell2location using NMF.
+
+'-- ArchetypalAnalysis - Class that provides methods for analysing the cell type abundance estimated by cell2location using Archetypal Analysis.
 
   
   
 
-'-- CoLocatedCombination_sklearnNMF
+'-- TorchModel - Methods for pytorch models
 
-  
-  
+'--- RegressionTorchModel - Methods for pytorch regression models: fixed weights for observations (1st dimension), estimating gene weights (2nd dimension).
 
-'-- TorchModel
+'---- RegressionGeneBackgroundCoverageTorch
 
-'--- RegressionTorchModel
+'---- RegressionGeneBackgroundCoverageGeneTechnologyTorch
 
-'---- RegressionNBV2Torch
+(In development)
 
-'---- RegressionNBV4Torch
+'-- PyroModel - Methods for pyro models
 
-<!-- #endregion -->
+'--- PyroLocModel - Methods for pyro location models: fixed gene weights (2nd dimension), estimating weights for observations (1st dimension).
 
-```python
+'---- LocationModelLinearDependentWPyro - Pyro translation of the main cell2location model that accounts for similarity in locations of cell types.
 
-```
+'---- LocationModelPyro - Pyro translation of the simplified model.
