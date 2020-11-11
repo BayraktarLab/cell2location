@@ -67,7 +67,13 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
 ## Using docker image
 
-Coming soon.
+1. Make sure you have Docker Engine [installed](https://docs.docker.com/engine/install/). Note that you'll need root access for the installation.
+   1. (optional) If you plan to utilize GPU install [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker)
+2. Pull docker image
+```docker pull quay.io/vitkl/cell2location```
+3. Run docker container
+```docker run -i --rm -p 8848:8888 quay.io/vitkl/cell2location:latest```
+4. Go to http://127.0.0.1:8888/?token= and log in using `cell2loc` token
 
 ## Using singularity image
 
