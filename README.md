@@ -95,7 +95,7 @@ bsub -q gpu_queue_name -M60000 \
 ```
 Replace 1) the path to `/bin/singularity` with the one availlable on your system; 2) the working directory which you need to mount to the environment (`/nfs/working_directory:/working_directory`); 3) path to the singularity image
 
-4. Take a note of the cluster node that the notebook started on. Go to http://node-name:1237/?token= and log in using `cell2loc` token
+3. Take a note of the cluster node that the notebook started on. Go to http://node-name:1237/?token= and log in using `cell2loc` token
 
 ## Documentation and API details
 
