@@ -101,7 +101,7 @@ wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-10112020.s
 bsub -q gpu_queue_name -M60000 \
   -R"select[mem>60000] rusage[mem=60000, ngpus_physical=1.00] span[hosts=1]"  \
   -gpu "mode=shared:j_exclusive=yes" -Is \
-  /software/singularity-v3.5.3/bin/singularity exec \
+  /bin/singularity exec \
   --no-home  \
   --nv \
   -B /nfs/working_directory:/working_directory \
