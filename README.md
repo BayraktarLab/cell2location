@@ -77,7 +77,25 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
 ## Using singularity image
 
-Coming soon.
+Singularity environments are used in the compute cluster environments. Follow the steps here to use it on your system, assuming that you need to use the GPU:
+1. Download the contained from our data portal
+```wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-10112020.sif```
+
+2. Submit a cluster job (LSF system) with GPU requested and start jupyter a notebook within a container:
+```
+bsub -q gpu_queue_name -M60000 \
+  -R"select[mem>60000] rusage[mem=60000, ngpus_physical=1.00] span[hosts=1]"  \
+  -gpu "mode=shared:j_exclusive=yes" -Is \
+  /software/singularity-v3.5.3/bin/singularity exec \
+  --no-home  \
+  --nv \
+  -B /nfs/working_directory:/working_directory \
+  path/to/cell2location-latest.sif \
+  /bin/bash -c "cd /working_directory && HOME=$(mktemp -d) jupyter notebook --notebook-dir=/working_directory --NotebookApp.token='cell2loc' --ip=0.0.0.0 --port=1237 --no-browser --allow-root"
+```
+Replace 1) the path to `/bin/singularity` with the one availlable on your system; 2) the working directory which you need to mount to the environment (`/nfs/working_directory:/working_directory`); 3) path to the singularity image
+
+4. Take a note of the cluster node that the notebook started on. Go to http://node-name:1237/?token= and log in using `cell2loc` token
 
 ## Documentation and API details
 
