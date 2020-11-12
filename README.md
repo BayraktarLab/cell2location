@@ -81,7 +81,7 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
    
           docker run -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
    
-4. Go to http://127.0.0.1:8888/?token= and log in using `cell2loc` token
+4. Go to http://127.0.0.1:8848/?token= and log in using `cell2loc` token
 
 
 
