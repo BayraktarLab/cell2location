@@ -77,11 +77,15 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
 ## Using singularity image
 
-Singularity environments are used in the compute cluster environments. Follow the steps here to use it on your system, assuming that you need to use the GPU:
-1. Download the contained from our data portal
-```wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-10112020.sif```
+Singularity environments are used in the compute cluster environments (check with your local IT if Singularity is setup on you cluster). Follow the steps here to use it on your system, assuming that you need to usethe GPU:
+1. Download the container from our data portal:
 
-2. Submit a cluster job (LSF system) with GPU requested and start jupyter a notebook within a container:
+```
+wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-10112020.sif
+```
+
+2. Submit a cluster job (LSF system) with GPU requested and start jupyter a notebook within a container (`--nv` option needed to use GPU):
+
 ```
 bsub -q gpu_queue_name -M60000 \
   -R"select[mem>60000] rusage[mem=60000, ngpus_physical=1.00] span[hosts=1]"  \
@@ -93,9 +97,9 @@ bsub -q gpu_queue_name -M60000 \
   path/to/cell2location-latest.sif \
   /bin/bash -c "cd /working_directory && HOME=$(mktemp -d) jupyter notebook --notebook-dir=/working_directory --NotebookApp.token='cell2loc' --ip=0.0.0.0 --port=1237 --no-browser --allow-root"
 ```
-Replace 1) the path to `/bin/singularity` with the one availlable on your system; 2) the working directory which you need to mount to the environment (`/nfs/working_directory:/working_directory`); 3) path to the singularity image
+Replace 1) the path to `/bin/singularity` with the one availlable on your system; 2) the working directory to the directory which you need to mount to the environment (`/nfs/working_directory:/working_directory`); 3) path to the singularity image downloaded in step 1.
 
-3. Take a note of the cluster node that the notebook started on. Go to http://node-name:1237/?token= and log in using `cell2loc` token
+3. Take a note of the cluster node name `node-name` that the job started on. Go to http://node-name:1237/?token= and log in using `cell2loc` token
 
 ## Documentation and API details
 
