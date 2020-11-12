@@ -1,4 +1,7 @@
-<img src="https://github.com/BayraktarLab/cell2location/blob/master/docs/logo.svg" width="200">
+<p align="center">
+   <img src="https://github.com/BayraktarLab/cell2location/blob/master/docs/logo.svg" width="200">
+</p>
+
 
 ### Highthroughput spatial mapping of cell types with single cell and spatial sequencing
 
