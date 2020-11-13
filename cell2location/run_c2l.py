@@ -315,7 +315,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                 **model_kwargs)
 
     ####### Print run name #######
-    run_name = f'{mod.__class__.__name__}_{n_exper}experiments_{mod.n_fact}clusters_{mod.n_obs}locations_{mod.n_var}genes{export_args['run_name_suffix']}'
+    run_name = f"{mod.__class__.__name__}_{n_exper}experiments_{mod.n_fact}clusters_{mod.n_obs}locations_{mod.n_var}genes{export_args['run_name_suffix']}"
 
     print('### Analysis name: ' + run_name)  # analysis name is always printed
 
