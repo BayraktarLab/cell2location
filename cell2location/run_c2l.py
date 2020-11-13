@@ -295,7 +295,11 @@ def run_cell2location(sc_data, sp_data, model_name=None,
             ValueError("train_args['sample_name_col'] point to invalid column")
     else:  # use supplied class
         Model = model_name
-
+    
+    n_exper = len(sp_data.obs[train_args['sample_name_col']].unique())
+    if n_exper == X_data.shape[0]:
+        raise ValueError("The number of samples is equal to the number of locations, aborting... (check 'sample_name_col')")
+        
     if verbose:
         print('### Creating model ### - time ' + str(np.around((time.time() - start) / 60, 2)) + ' min')
     mod = Model(cell_state_mat, X_data,
@@ -311,9 +315,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                 **model_kwargs)
 
     ####### Print run name #######
-    run_name = str(mod.__class__.__name__) + '_' + str(mod.n_fact) + 'clusters_' \
-               + str(mod.n_obs) + 'locations_' + str(mod.n_var) + 'genes' \
-               + export_args['run_name_suffix']
+    run_name = f'{mod.__class__.__name__}_{n_exper}experiments_{mod.n_fact}clusters_{mod.n_obs}locations_{mod.n_var}genes{export_args['run_name_suffix']}'
 
     print('### Analysis name: ' + run_name)  # analysis name is always printed
 
