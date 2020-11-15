@@ -2,7 +2,7 @@ import numpy as np
 import scanpy as sc
 
 
-def select_features(adata, groupName, n_features=10000, use_raw=True, verbose=False):
+def select_features(adata, groupName, n_features=10000, use_raw=True, verbose=False, sc_kwargs={}):
     r"""
     #TODO Write docstring
     """
@@ -15,7 +15,7 @@ def select_features(adata, groupName, n_features=10000, use_raw=True, verbose=Fa
     else:
 
         sc.tl.rank_genes_groups(adata, groupName, use_raw=use_raw,
-                                n_genes=int(np.round(len(adata.var) / 10)))  # explain why
+                                n_genes=int(np.round(len(adata.var) / 10)), **sc_kwargs)  # explain why
 
     ranked_features = np.unique([item for sublist in adata.uns['rank_genes_groups']['names']
                                  for item in sublist])

@@ -85,11 +85,16 @@ def run_cell2location(sc_data, sp_data, model_name=None,
         * **selection** - select highly variable genes in sc_data? (Default: None - do not select), available options:
         
             * None
+            * **cluster_specificity** use marker specificity to clusters to select most informative genes
+              (see **selection_specificity** below)
             * **high_cv** use rank by coefficient of variation (variance / mean)
             * **cluster_markers** use cluster markers (derived using sc.tl.rank_genes_groups)
             * **AutoGeneS** use https://github.com/theislab/AutoGeneS
             * **select_n** - how many variable genes to select? Used only when selection is not None (Default: 5000).
             * **select_n_AutoGeneS** - how many variable genes tor select with AutoGeneS (lower than select_n)? (Default: 1000).
+
+        * **selection_specificity** expression specificity cut-off (default=0.1), expression signatures of cell types
+          are normalised to sum to 1 gene-wise, then a cutoff is applied. Decrease cutoff to include more genes.
 
     train_args :
         arguments for training methods. See help(c2l.LocationModel) for more details
@@ -161,7 +166,8 @@ def run_cell2location(sc_data, sp_data, model_name=None,
 
     # set default parameters
     d_summ_sc_data_args = {'cluster_col': "annotation_1", 'which_genes': "intersect",
-                           'selection': None, 'select_n': 5000, 'select_n_AutoGeneS': 1000}
+                           'selection': None, 'select_n': 5000, 'select_n_AutoGeneS': 1000,
+                           'selection_specificity': 0.1, 'cluster_markers_kwargs': {}}
 
     d_train_args = {'mode': "normal", 'use_raw': True, 'data_type': "float32",
                     'n_iter': 20000, 'learning_rate': 0.005, 'total_grad_norm_constraint': 200,
@@ -226,7 +232,16 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                 'summ_sc_data_args["selection"] = "cluster_markers" can only be used with type(sc_data) Anndata')
 
         sel_feat = select_features(sc_data, summ_sc_data_args['cluster_col'],
-                                   n_features=summ_sc_data_args['select_n'], use_raw=train_args['use_raw'])
+                                   n_features=summ_sc_data_args['select_n'], use_raw=train_args['use_raw'],
+                                   sc_kwargs=summ_sc_data_args['cluster_markers_kwargs'])
+        cell_state_df = cell_state_df.loc[cell_state_df.index.isin(sel_feat), :]
+
+    elif summ_sc_data_args['selection'] == 'cluster_specificity':
+
+        # selecting most informative genes based on specificity
+        cell_state_df_norm = (cell_state_df.T / cell_state_df.sum(1)).T
+        cell_state_df_norm = (cell_state_df_norm > summ_sc_data_args['selection_specificity'])
+        sel_feat = cell_state_df_norm.index[cell_state_df_norm.sum(1) > 0]
         cell_state_df = cell_state_df.loc[cell_state_df.index.isin(sel_feat), :]
 
     elif summ_sc_data_args['selection'] == 'AutoGeneS':
