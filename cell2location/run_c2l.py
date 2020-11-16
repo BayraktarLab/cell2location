@@ -32,7 +32,9 @@ def save_plot(path, filename, extension='png'):
 
 def run_cell2location(sc_data, sp_data, model_name=None,
                       verbose=True, show_locations=False, return_all=True,
-                      summ_sc_data_args={'cluster_col': "annotation_1"},
+                      summ_sc_data_args={'cluster_col': "annotation_1",
+                                         'selection': "cluster_specificity",
+                                         'selection_specificity': 0.1},
                       train_args={'n_iter': 20000, 'learning_rate': 0.005,
                                   'sample_prior': False, 'readable_var_name_col': None,
                                   'sample_name_col': None},
