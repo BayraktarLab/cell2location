@@ -20,7 +20,7 @@ Tutorials covering the estimation of expresson signatures of reference cell type
 
 There are 2 ways to install and use our package: setup your [own conda environment](https://github.com/BayraktarLab/cell2location#installation-of-dependecies-and-configuring-environment) or use the [singularity](https://github.com/BayraktarLab/cell2location#using-singularity-image) and [docker](https://github.com/BayraktarLab/cell2location#using-docker-image) images. See below for details.
 
-Please report bugs and feedback on via https://github.com/BayraktarLab/cell2location/issues .
+Please report bugs and feedback via https://github.com/BayraktarLab/cell2location/issues .
 
 ## Configure your own conda environment
 
