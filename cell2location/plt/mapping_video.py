@@ -385,7 +385,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                        sc_img=None, sp_img=None, sp_img_scaling_fac=1,
                        adata_cluster_col='annotation_1', cell_fact_df=None,
                        step_n=[20, 100, 15, 45, 80, 30], step_quantile=[1, 1, 1, 1, 0.95, 0.95],
-                       sc_point_size=1, aver_point_size=20, sp_point_size=5,
+                       sc_point_size=1, aver_point_size=20, sp_point_size=5, reorder_cmap=range(7),
                        label_clusters=False, style='dark_background', adjust_text=False,
                        sc_alpha=0.6, sp_alpha=0.8, img_alpha=0.8,
                        sc_power=20, sp_power=20,
@@ -534,7 +534,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            # determine max color level using data quantiles
                            max_color_quantile=step_quantile[0],  # set to 1 to pick max - essential for discrete scaling
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + 1}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -552,7 +552,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            # determine max color level using data quantiles
                            max_color_quantile=step_quantile[1],  # set to 1 to pick max - essential for discrete scaling
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + 2}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -575,7 +575,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            # determine max color level using data quantiles
                            max_color_quantile=step_quantile[2],  # set to 1 to pick max - essential for discrete scaling
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + 3}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -594,7 +594,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            # determine max color level using data quantiles
                            max_color_quantile=step_quantile[3],  # set to 1 to pick max - essential for discrete scaling
                            adjust_text=adjust_text, crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i22 + 4}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -619,7 +619,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            img=sp_img, img_alpha=img_alpha, style=style,
                            max_color_quantile=step_quantile[4],
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i2 + i3 + 5}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
@@ -644,7 +644,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                            img=sp_img, img_alpha=img_alpha, style=style,
                            max_color_quantile=step_quantile[5],
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
-                           colorbar_shape=colorbar_shape)
+                           colorbar_shape=colorbar_shape, reorder_cmap=reorder_cmap)
         fig.savefig(f'{save_path}cell_maps_{i0 + i1 + i2 + i2 + i3 + i4 + 6}.{save_extension}',
                     bbox_inches='tight')
         fig.clear()
