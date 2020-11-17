@@ -123,3 +123,10 @@ Replace **1)** the path to `/bin/singularity` with the one availlable on your sy
 User documentation is availlable on https://cell2location.readthedocs.io/en/latest/. 
 
 The architecture of the package is briefly described [here](https://github.com/BayraktarLab/cell2location/blob/master/cell2location/models/README.md). Cell2location architecture is designed to simplify extended versions of the model that account for additional technical and biologial information. We plan to provide a tutorial showing how to add new model classes but please get in touch if you would like to contribute or build on top our package.
+
+## Documentation and API details
+
+We thank all paper authors for their contributions:
+Vitalii Kleshchevnikov, Artem Shmatko, Emma Dann, Alexander Aivazidis, Hamish W King, Tong Li, Artem Lomakin, Veronika Kedlian, Mika Sarkin Jain, Jun Sung Park, Lauma Ramona, Liz Tuck, Anna Arutyunyan, Roser Vento-Tormo, Moritz Gerstung, Louisa James, Oliver Stegle, Omer Ali Bayraktar
+
+We also thank Krzysztof Polanski, Luz Garcia Alonso, Carlos Talavera-Lopez for feedback on the package, Martin Prete for dockerising cell2location and other software support.
