@@ -1,7 +1,7 @@
 # base image maintained by the NVIDIA CUDA Installer Team - https://hub.docker.com/r/nvidia/cuda/
 FROM nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
 
-LABEL version="0.04"
+LABEL version="0.05"
 LABEL maintainer="Vitalii Kleshchevnikov <vitalii.kleshchevnikov@sanger.ac.uk>"
 LABEL description="High-throughput spatial mapping of cell types."
 
