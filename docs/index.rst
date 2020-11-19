@@ -13,6 +13,12 @@ Welcome to cell2location's documentation!
    notebooks/cell2location_estimating_signatures
    notebooks/cell2location_short_demo
    notebooks/cell2location_short_demo_downstream
+   
+.. toctree::
+   :maxdepth: 1
+   :caption: Cell2location Google Colab tutorial (2/3):
+   
+   notebooks/cell2location_short_demo_colab
 
 .. toctree::
    :maxdepth: 4
