@@ -185,7 +185,8 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                      'plot_extension': "png",
                      'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                      'save_model': False, 'save_spatial_plots': True,
-                     'run_name_suffix': '', 'export_q05': True,
+                     'run_name_suffix': '', 
+                     'export_q05': True, 'export_mean': False,
                      'scanpy_coords_name': 'spatial', 'img_key': 'hires'}
 
     # replace defaults with parameters supplied
@@ -522,85 +523,83 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                     s_ind = sp_data.obs[train_args['sample_name_col']] == s
                     s_keys = list(sp_data.uns['spatial'].keys())
                     s_spatial = np.array(s_keys)[[s in i for i in s_keys]][0]
+                    
+                    if export_args['export_mean']:
+                        # Visualize cell type locations - mRNA_count = nUMI #####
+                        # making copy to transform to log & assign nice names
+                        clust_names_orig = ['mean_nUMI_factors' + i for i in sp_data.uns['mod']['fact_names']]
+                        clust_names = sp_data.uns['mod']['fact_names']
 
-                    # Visualize cell type locations - mRNA_count = nUMI #####
-                    # making copy to transform to log & assign nice names
-                    adata_vis_pl = sp_data.copy()
-                    clust_names_orig = ['mean_nUMI_factors' + i for i in sp_data.uns['mod']['fact_names']]
-                    clust_names = sp_data.uns['mod']['fact_names']
+                        sp_data.obs[clust_names] = sp_data.obs[clust_names_orig]
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
+                                            color=clust_names, ncols=5, library_id=s_spatial,
+                                            size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
+                                            vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                            return_fig=True,
+                                            show=False
+                                            )
 
-                    adata_vis_pl.obs[clust_names] = adata_vis_pl.obs[clust_names_orig]
-                    fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
-                                        color=clust_names, ncols=5, library_id=s_spatial,
-                                        size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
-                                        vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        return_fig=True,
-                                        show=False
-                                        )
+                        fig.savefig(f"{fig_path}/spatial/W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                                    f".{export_args['plot_extension']}",
+                                    bbox_inches='tight')
+                        fig.clear()
+                        plt.close(fig)
+                        if show_locations:
+                            plt.show()
 
-                    fig.savefig(f"{fig_path}/spatial/W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
-                                f".{export_args['plot_extension']}",
-                                bbox_inches='tight')
-                    fig.clear()
-                    plt.close(fig)
-                    if show_locations:
-                        plt.show()
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
+                                            color=clust_names, ncols=5, library_id=s_spatial,
+                                            size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
+                                            vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                            show=False,
+                                            return_fig=True
+                                            )
+                        fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                                    f".{export_args['plot_extension']}",
+                                    bbox_inches='tight')
+                        fig.clear()
+                        plt.close(fig)
 
-                    fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
-                                        color=clust_names, ncols=5, library_id=s_spatial,
-                                        size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
-                                        vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        show=False,
-                                        return_fig=True
-                                        )
-                    fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
-                                f".{export_args['plot_extension']}",
-                                bbox_inches='tight')
-                    fig.clear()
-                    plt.close(fig)
+                        # Visualize cell type locations #####
+                        # making copy to transform to log & assign nice names
+                        clust_names_orig = ['mean_spot_factors' + i for i in sp_data.uns['mod']['fact_names']]
+                        clust_names = sp_data.uns['mod']['fact_names']
+                        sp_data.obs[clust_names] = (sp_data.obs[clust_names_orig])
 
-                    # Visualize cell type locations #####
-                    # making copy to transform to log & assign nice names
-                    adata_vis_pl = sp_data.copy()
-                    clust_names_orig = ['mean_spot_factors' + i for i in sp_data.uns['mod']['fact_names']]
-                    clust_names = sp_data.uns['mod']['fact_names']
-                    adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
+                                            color=clust_names, ncols=5, library_id=s_spatial,
+                                            size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
+                                            vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                            show=False,
+                                            return_fig=True
+                                            )
+                        fig.savefig(f"{fig_path}/spatial/W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}."
+                                    f"{export_args['plot_extension']}",
+                                    bbox_inches='tight')
+                        fig.clear()
+                        plt.close(fig)
 
-                    fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
-                                        color=clust_names, ncols=5, library_id=s_spatial,
-                                        size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=0,
-                                        vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        show=False,
-                                        return_fig=True
-                                        )
-                    fig.savefig(f"{fig_path}/spatial/W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}."
-                                f"{export_args['plot_extension']}",
-                                bbox_inches='tight')
-                    fig.clear()
-                    plt.close(fig)
-
-                    fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
-                                        color=clust_names, ncols=5, library_id=s_spatial,
-                                        size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
-                                        vmin=0, vmax=export_args['scanpy_plot_vmax'],
-                                        show=False,
-                                        return_fig=True
-                                        )
-                    fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}"
-                                f".{export_args['plot_extension']}",
-                                bbox_inches='tight')
-                    fig.clear()
-                    plt.close(fig)
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
+                                            color=clust_names, ncols=5, library_id=s_spatial,
+                                            size=export_args['scanpy_plot_size'], img_key=export_args['img_key'], alpha_img=1,
+                                            vmin=0, vmax=export_args['scanpy_plot_vmax'],
+                                            show=False,
+                                            return_fig=True
+                                            )
+                        fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}"
+                                    f".{export_args['plot_extension']}",
+                                    bbox_inches='tight')
+                        fig.clear()
+                        plt.close(fig)
 
                     if export_args['export_q05']:
                         # Visualize cell type locations - mRNA_count = nUMI #####
                         # making copy to transform to log & assign nice names
-                        adata_vis_pl = sp_data.copy()
                         clust_names_orig = ['q05_nUMI_factors' + i for i in sp_data.uns['mod']['fact_names']]
                         clust_names = sp_data.uns['mod']['fact_names']
 
-                        adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
-                        fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
+                        sp_data.obs[clust_names] = (sp_data.obs[clust_names_orig])
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
                                             color=clust_names, ncols=5, library_id=s_spatial,
                                             size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                             alpha_img=0,
@@ -614,7 +613,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                         fig.clear()
                         plt.close(fig)
 
-                        fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
                                             color=clust_names, ncols=5, library_id=s_spatial,
                                             size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                             alpha_img=1,
@@ -630,12 +629,11 @@ def run_cell2location(sc_data, sp_data, model_name=None,
 
                         # Visualize cell type locations #####
                         # making copy to transform to log & assign nice names
-                        adata_vis_pl = sp_data.copy()
                         clust_names_orig = ['q05_spot_factors' + i for i in sp_data.uns['mod']['fact_names']]
                         clust_names = sp_data.uns['mod']['fact_names']
-                        adata_vis_pl.obs[clust_names] = (adata_vis_pl.obs[clust_names_orig])
+                        sp_data.obs[clust_names] = (sp_data.obs[clust_names_orig])
 
-                        fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
                                             color=clust_names, ncols=5, library_id=s_spatial,
                                             size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                             alpha_img=0,
@@ -649,7 +647,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                         fig.clear()
                         plt.close(fig)
 
-                        fig = sc.pl.spatial(adata_vis_pl[s_ind, :], cmap='magma',
+                        fig = sc.pl.spatial(sp_data[s_ind, :], cmap='magma',
                                             color=clust_names, ncols=5, library_id=s_spatial,
                                             size=export_args['scanpy_plot_size'], img_key=export_args['img_key'],
                                             alpha_img=1,
@@ -672,16 +670,17 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                         # move spatial coordinates to obs for compatibility with our plotter
                         sp_data.obs['imagecol'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 0]
                         sp_data.obs['imagerow'] = sp_data.obsm[export_args['scanpy_coords_name']][:, 1]
-
-                        p = c2lpl.plot_factor_spatial(adata=sp_data,
-                                                      fact_ind=np.arange(mod.spot_factors_df.shape[1]),
-                                                      fact=mod.spot_factors_df,
-                                                      cluster_names=cluster_plot_names,
-                                                      n_columns=6, trans='log',
-                                                      sample_name=s, samples_col=train_args['sample_name_col'],
-                                                      obs_x='imagecol', obs_y='imagerow')
-                        p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(s) + '.' \
-                                        + export_args['plot_extension'])
+                        
+                        if export_args['export_mean']:
+                            p = c2lpl.plot_factor_spatial(adata=sp_data,
+                                                          fact_ind=np.arange(mod.spot_factors_df.shape[1]),
+                                                          fact=mod.spot_factors_df,
+                                                          cluster_names=cluster_plot_names,
+                                                          n_columns=6, trans='log',
+                                                          sample_name=s, samples_col=train_args['sample_name_col'],
+                                                          obs_x='imagecol', obs_y='imagerow')
+                            p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(s) + '.' \
+                                            + export_args['plot_extension'])
 
                         if export_args['export_q05']:
                             p = c2lpl.plot_factor_spatial(adata=sp_data,
