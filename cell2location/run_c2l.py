@@ -538,7 +538,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
 
                 fig.savefig(f"{fig_path}/spatial/W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
                             f".{export_args['plot_extension']}",
-                            dpi=180, bbox_inches='tight')
+                            bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
                 if show_locations:
@@ -553,7 +553,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                     )
                 fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_mean_{s}_{export_args['scanpy_plot_vmax']}"
                             f".{export_args['plot_extension']}",
-                            dpi=180, bbox_inches='tight')
+                            bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -573,7 +573,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                     )
                 fig.savefig(f"{fig_path}/spatial/W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}."
                             f"{export_args['plot_extension']}",
-                            dpi=180, bbox_inches='tight')
+                            bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -586,7 +586,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                     )
                 fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_mean_{s}_{export_args['scanpy_plot_vmax']}"
                             f".{export_args['plot_extension']}",
-                            dpi=180, bbox_inches='tight')
+                            bbox_inches='tight')
                 fig.clear()
                 plt.close(fig)
 
@@ -608,7 +608,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                         )
                     fig.savefig(f"{fig_path}/spatial/W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}"
                                 f".{export_args['plot_extension']}",
-                                dpi=180, bbox_inches='tight')
+                                bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -622,7 +622,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                         )
                     fig.savefig(f"{fig_path}/spatial/histo_W_mRNA_count_q05_{s}_{export_args['scanpy_plot_vmax']}"
                                 f".{export_args['plot_extension']}",
-                                dpi=180, bbox_inches='tight')
+                                bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -643,7 +643,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                         )
                     fig.savefig(f"{fig_path}/spatial/W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}"
                                 f".{export_args['plot_extension']}",
-                                dpi=180, bbox_inches='tight')
+                                bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
@@ -657,7 +657,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                         )
                     fig.savefig(f"{fig_path}/spatial/histo_W_cell_density_q05_{s}_{export_args['scanpy_plot_vmax']}"
                                 f".{export_args['plot_extension']}",
-                                dpi=180, bbox_inches='tight')
+                                bbox_inches='tight')
                     fig.clear()
                     plt.close(fig)
 
