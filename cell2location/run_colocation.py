@@ -60,8 +60,9 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
 
     d_train_args = {'n_fact': [30], 'n_iter': 20000,
                     'learning_rate': 0.01,
-                    'use_cuda': True,
+                    'use_cuda': False,
                     'sample_prior': False,
+                    'posterior_summary': 'post_sample_q05',
                     'sample_name_col': None,
                     'mode': 'normal', 'n_type': 'restart', 'n_restarts': 5,
                     'include_source_location': False}
@@ -101,7 +102,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
 
     ####### Preparing data #######
     # extract cell density parameter
-    X_data = sp_data.uns['mod']['post_sample_means']['spot_factors']
+    X_data = sp_data.uns['mod'][train_args['posterior_summary']]['spot_factors']
     var_names = sp_data.uns['mod']['fact_names']
     obs_names = sp_data.obs_names
     if train_args['sample_name_col'] is None:
