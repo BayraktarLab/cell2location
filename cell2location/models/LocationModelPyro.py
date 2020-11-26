@@ -64,9 +64,12 @@ class LocationModelPyro(PyroLocModel):
             verbose=True,
             var_names=None, var_names_read=None,
             obs_names=None, fact_names=None, sample_id=None,
-            gene_level_prior={'mean': 1 / 2, 'sd': 1 / 8, 'mean_var_ratio': 1},
-            cell_number_prior={'cells_per_spot': 7, 'factors_per_spot': 6,
-                               'cells_mean_var_ratio': 1, 'factors_mean_var_ratio': 1},
+            gene_level_prior={'mean': 1 / 2, 'sd': 1 / 4},
+            gene_level_var_prior={'mean_var_ratio': 1},
+            cell_number_prior={'cells_per_spot': 8,
+                               'factors_per_spot': 7},
+            cell_number_var_prior={'cells_mean_var_ratio': 1,
+                                   'factors_mean_var_ratio': 1},
             phi_hyp_prior={'mean': 3, 'sd': 1},
             initialise_at_prior=False,
             minibatch_size=None,
@@ -81,17 +84,18 @@ class LocationModelPyro(PyroLocModel):
                          obs_names=obs_names, fact_names=fact_names, sample_id=sample_id,
                          minibatch_size=minibatch_size, minibatch_seed=minibatch_seed)
 
-        self.cell_state_mat = cell_state_mat
-        # Pass data to pyro / pytorch
-        self.cell_state = torch.tensor(cell_state_mat.astype(self.data_type))  # .double()
-        if self.use_cuda:
-            # move tensors and modules to CUDA
-            self.cell_state = self.cell_state.cuda()
-
         self.gene_level_prior = gene_level_prior
         self.cell_number_prior = cell_number_prior
         self.phi_hyp_prior = phi_hyp_prior
         self.initialise_at_prior = initialise_at_prior
+
+        for k in cell_number_var_prior.keys():
+            cell_number_prior[k] = cell_number_var_prior[k]
+        self.cell_number_prior = cell_number_prior
+
+        for k in gene_level_var_prior.keys():
+            gene_level_prior[k] = gene_level_var_prior[k]
+        self.gene_level_prior = gene_level_prior
 
         ## define parameters used to initialize variational parameters##
         self.gl_shape = self.gene_level_prior['mean'] ** 2 / self.gene_level_prior['sd'] ** 2
