@@ -671,7 +671,7 @@ class PyroModel(BaseModel):
         """
 
         if filename in os.listdir(self.checkpoint_dir):
-            pyro.get_param_store().save(filename)
+            pyro.get_param_store().load(filename)
         else:
             checkpoints = os.listdir(self.checkpoint_dir)
             checkpoints = '\n'.join(checkpoints)
