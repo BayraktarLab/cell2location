@@ -4,7 +4,8 @@ import torch
 def Gamma(mu=None, sigma=None, alpha=None, beta=None, shape=None):
     r"""
     Function that converts mu/sigma Gamma distribution parametrisation into alpha/beta and
-    returns pyro Gamma distribution with an event of a given shape
+    returns pyro Gamma distribution with an event of a given shape.
+    A thin wrapper over pyro.dist.Gamma.
 
     :param mu: mean of Gamma distribution
     :param sigma: variance of Gamma distribution
@@ -26,6 +27,6 @@ def Gamma(mu=None, sigma=None, alpha=None, beta=None, shape=None):
         alpha = torch.tensor(alpha)
         beta = torch.tensor(beta)
     else:
-        alpha = torch.ones(shape) * alpha
-        beta = torch.ones(shape) * beta
+        alpha = torch.ones(shape) * torch.tensor(alpha)
+        beta = torch.ones(shape) * torch.tensor(beta)
     return dist.Gamma(alpha, beta)

@@ -14,6 +14,9 @@ from torch.distributions.utils import (
     probs_to_logits,
 )
 
+# NB distribution parameterisation with mu and theta parametrisation is copied over from scVI:
+#    Copyright (c) 2020 Romain Lopez, Adam Gayoso, Galen Xing, Yosef Lab
+#    All rights reserved
 
 # +
 def log_nb_positive(value, mu, theta, eps=1e-8):
