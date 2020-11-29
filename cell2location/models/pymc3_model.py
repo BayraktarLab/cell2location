@@ -397,7 +397,7 @@ class Pymc3Model(BaseModel):
         for i in self.mean_field.keys():
             print(plt.plot(np.log10(self.mean_field[i].hist[iter_start:iter_end])))
 
-    def b_evaluate_stability(self, node, n_samples=1000, align=True, batch_size: int = 40):
+    def b_evaluate_stability(self, node, fact_filt=None, n_samples=1000, align=True, batch_size: int = 40):
         """Evaluate stability of posterior samples between training initialisations
         (takes samples and correlates the values of factors between training initialisations)
 
@@ -437,6 +437,9 @@ class Pymc3Model(BaseModel):
                 # concatenate batches
                 post_node = np.concatenate((post_node, post_node_1), axis=0)
 
+            if fact_filt is not None:
+                post_node = post_node[:, :, fact_filt]
+
             self.samples[node_name + '_stab'][i] = post_node.mean(0)
 
         n_plots = len(self.samples[node_name + '_stab'].keys()) - 1
@@ -444,10 +447,10 @@ class Pymc3Model(BaseModel):
             ncol = int(np.min((n_plots, 3)))
             nrow = np.ceil(n_plots / ncol)
             plt.subplot(nrow, ncol, i + 1)
-            plt.subplot(np.ceil(n_plots/ncol), ncol, i+1)
+            plt.subplot(np.ceil(n_plots / ncol), ncol, i + 1)
             self.align_plot_stability(self.samples[node_name + '_stab']['init_' + str(1)],
-                                            self.samples[node_name + '_stab']['init_' + str(i + 2)],
-                                            str(1), str(i + 2), align=align)
+                                      self.samples[node_name + '_stab']['init_' + str(i + 2)],
+                                      str(1), str(i + 2), align=align)
 
     def sample_posterior(self, node='all', n_samples=1000,
                          save_samples=False, return_samples=True,
