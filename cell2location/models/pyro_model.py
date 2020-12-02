@@ -170,6 +170,18 @@ class PyroModel(BaseModel):
             elif method is 'custom':
                 self.guide_i[name] = self.guide
 
+            # pick dataset depending on the training mode and move to GPU
+            if np.isin(n_type, ['cv', 'bootstrap']):
+                self.x_data = torch.tensor(self.X_data_sample[i].astype(self.data_type))
+            else:
+                self.x_data = torch.tensor(self.X_data.astype(self.data_type))
+
+            if self.use_cuda:
+                # move tensors and modules to CUDA
+                self.x_data = self.x_data.cuda()
+
+            self.guide_i[name](self.x_data)
+
             # initialise SVI inference method
             self.svi[name] = SVI(self.model, self.guide_i[name],
                                  optim.ClippedAdam({'lr': learning_rate,
@@ -181,16 +193,6 @@ class PyroModel(BaseModel):
 
             # record ELBO Loss history here
             self.hist[name] = []
-
-            # pick dataset depending on the training mode and move to GPU
-            if np.isin(n_type, ['cv', 'bootstrap']):
-                self.x_data = torch.tensor(self.X_data_sample[i].astype(self.data_type))
-            else:
-                self.x_data = torch.tensor(self.X_data.astype(self.data_type))
-
-            if self.use_cuda:
-                # move tensors and modules to CUDA
-                self.x_data = self.x_data.cuda()
 
             # train for n_iter
             it_iterator = tqdm(range(n_iter))
@@ -303,16 +305,20 @@ class PyroModel(BaseModel):
             elif method is 'custom':
                 self.guide_i[name] = self.guide
 
-            # initialise SVI inference method
-            self.svi[name] = SVI(self.model, self.guide_i[name],
-                                 optim.ClippedAdam({'lr': learning_rate,
-                                                    # limit the gradient step from becoming too large
-                                                    'clip_norm': self.total_grad_norm_constraint}),
-                                 loss=JitTrace_ELBO())
+            def initialise_svi(x_data, extra_data):
 
-            pyro.clear_param_store()
+                pyro.clear_param_store()
+                
+                self.init_guide(name, x_data, extra_data)
 
-            self.set_initial_values()
+                # initialise SVI inference method
+                self.svi[name] = SVI(self.model, self.guide_i[name],
+                                     optim.ClippedAdam({'lr': learning_rate,
+                                                        # limit the gradient step from becoming too large
+                                                        'clip_norm': self.total_grad_norm_constraint}),
+                                     loss=JitTrace_ELBO())
+
+                self.set_initial_values()
 
             # record ELBO Loss history here
             self.hist[name] = []
@@ -364,6 +370,19 @@ class PyroModel(BaseModel):
                                     num_workers=0)  # TODO num_workers
 
             ################### Training the model ###################
+            if self.minibatch_size is None:
+                initialise_svi(x_data, extra_data_train)
+            else:
+                i = 0
+                for batch in loader:
+                    i = i + 1
+                    if i == 1:
+                        x_data_batch, extra_data_batch = batch
+                        x_data_batch = x_data_batch.to(self.device)
+                        extra_data_batch = {k: v.to(self.device) for k, v in extra_data_batch.items()}
+
+                initialise_svi(x_data, extra_data_train)
+
             # start training in epochs
             epochs_iterator = tqdm(range(n_iter))
             for epoch in epochs_iterator:
@@ -478,6 +497,10 @@ class PyroModel(BaseModel):
             if self.verbose:
                 print(plt.plot(np.log10(self.hist[name][0:])));
 
+    def init_guide(self, name, x_data, extra_data):
+
+        self.guide_i[name](x_data)
+
     def step_train(self, name, x_data, extra_data):
 
         return self.svi[name].step(x_data)
@@ -553,7 +576,6 @@ class PyroModel(BaseModel):
 
         # compute mean across samples
         self.samples[node + suff][init] = self.samples[node + suff][init].mean(0)
-
 
     def sample_all1(self, init='init_1', batch_size: int = 10):
 
