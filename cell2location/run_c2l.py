@@ -208,6 +208,10 @@ def run_cell2location(sc_data, sp_data, model_name=None,
     # start timing
     start = time.time()
 
+    if np.sum(sp_data.obs_names.duplicated()) > 0:
+        raise ValueError(
+            'Make sure location names are unique (`sp_data.obs_names`)')
+
     sp_data = sp_data.copy()
 
     ####### Summarising single cell clusters #######
