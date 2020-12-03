@@ -14,9 +14,9 @@ import pyro
 import torch
 from pyro.infer import SVI, Trace_ELBO, JitTrace_ELBO
 from pyro.infer import Predictive
-from pyro.infer.autoguide import AutoNormal, AutoDelta, AutoGuideList
+from pyro.infer.autoguide import AutoDelta, AutoGuideList
+from cell2location.distributions.AutoNormal import AutoNormal
 from pyro.infer.autoguide import init_to_mean
-from pyro.infer.autoguide import init_to_feasible
 import pyro.optim as optim
 from sklearn.model_selection import train_test_split
 
@@ -180,6 +180,8 @@ class PyroModel(BaseModel):
                 # move tensors and modules to CUDA
                 self.x_data = self.x_data.cuda()
 
+            pyro.clear_param_store()
+
             self.guide_i[name](self.x_data)
 
             # initialise SVI inference method
@@ -188,8 +190,6 @@ class PyroModel(BaseModel):
                                                     # limit the gradient step from becoming too large
                                                     'clip_norm': self.total_grad_norm_constraint}),
                                  loss=JitTrace_ELBO())
-
-            pyro.clear_param_store()
 
             # record ELBO Loss history here
             self.hist[name] = []
@@ -245,6 +245,7 @@ class PyroModel(BaseModel):
         self.svi = {}
         self.hist = {}
         self.guide_i = {}
+        self.trace_elbo_i = {}
         self.samples = {}
         self.node_samples = {}
 
@@ -311,14 +312,16 @@ class PyroModel(BaseModel):
                 
                 self.init_guide(name, x_data, extra_data)
 
+                self.set_initial_values()
+
+                self.trace_elbo_i[name] = Trace_ELBO()#JitTrace_ELBO()
+
                 # initialise SVI inference method
                 self.svi[name] = SVI(self.model, self.guide_i[name],
                                      optim.ClippedAdam({'lr': learning_rate,
                                                         # limit the gradient step from becoming too large
                                                         'clip_norm': self.total_grad_norm_constraint}),
-                                     loss=JitTrace_ELBO())
-
-                self.set_initial_values()
+                                     loss=self.trace_elbo_i[name])
 
             # record ELBO Loss history here
             self.hist[name] = []
