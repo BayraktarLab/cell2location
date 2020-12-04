@@ -295,13 +295,14 @@ class PyroModel(BaseModel):
             ################### Initialise parameters & optimiser ###################
             # initialise Variational distribution = guide
             if method is 'advi':
-                self.guide_i[name] = AutoGuideList(self.model)
-                normal_guide_block = poutine.block(self.model, expose_all=True, hide_all=False,
-                                                   hide=self.point_estim + flatten_iterable(self.custom_guides.keys()))
-                self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean))
-                self.guide_i[name].append(AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
-                for k, v in self.custom_guides.items():
-                    self.guide_i[name].append(v)
+                # self.guide_i[name] = AutoGuideList(self.model)
+                # normal_guide_block = poutine.block(self.model, expose_all=True, hide_all=False,
+                #                                   hide=self.point_estim + flatten_iterable(self.custom_guides.keys()))
+                # self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean))
+                # self.guide_i[name].append(AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
+                # for k, v in self.custom_guides.items():
+                #    self.guide_i[name].append(v)
+                self.guide_i[name] = AutoNormal(self.model, init_loc_fn=init_to_mean)
 
             elif method is 'custom':
                 self.guide_i[name] = self.guide
@@ -309,12 +310,12 @@ class PyroModel(BaseModel):
             def initialise_svi(x_data, extra_data):
 
                 pyro.clear_param_store()
-                
+
                 self.init_guide(name, x_data, extra_data)
 
                 self.set_initial_values()
 
-                self.trace_elbo_i[name] = Trace_ELBO()#JitTrace_ELBO()
+                self.trace_elbo_i[name] = JitTrace_ELBO()  # JitTrace_ELBO()
 
                 # initialise SVI inference method
                 self.svi[name] = SVI(self.model, self.guide_i[name],
