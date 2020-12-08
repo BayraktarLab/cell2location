@@ -87,6 +87,7 @@ class PyroModel(BaseModel):
                          obs_names, fact_names, sample_id)
 
         self.extra_data = {}
+        self.init_vals = {}
         self.minibatch_size = minibatch_size
         self.minibatch_seed = minibatch_seed
         self.MiniBatchDataset = MiniBatchDataset
@@ -94,6 +95,7 @@ class PyroModel(BaseModel):
         self.device = 'cuda' if self.use_cuda else 'cpu'
         self.point_estim = point_estim
         self.custom_guides = custom_guides
+        self.guide_type = 'AutoNormal'
 
         if self.use_cuda:
             if data_type == 'float32':
@@ -208,10 +210,24 @@ class PyroModel(BaseModel):
                     torch.cuda.empty_cache()
 
     def set_initial_values(self):
-        r"""Method for setting initial values (specific to each model or model group)
+        r"""Method for setting initial values on covariate effect (gene_factors parameter)
         :return: nothing
         """
-        pass
+        if self.guide_type == 'AutoGuideList':
+            def prefix(i):
+                return f'AutoGuideList.{i}.'
+        elif self.guide_type == 'AutoNormal':
+            def prefix(i):
+                return f'AutoNormal.'
+            
+        for k in list(self.init_vals.keys()):
+
+            if k in self.point_estim:
+                pyro.param(f'{prefix(1)}{k}',
+                           torch.Tensor(self.init_vals[k][1](self.init_vals[k][0])))
+            else:
+                pyro.param(f'{prefix(0)}locs.{k}',
+                           torch.Tensor(self.init_vals[k][1](self.init_vals[k][0])))
 
     def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
                            n_iter=None, learning_rate=None,
@@ -295,14 +311,20 @@ class PyroModel(BaseModel):
             ################### Initialise parameters & optimiser ###################
             # initialise Variational distribution = guide
             if method is 'advi':
-                # self.guide_i[name] = AutoGuideList(self.model)
-                # normal_guide_block = poutine.block(self.model, expose_all=True, hide_all=False,
-                #                                   hide=self.point_estim + flatten_iterable(self.custom_guides.keys()))
-                # self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean))
-                # self.guide_i[name].append(AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
-                # for k, v in self.custom_guides.items():
-                #    self.guide_i[name].append(v)
-                self.guide_i[name] = AutoNormal(self.model, init_loc_fn=init_to_mean)
+                if len(self.point_estim + flatten_iterable(self.custom_guides.keys())) > 0:
+                    self.guide_i[name] = AutoGuideList(self.model)
+                    normal_guide_block = poutine.block(self.model, expose_all=True, hide_all=False,
+                                                       hide=self.point_estim + flatten_iterable(
+                                                           self.custom_guides.keys()))
+                    self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean))
+                    self.guide_i[name].append(
+                        AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
+                    for k, v in self.custom_guides.items():
+                        self.guide_i[name].append(v)
+                else:
+                    self.guide_i[name] = AutoNormal(self.model, init_loc_fn=init_to_mean)
+
+                self.guide_type = type(self.guide_i[name]).__name__
 
             elif method is 'custom':
                 self.guide_i[name] = self.guide
@@ -310,7 +332,7 @@ class PyroModel(BaseModel):
             def initialise_svi(x_data, extra_data):
 
                 pyro.clear_param_store()
-                
+
                 self.set_initial_values()
 
                 self.init_guide(name, x_data, extra_data)
@@ -555,7 +577,7 @@ class PyroModel(BaseModel):
             print(plt.plot(np.log10(np.array(self.hist[i])[iter_start:iter_end])));
 
     def plot_history_1(self, iter_start=0, iter_end=-1,
-                     mean_field_slot=None, log_y=True, ax=None):
+                       mean_field_slot=None, log_y=True, ax=None):
         r""" Plot training history
 
         :param iter_start: omit initial iterations from the plot
