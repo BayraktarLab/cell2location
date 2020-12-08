@@ -546,13 +546,43 @@ class PyroModel(BaseModel):
         if (save_samples):
             self.samples['post_samples'] = post_samples
 
-    def plot_history(self, iter_start: int = 15000, iter_end=-1):
+    def plot_history_old(self, iter_start: int = 15000, iter_end=-1):
         r""" Plot training history
         :param iter_start: omit initial iterations from the plot
         :param iter_end: omit last iterations from the plot
         """
         for i in self.hist.keys():
             print(plt.plot(np.log10(np.array(self.hist[i])[iter_start:iter_end])));
+
+    def plot_history(self, iter_start=0, iter_end=-1,
+                     mean_field_slot=None, log_y=True, ax=None):
+        r""" Plot training history
+
+        :param iter_start: omit initial iterations from the plot
+        :param iter_end: omit last iterations from the plot
+        """
+
+        if ax is None:
+            ax = plt
+            ax.set_xlabel = plt.xlabel
+            ax.set_ylabel = plt.ylabel
+
+        if mean_field_slot is None:
+            mean_field_slot = self.hist.keys()
+
+        for i in mean_field_slot:
+
+            if iter_end == -1:
+                iter_end = np.array(self.hist[i]).flatten().shape[0]
+
+            y = np.array(self.hist[i]).flatten()[iter_start:iter_end]
+            if log_y:
+                y = np.log10(y)
+            ax.plot(np.arange(iter_start, iter_end), y, label='train')
+            ax.set_xlabel('Training epochs')
+            ax.set_ylabel('Reconstruction accuracy (ELBO loss)')
+            ax.legend()
+            plt.tight_layout()
 
     def sample_node1(self, node, init, batch_size: int = 10):
 
