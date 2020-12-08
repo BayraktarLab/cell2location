@@ -310,10 +310,10 @@ class PyroModel(BaseModel):
             def initialise_svi(x_data, extra_data):
 
                 pyro.clear_param_store()
+                
+                self.set_initial_values()
 
                 self.init_guide(name, x_data, extra_data)
-
-                self.set_initial_values()
 
                 self.trace_elbo_i[name] = JitTrace_ELBO()  # JitTrace_ELBO()
 
@@ -554,7 +554,7 @@ class PyroModel(BaseModel):
         for i in self.hist.keys():
             print(plt.plot(np.log10(np.array(self.hist[i])[iter_start:iter_end])));
 
-    def plot_history(self, iter_start=0, iter_end=-1,
+    def plot_history_1(self, iter_start=0, iter_end=-1,
                      mean_field_slot=None, log_y=True, ax=None):
         r""" Plot training history
 
