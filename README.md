@@ -27,6 +27,8 @@ You can also try cell2location on [Google Colab](https://colab.research.google.c
 
 Please report bugs and feedback via https://github.com/BayraktarLab/cell2location/issues .
 
+We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. 
+
 ## Configure your own conda environment
 
 1. Installation of dependecies and configuring environment (Method 1 and Method 2)
@@ -128,6 +130,8 @@ Replace **1)** the path to `/bin/singularity` with the one availlable on your sy
 User documentation is availlable on https://cell2location.readthedocs.io/en/latest/. 
 
 The architecture of the package is briefly described [here](https://github.com/BayraktarLab/cell2location/blob/master/cell2location/models/README.md). Cell2location architecture is designed to simplify extended versions of the model that account for additional technical and biologial information. We plan to provide a tutorial showing how to add new model classes but please get in touch if you would like to contribute or build on top our package.
+
+We also provide an experimental numpyro translation of the model. Note that the pyro translation of cell2location in this repo does not work.
 
 ## Documentation and API details
 
