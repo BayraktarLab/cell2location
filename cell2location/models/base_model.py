@@ -231,6 +231,9 @@ class BaseModel():
         if mean_field_slot is None:
             mean_field_slot = self.hist.keys()
 
+        if type(mean_field_slot) == str:
+            mean_field_slot = [mean_field_slot]
+
         for i in mean_field_slot:
 
             if iter_end == -1:
