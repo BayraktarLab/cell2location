@@ -219,7 +219,7 @@ class PyroModel(BaseModel):
         elif self.guide_type == 'AutoNormal':
             def prefix(i):
                 return f'AutoNormal.'
-            
+
         for k in list(self.init_vals.keys()):
 
             if k in self.point_estim:
@@ -407,7 +407,7 @@ class PyroModel(BaseModel):
                         x_data_batch = x_data_batch.to(self.device)
                         extra_data_batch = {k: v.to(self.device) for k, v in extra_data_batch.items()}
 
-                initialise_svi(x_data, extra_data_train)
+                initialise_svi(x_data, extra_data_batch)
 
             # start training in epochs
             epochs_iterator = tqdm(range(n_iter))
