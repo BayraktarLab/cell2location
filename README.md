@@ -150,12 +150,16 @@ FloatingPointError: NaN occurred in optimization.
 The current approximation of RV `gene_level_beta_hyp_log__`.ravel()[0] is NaN.
 ...
 ```
-This usually happens when 
-A. Numerical accuracy issues with older CUDA versions. Solution: use our singularity and docker images with CUDA 10.2.
-B. The single cell reference is a very poor match to the data - reference expression signatures of cell types cannot explain most of in-situ expression. E.g. trying to map immune cell types to a tissue section that contains mostly stromal and epithelial cells. Solution: aim to construct a comprehensive reference.
-C. Using cell2location in single-sample mode makes it harder to distinguish technology difference from cell abundance. Solution: if you have multiple expreriments try analysing them jointly in the multi-sample mode (detected automatically based on `'sample_name_col': 'sample'`).
-D. Many genes are not expressed in the spatial data. Solution: try removing genes detected at low levels in spatial data.
+This usually happens when:
 
-2. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. Solution: use our docker and singularity images.
+**A.** Numerical accuracy issues with older CUDA versions. **Solution**: use our singularity and docker images with CUDA 10.2.
+
+**B.** The single cell reference is a very poor match to the data - reference expression signatures of cell types cannot explain most of in-situ expression. E.g. trying to map immune cell types to a tissue section that contains mostly stromal and epithelial cells. **Solution**: aim to construct a comprehensive reference.
+
+**C.** Using cell2location in single-sample mode makes it harder to distinguish technology difference from cell abundance. **Solution**: if you have multiple expreriments try analysing them jointly in the multi-sample mode (detected automatically based on `'sample_name_col': 'sample'`).
+
+**D.** Many genes are not expressed in the spatial data. **Solution**: try removing genes detected at low levels in spatial data.
+
+2. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images.
 
 ## FAQ
