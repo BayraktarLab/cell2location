@@ -19,10 +19,12 @@ def get_rgb_function(cmap, min_value, max_value):
 
     if min_value == max_value:
         warnings.warn('Max_color is equal to min_color. It might be because of the data or bad parameter choice. '
-                      'If you are using plot_contours function try increasing max_color_quantile parameter.')
+                      'If you are using plot_contours function try increasing max_color_quantile parameter and'
+                      'removing cell types with all zero values.')
 
         def func_equal(x):
-            return cmap(0.5)
+            factor = 0 if max_value == 0 else 0.5
+            return cmap(np.ones_like(x) * factor)
 
         return func_equal
 
@@ -300,7 +302,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
                                   **{**{'size': 20, 'color': max_color, 'alpha': 1}, **colorbar_label_kw})
 
             colors[:, c] = color
-            weights[:, c] = np.clip(counts[:, c] / max_color_intensity, 0, 1)
+            weights[:, c] = np.clip(counts[:, c] / (max_color_intensity + 1e-10), 0, 1)
             weights[:, c][counts[:, c] < min_color_intensity] = 0
 
         colors_ryb = np.zeros((*weights.shape, 3))
