@@ -34,52 +34,76 @@ def get_rgb_function(cmap, min_value, max_value):
     return func
 
 
-def rgb_to_ryb(rgb_r, rgb_g, rgb_b):
-    white = min(rgb_r, rgb_g, rgb_b)
-    black = min(1 - rgb_r, 1 - rgb_g, 1 - rgb_b)
-    rgb_r = rgb_r - white
-    rgb_g = rgb_g - white
-    rgb_b = rgb_b - white
+def rgb_to_ryb(rgb):
+    """
+    Converts colours from RGB colorspace to RYB
 
-    yellow = min(rgb_r, rgb_g)
-    ryb_r = rgb_r - yellow
-    ryb_y = (yellow + rgb_g) / 2
-    ryb_b = (rgb_b + rgb_g - yellow) / 2
+    Parameters
+    ----------
 
-    if max(rgb_r, rgb_g, rgb_b) != 0:
-        norm = max(ryb_r, ryb_y, ryb_b) / max(rgb_r, rgb_g, rgb_b)
-        ryb_r = ryb_r / norm
-        ryb_y = ryb_y / norm
-        ryb_b = ryb_b / norm
+    rgb
+        numpy array Nx3
 
-    ryb_r = ryb_r + black
-    ryb_y = ryb_y + black
-    ryb_b = ryb_b + black
-    return np.array((ryb_r, ryb_y, ryb_b))
+    Returns
+    -------
+    Numpy array Nx3
+    """
+    rgb = np.array(rgb)
+    if len(rgb.shape) == 1:
+        rgb = rgb[np.newaxis, :]
+
+    white = rgb.min(axis=1)
+    black = (1 - rgb).min(axis=1)
+    rgb = rgb - white[:, np.newaxis]
+
+    yellow = rgb[:, :2].min(axis=1)
+    ryb = np.zeros_like(rgb)
+    ryb[:, 0] = rgb[:, 0] - yellow
+    ryb[:, 1] = (yellow + rgb[:, 1]) / 2
+    ryb[:, 2] = (rgb[:, 2] + rgb[:, 1] - yellow) / 2
+
+    mask = ~ (ryb == 0).all(axis=1)
+    if mask.any():
+        norm = ryb[mask].max(axis=1) / rgb[mask].max(axis=1)
+        ryb[mask] = ryb[mask] / norm[:, np.newaxis]
+
+    return ryb + black[:, np.newaxis]
 
 
-def ryb_to_rgb(ryb_r, ryb_y, ryb_b):
-    black = min(ryb_r, ryb_y, ryb_b)
-    white = min(1 - ryb_r, 1 - ryb_y, 1 - ryb_b)
-    ryb_r = ryb_r - black
-    ryb_y = ryb_y - black
-    ryb_b = ryb_b - black
+def ryb_to_rgb(ryb):
+    """
+    Converts colours from RYB colorspace to RGB
 
-    green = min(ryb_y, ryb_b)
-    rgb_r = ryb_r + ryb_y - green
-    rgb_g = ryb_y + green
-    rgb_b = 2 * (ryb_b - green)
+    Parameters
+    ----------
 
-    if max(ryb_r, ryb_y, ryb_b) != 0:
-        norm = max(rgb_r, rgb_g, rgb_b) / max(ryb_r, ryb_y, ryb_b)
-        rgb_r = rgb_r / norm
-        rgb_g = rgb_g / norm
-        rgb_b = rgb_b / norm
+    ryb
+        numpy array Nx3
 
-    rgb_r = rgb_r + white
-    rgb_g = rgb_g + white
-    rgb_b = rgb_b + white
-    return np.array((rgb_r, rgb_g, rgb_b))
+    Returns
+    -------
+    Numpy array Nx3
+    """
+    ryb = np.array(ryb)
+    if len(ryb.shape) == 1:
+        ryb = ryb[np.newaxis, :]
+
+    black = ryb.min(axis=1)
+    white = (1 - ryb).min(axis=1)
+    ryb = ryb - black[:, np.newaxis]
+
+    green = ryb[:, 1:].min(axis=1)
+    rgb = np.zeros_like(ryb)
+    rgb[:, 0] = ryb[:, 0] + ryb[:, 1] - green
+    rgb[:, 1] = green + ryb[:, 1]
+    rgb[:, 2] = (ryb[:, 2] - green) * 2
+
+    mask = ~ (ryb == 0).all(axis=1)
+    if mask.any():
+        norm = rgb[mask].max(axis=1) / ryb[mask].max(axis=1)
+        rgb[mask] = rgb[mask] / norm[:, np.newaxis]
+
+    return rgb + white[:, np.newaxis]
 
 
 def plot_spatial(spot_factors_df, coords, labels, text=None,
@@ -308,8 +332,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
         colors_ryb = np.zeros((*weights.shape, 3))
 
         for i in range(colors.shape[0]):
-            for j in range(colors.shape[1]):
-                colors_ryb[i, j] = rgb_to_ryb(*colors[i, j, :3])
+            colors_ryb[i] = rgb_to_ryb(colors[i, :, :3])
 
         def kernel(w):
             return w ** 2
@@ -319,8 +342,7 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
 
         weighted_colors = np.zeros((weights.shape[0], 4))
 
-        for i in range(colors.shape[0]):
-            weighted_colors[i, :3] = ryb_to_rgb(*weighted_colors_ryb[i])
+        weighted_colors[:, :3] = ryb_to_rgb(weighted_colors_ryb)
 
         weighted_colors[:, 3] = colors[:, :, 3].max(axis=1)
 
