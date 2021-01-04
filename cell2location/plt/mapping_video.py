@@ -7,21 +7,29 @@ import pandas as pd
 from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
+import warnings
 
 
 def get_rgb_function(cmap, min_value, max_value):
     r""" Generate a function to map continous values to RGB values using colormap between min_value & max_value.
     """
 
-    if min_value >= max_value:
-        raise ValueError('Max_value should be greater than min_value. If you are using plot_contours '
-                         'function try increasing max_color_quantile parameter.')
+    if min_value > max_value:
+        raise ValueError('Max_value should be greater or than min_value.')
+
+    if min_value == max_value:
+        warnings.warn('Max_color is equal to min_color. It might be because of the data or bad parameter choice. '
+                      'If you are using plot_contours function try increasing max_color_quantile parameter.')
+
+        def func_equal(x):
+            return cmap(0.5)
+
+        return func_equal
 
     def func(x):
         return cmap((np.clip(x, min_value, max_value) - min_value) / (max_value - min_value))
 
     return func
-
 
 
 def rgb_to_ryb(rgb_r, rgb_g, rgb_b):
@@ -46,7 +54,6 @@ def rgb_to_ryb(rgb_r, rgb_g, rgb_b):
     ryb_y = ryb_y + black
     ryb_b = ryb_b + black
     return np.array((ryb_r, ryb_y, ryb_b))
-
 
 
 def ryb_to_rgb(ryb_r, ryb_y, ryb_b):
@@ -91,8 +98,8 @@ def plot_spatial(spot_factors_df, coords, labels, text=None,
                  reorder_cmap=range(7),
                  style='fast',
                  colorbar_position='bottom',
-                 colorbar_label_kw={}.copy(),
-                 colorbar_shape={}.copy(),
+                 colorbar_label_kw={},
+                 colorbar_shape={},
                  colorbar_tick_size=12,
                  colorbar_grid=None,
                  image_cmap='Greys_r',
@@ -380,6 +387,7 @@ def expand_1by1(df):
 
     return pd.concat(col6, axis=0)
 
+
 def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
                        sel_clust, sel_clust_col, sample_id,
                        sc_img=None, sp_img=None, sp_img_scaling_fac=1,
@@ -631,7 +639,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
         clusters = []
         for i in range(sel_clust_df.shape[1]):
             idx = (sel_clust_df.values.argmax(axis=1) == i)
-            dfs.append(moving_averages2[i, i3+1, idx, :])
+            dfs.append(moving_averages2[i, i3 + 1, idx, :])
             clusters.append(sel_clust_df[idx])
         # coord = moving_averages2[0, i3, :, :]
         for d in dfs:
@@ -640,7 +648,7 @@ def plot_video_mapping(adata_vis, adata, sample_ids, spot_factors_df,
 
         fig = plot_spatial(pd.concat(clusters, axis=0),
                            coords=coord, labels=sel_clust_df.columns,
-                           circle_diameter=circ_diam2[i3+1], alpha_scaling=sp_alpha,
+                           circle_diameter=circ_diam2[i3 + 1], alpha_scaling=sp_alpha,
                            img=sp_img, img_alpha=img_alpha, style=style,
                            max_color_quantile=step_quantile[5],
                            crop_x=crop_x, crop_y=crop_y, colorbar_position='right',
