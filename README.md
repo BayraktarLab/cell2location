@@ -163,3 +163,5 @@ This usually happens when:
 2. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images.
 
 ## FAQ
+
+See https://github.com/BayraktarLab/cell2location/discussions
