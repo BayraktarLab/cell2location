@@ -162,13 +162,19 @@ class PyroModel(BaseModel):
         for i, name in enumerate(init_names):
 
             # initialise Variational distributiion = guide
+            try:
+                create_plates = getattr(self, 'create_plates')
+            except Exception as e:
+                create_plates = None
+            
             if method is 'advi':
                 self.guide_i[name] = AutoGuideList(self.model)
                 self.guide_i[name].append(
                     AutoNormal(poutine.block(self.model, expose_all=True, hide_all=False, hide=self.point_estim),
-                               init_loc_fn=init_to_mean))
+                               init_loc_fn=init_to_mean, create_plates=create_plates))
                 self.guide_i[name].append(
-                    AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
+                    AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim,
+                                            create_plates=create_plates)))
             elif method is 'custom':
                 self.guide_i[name] = self.guide
 
@@ -310,19 +316,27 @@ class PyroModel(BaseModel):
         for i, name in enumerate(init_names):
             ################### Initialise parameters & optimiser ###################
             # initialise Variational distribution = guide
+            try:
+                create_plates = getattr(self, 'create_plates')
+            except Exception as e:
+                create_plates = None
+            
             if method is 'advi':
                 if len(self.point_estim + flatten_iterable(self.custom_guides.keys())) > 0:
                     self.guide_i[name] = AutoGuideList(self.model)
                     normal_guide_block = poutine.block(self.model, expose_all=True, hide_all=False,
                                                        hide=self.point_estim + flatten_iterable(
                                                            self.custom_guides.keys()))
-                    self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean))
+                    self.guide_i[name].append(AutoNormal(normal_guide_block, init_loc_fn=init_to_mean,
+                                                         create_plates=create_plates))
                     self.guide_i[name].append(
-                        AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim)))
+                        AutoDelta(poutine.block(self.model, hide_all=True, expose=self.point_estim, 
+                                                create_plates=create_plates)))
                     for k, v in self.custom_guides.items():
                         self.guide_i[name].append(v)
                 else:
-                    self.guide_i[name] = AutoNormal(self.model, init_loc_fn=init_to_mean)
+                    self.guide_i[name] = AutoNormal(self.model, init_loc_fn=init_to_mean, 
+                                                    create_plates=create_plates)
 
                 self.guide_type = type(self.guide_i[name]).__name__
 
@@ -393,7 +407,7 @@ class PyroModel(BaseModel):
                 # create minibatches
                 dataset = MiniBatchDataset(x_data, extra_data_train, return_idx=True)
                 loader = DataLoader(dataset, batch_size=self.minibatch_size,
-                                    num_workers=0)  # TODO num_workers
+                                    num_workers=0, shuffle=True, drop_last=True) 
 
             ################### Training the model ###################
             if self.minibatch_size is None:
