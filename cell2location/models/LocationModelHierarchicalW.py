@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 r"""Location model decomposes the expression of genes across locations into a set of reference regulatory programmes,
-    it is identical to CoLocationModelNB4V2 but does not account for correlation of programs
+    it is identical to LocationModelLinearDependentW but does not account for correlation of programs
     across locations with similar cell composition, thus has reduced accuracy."""
 
 import matplotlib.pyplot as plt
@@ -12,8 +12,8 @@ from cell2location.models.pymc3_loc_model import Pymc3LocModel
 
 
 # defining the model itself
-class LocationModel(Pymc3LocModel):
-    r"""Provided here as a 'base' model for completeness.
+class LocationModelHierarchicalW(Pymc3LocModel):
+    r"""Provided here as a 'base' model.
 
     Parameters
     ----------
