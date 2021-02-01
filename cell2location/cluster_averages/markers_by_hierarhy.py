@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05]):
+def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0.2], mode='exclusive'):
     """Find which genes are expressed at which level of cell type hierarchy.
     Assigns expression counts for each gene to higher levels of hierarhy using estimates of average expression for the lowest level and substracts that expression from the lowest level. For example, low level annotation can be `Inh_SST neurones`, high level `Inh neurones`, very high level `neurones`, top level `all cell types`. The function can deal with any number of layers but the order needs to be carefully considered (from broad to specific).
         
@@ -36,6 +36,7 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05]):
        last column corresponds to the second level :math:`f2`. 
        It is crucial the order of cell types :math:`f` in `hierarhy_df` matches the order of cell types in axis 1 of `inf_aver`.
     :param quantile: list of posterior distribution quantiles to be computed
+    :param mode: 'exclusive' or 'tree' mode. In 'exclusive' mode, the number of counts specific to each layer is computed (e.g. counts at layer 2 are excluded from layer 1). In 'tree' mode, children nodes inherit the expression of their parents (e.g. layer 1 countains the original counts :math:`g_{f,g}`, layer 2 contains counts from all parent layers :math:`g_{f2,g} + g_{f3,g} + ... + g_{fn,g} + g_{g}`.
     
     :return: When input is :math:`g_{g,f}` the output is pd.DataFrame with values for :math:`f1, f2, f3, ..., fn, all`in columns. When input is :math:`g_{g,f,s}` where `s` represents posterior sample the output is a dictionary with posterior samples for :math:`g_{g,f1-fn+all,s}` and similar dataframes for 'mean' and quantiles of the posterior distribution (e.g. 'q0.05').
     """
@@ -66,6 +67,22 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05]):
                 ind_min = results[f'level_1'][c_names].min(1)
                 results[f'level_{k_level}'][c] = ind_min
                 results[f'level_1'][c_names] = (results[f'level_1'][c_names].T - ind_min).T
+        
+        if mode == 'tree':
+            # when mode is tree, add counts from parent levels
+            for plev in np.arange(len(results) - 1):
+                p_level = len(results) - plev
+                p_names = list(hierarhy_df.iloc[:,plev].unique())
+                
+                # iterate over clusters at each level (e.g. f2, f3 ...)
+                for p in p_names:
+                    ind = hierarhy_df.iloc[:,plev] == p
+                    if (plev) == (len(results) - 2):
+                        ch_names = hierarhy_df.index[ind]
+                    else:
+                        ch_names = hierarhy_df.loc[ind,:].iloc[:,plev+1]
+                    results[f'level_{p_level-1}'][ch_names] \
+                    = (results[f'level_{p_level-1}'][ch_names].T + results[f'level_{p_level}'][p].values).T
 
         # concatenate to produce a general summary
         sep_inf_aver = pd.concat(list(results.values()), axis=1)
@@ -96,6 +113,26 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05]):
                 results[f'level_{k_level}'][:, k_ind, :] = ind_min
                 results[f'level_1'][:, ind, :] = results[f'level_1'][:, ind, :] - ind_min
                 
+        if mode == 'tree':
+            # when mode is tree, add counts from parent levels
+            for plev in np.arange(len(results) - 1):
+                p_level = len(results) - plev
+                p_names = list(hierarhy_df.iloc[:,plev].unique())
+                
+                # iterate over clusters at each level (e.g. f2, f3 ...)
+                for p in p_names:
+                    ind = hierarhy_df.iloc[:,plev] == p
+                    if (plev) == (len(results) - 2):
+                        ch_names = hierarhy_df.index[ind]
+                    else:
+                        ch_names = hierarhy_df.loc[ind,:].iloc[:,plev+1]
+                    ind = np.isin(names[f'level_{p_level-1}'], ch_names)
+                    p_ind = np.isin(p_names, p)
+                    
+                    results[f'level_{p_level-1}'][:, ind, :] \
+                    = results[f'level_{p_level-1}'][:, ind, :] \
+                       + results[f'level_{p_level}'][:, p_ind, :].reshape((n_genes, 1, n_samples))
+                    
         sep_inf_aver = np.concatenate(list(results.values()), axis=1)
         from itertools import chain
         sep_inf_aver_names = list(chain(*names.values()))
@@ -110,5 +147,7 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05]):
             out[f'q{q}'] = pd.DataFrame(np.squeeze(np.quantile(sep_inf_aver, q=q, axis=2)), 
                                         index=var_names,
                                         columns=sep_inf_aver_names)
+            
+        # TODO remove redundant layers
 
         return out
