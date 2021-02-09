@@ -152,6 +152,7 @@ os.environ["THEANO_FLAGS"] = 'device=cuda,floatX=float32,force_device=True'
 import cell2location
 ```
 which tells theano (cell2location dependency) to use the GPU before importing cell2location (or it's dependencies - theano & pymc3).
+For data with 4039 locations and 10241 genes the analysis should take about 17-40 minutes depending on GPU hardware.
 
 #### 2. `FloatingPointError: NaN occurred in optimization.`
 
