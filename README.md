@@ -142,9 +142,20 @@ We also thank Krzysztof Polanski, Luz Garcia Alonso, Carlos Talavera-Lopez, Ni H
 
 ## Common errors
 
-### Training main cell2location model
+#### 1. Training cell2location on GPU takes forever (>50 hours)
 
-1. `FloatingPointError: NaN occurred in optimization.` During training model parameters get into very unlikely range, resulting in division by 0 when computing gradients and breaking the optimisation:
+1. Training cell2location using `cell2location.run_cell2location()` on GPU takes forever (>50 hours). Please check that cell2location is actually using the GPU. It is crucial to add this line in your script / notebook:
+
+```python
+# this line should go before importing cell2location
+os.environ["THEANO_FLAGS"] = 'device=cuda,floatX=float32,force_device=True'
+import cell2location
+```
+which tells theano (cell2location dependency) to use the GPU before importing cell2location (or it's dependencies - theano & pymc3).
+
+#### 2. `FloatingPointError: NaN occurred in optimization.`
+
+2. `FloatingPointError: NaN occurred in optimization.` During training model parameters get into very unlikely range, resulting in division by 0 when computing gradients and breaking the optimisation:
 ```
 FloatingPointError: NaN occurred in optimization. 
 The current approximation of RV `gene_level_beta_hyp_log__`.ravel()[0] is NaN.
@@ -160,7 +171,8 @@ This usually happens when:
 
 **D.** Many genes are not expressed in the spatial data. **Solution**: try removing genes detected at low levels in spatial data.
 
-2. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images.
+#### 3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...`
+3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images, or try re-creating your conda environment.
 
 ## FAQ
 
