@@ -281,6 +281,18 @@ class LocationModelWTA(Pymc3LocModel):
             # =====================Compute nUMI from each factor in spots  ======================= #                          
             self.nUMI_factors = pm.Deterministic('nUMI_factors',
                                                  (self.spot_factors * (self.gene_factors * self.gene_level).sum(0)))
+            
+    def compute_expected(self):
+        r"""Compute expected expression of each gene in each spot (Poisson mu). Useful for evaluating how well
+        the model learned expression pattern of all genes in the data.
+        """
+
+        # compute the poisson rate
+        self.mu = (np.dot(self.samples['post_sample_means']['spot_factors'],
+              self.samples['post_sample_means']['gene_factors'].T)
+        * self.samples['post_sample_means']['gene_level'].T
+        + self.samples['post_sample_means']['gene_add']*self.l_r
+        + self.samples['post_sample_means']['spot_add'])
 
     def plot_Locations_1D_scatterPlot(self, x, order = None, polynomial_order = 6, figure_size = (30,30),
                                       saveFig = None, density = True, xlabel = 'x-coordinate'):
