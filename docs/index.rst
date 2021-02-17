@@ -28,10 +28,12 @@ Welcome to cell2location's documentation!
    cell2location.location_models
    cell2location.regression_models
    cell2location.downstream_models
+   cell2location.utils.filtering
    cell2location.cluster_averages
    cell2location.plt
    cell2location.region
    cell2location.location_models_pyro
+   cell2location.other_architectures.rst
 
 Indices and tables
 ==================
