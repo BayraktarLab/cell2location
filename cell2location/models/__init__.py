@@ -5,7 +5,7 @@ from .ArchetypalAnalysis import ArchetypalAnalysis
 from .LocationModelLinearDependentWMultiExperiment import LocationModelLinearDependentWMultiExperiment
 from .RegressionGeneBackgroundCoverageTorch import RegressionGeneBackgroundCoverageTorch
 from .RegressionGeneBackgroundCoverageGeneTechnologyTorch import RegressionGeneBackgroundCoverageGeneTechnologyTorch
-from .LocationModel_WTA import LocationModel_WTA
+from .LocationModelWTA import LocationModelWTA
 
 __all__ = [
     "LocationModelLinearDependentWMultiExperiment",
