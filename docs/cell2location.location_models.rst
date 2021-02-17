@@ -1,14 +1,5 @@
-Location Models (spatial mapping)
+Spatial Mapping Models
 ============================
-
-
-LocationModelLinearDependentW
-------------------------------------------------
-
-.. automodule:: cell2location.models.LocationModelLinearDependentW
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 LocationModelLinearDependentWMultiExperiment
 ------------------------------------------------
@@ -17,15 +8,15 @@ LocationModelLinearDependentWMultiExperiment
    :members:
    :undoc-members:
    :show-inheritance:
+   
+LocationModelWTA
+------------------------------------------------
 
-LocationModel
-------------------------------------------------------
-
-.. automodule:: cell2location.models.LocationModel
+.. automodule:: cell2location.models.LocationModelWTA
    :members:
    :undoc-members:
    :show-inheritance:
-
+   
 BaseModel
 ---------------------------------------
 
