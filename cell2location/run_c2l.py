@@ -7,6 +7,7 @@ import pandas as pd
 import scanpy as sc
 import pickle
 import theano
+import scipy
 
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
@@ -271,9 +272,15 @@ def run_cell2location(sc_data, sp_data, model_name=None,
 
     # extract data as a dense matrix
     if train_args['use_raw']:
-        X_data = sp_data.raw.X.toarray()
+        if isinstance(sp_data.raw.X, scipy.sparse.csc.csc_matrix):
+            X_data = sp_data.raw.X.toarray()
+        else:
+            X_data = sp_data.raw.X
     else:
-        X_data = sp_data.X.toarray()
+        if isinstance(sp_data.X, scipy.sparse.csc.csc_matrix):
+            X_data = sp_data.X.toarray()
+        else:
+            X_data = sp_data.X
 
     # Filter cell states and X_data to common genes
     sp_ind = sp_data.var_names.isin(cell_state_df.index)
