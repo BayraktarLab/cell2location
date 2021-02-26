@@ -31,7 +31,7 @@ We also provide an experimental numpyro translation of the model which has impro
 
 ## Configure your own conda environment
 
-1. Installation of dependecies and configuring environment (Method 1 and Method 2)
+1. Installation of dependecies and configuring environment (Method 1 (preferred) and Method 2)
 2. Installation of cell2location
 
 Prior to installing cell2location package you need to install miniconda and create a conda environment containing pymc3 and theano ready for use on GPU. Follow the steps below:
@@ -45,7 +45,17 @@ bash Miniconda3-latest-Linux-x86_64.sh
 # use prefix /path/to/software/miniconda3
 ```
 
-#### 1. Method 1: Create conda environment manually
+#### 1. Method 1 (preferred): Create environment from file
+
+Create `cellpymc` environment from file, which will install all the required conda and pip packages:
+
+```bash
+git clone https://github.com/BayraktarLab/cell2location.git
+cd cell2location
+conda env create -f environment.yml
+```
+
+#### 1. Method 2: Create conda environment manually
 
 Create conda environment with the required packages pymc3 and scanpy:
 
@@ -59,16 +69,6 @@ Do not install pymc3 and theano with conda because it will not use the system cu
 
 ```bash
 pip install "plotnine pymc3>=3.8,<3.10" torch pyro-ppl
-```
-
-#### 1. Method 2: Create environment from file
-
-Create `cellpymc` environment from file, which will install all the required conda and pip packages:
-
-```bash
-git clone https://github.com/BayraktarLab/cell2location.git
-cd cell2location
-conda env create -f environment.yml
 ```
 
 ### 2. Install `cell2location` package
