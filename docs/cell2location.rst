@@ -1,4 +1,4 @@
-Pipelines
+Pipelines (wrappers for full workflow)
 =========================
 
 Run cell2location
