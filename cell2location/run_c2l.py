@@ -684,7 +684,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                                           fact_ind=np.arange(mod.spot_factors_df.shape[1]),
                                                           fact=mod.spot_factors_df,
                                                           cluster_names=cluster_plot_names,
-                                                          n_columns=6, trans='log',
+                                                          n_columns=6, trans='identity',
                                                           sample_name=s, samples_col=train_args['sample_name_col'],
                                                           obs_x='imagecol', obs_y='imagerow')
                             p.save(filename=fig_path + 'cell_locations_W_mRNA_count_' + str(s) + '.' \
@@ -695,7 +695,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                                           fact_ind=np.arange(mod.spot_factors_q05.shape[1]),
                                                           fact=mod.spot_factors_q05,
                                                           cluster_names=cluster_plot_names,
-                                                          n_columns=6, trans='log',
+                                                          n_columns=6, trans='identity',
                                                           sample_name=s, samples_col=train_args['sample_name_col'],
                                                           obs_x='imagecol', obs_y='imagerow')
                             p.save(filename=fig_path + 'cell_locations_W_mRNA_count_q05_' + str(s) + '.' \
