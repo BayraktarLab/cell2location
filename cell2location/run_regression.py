@@ -147,6 +147,10 @@ def run_regression(sc_data, model_name=None,
 
     # extract pd.DataFrame with covariates
     cell2covar = sc_data.obs[[train_args['sample_name_col']] + train_args['covariate_col_names']]
+    
+    sample_n = len(np.unique(sc_data.obs[train_args['sample_name_col']]))
+    if sample_n == sc_data.shape[0]:
+        ValueError("The number of samples (batches) is equal to the number of observations `adata.n_obs`")
 
     ####### Creating model #######
     if verbose:
