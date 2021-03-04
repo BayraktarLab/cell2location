@@ -308,14 +308,11 @@ def run_cell2location(sc_data, sp_data, model_name=None,
     if model_name is None:
         sample_name = sp_data.obs[train_args['sample_name_col']]
         sample_n = len(np.unique(sample_name))
-        if sample_n == 1:
-            Model = models.LocationModelLinearDependentW
-            model_name = 'LocationModelLinearDependentW'
-        elif sample_n > 1:
+        if sample_n < sp_data.shape[0]:
             Model = models.LocationModelLinearDependentWMultiExperiment
             model_name = 'LocationModelLinearDependentWMultiExperiment'
         else:
-            ValueError("train_args['sample_name_col'] point to invalid column")
+            ValueError("train_args['sample_name_col'] points to non-existing column or the number of samples(batches) is equal to the number of observations `adata.n_obs`")
     else:  # use supplied class
         Model = model_name
     
