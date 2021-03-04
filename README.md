@@ -31,7 +31,7 @@ We also provide an experimental numpyro translation of the model which has impro
 
 ## Configure your own conda environment
 
-1. Installation of dependecies and configuring environment (Method 1 and Method 2)
+1. Installation of dependecies and configuring environment (Method 1 (preferred) and Method 2)
 2. Installation of cell2location
 
 Prior to installing cell2location package you need to install miniconda and create a conda environment containing pymc3 and theano ready for use on GPU. Follow the steps below:
@@ -45,7 +45,17 @@ bash Miniconda3-latest-Linux-x86_64.sh
 # use prefix /path/to/software/miniconda3
 ```
 
-#### 1. Method 1: Create conda environment manually
+#### 1. Method 1 (preferred): Create environment from file
+
+Create `cellpymc` environment from file, which will install all the required conda and pip packages:
+
+```bash
+git clone https://github.com/BayraktarLab/cell2location.git
+cd cell2location
+conda env create -f environment.yml
+```
+
+#### 1. Method 2: Create conda environment manually
 
 Create conda environment with the required packages pymc3 and scanpy:
 
@@ -58,17 +68,7 @@ mkl-service pygpu --channel bioconda --channel conda-forge
 Do not install pymc3 and theano with conda because it will not use the system cuda (GPU drivers) and we had problems with cuda installed in the local environment, install them with pip:
 
 ```bash
-pip install plotnine pymc3>=3.8,<3.10 torch pyro-ppl
-```
-
-#### 1. Method 2: Create environment from file
-
-Create `cellpymc` environment from file, which will install all the required conda and pip packages:
-
-```bash
-git clone https://github.com/BayraktarLab/cell2location.git
-cd cell2location
-conda env create -f environment.yml
+pip install "plotnine pymc3>=3.8,<3.10" torch pyro-ppl
 ```
 
 ### 2. Install `cell2location` package
@@ -87,13 +87,13 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
        docker pull quay.io/vitkl/cell2location
 
-3. Run docker container
+3. Run docker container with GPU support
 
-       docker run -i --rm -p 8848:8888 quay.io/vitkl/cell2location:latest
+       docker run -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
 
-   1. (recommended) For running with GPU support use
+   1. (recommended) For running without GPU support use
    
-          docker run -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
+          docker run -i --rm -p 8848:8888 quay.io/vitkl/cell2location:latest
    
 4. Go to http://127.0.0.1:8848/?token= and log in using `cell2loc` token
 
@@ -142,9 +142,21 @@ We also thank Krzysztof Polanski, Luz Garcia Alonso, Carlos Talavera-Lopez, Ni H
 
 ## Common errors
 
-### Training main cell2location model
+#### 1. Training cell2location on GPU takes forever (>50 hours)
 
-1. `FloatingPointError: NaN occurred in optimization.` During training model parameters get into very unlikely range, resulting in division by 0 when computing gradients and breaking the optimisation:
+1. Training cell2location using `cell2location.run_cell2location()` on GPU takes forever (>50 hours). Please check that cell2location is actually using the GPU. It is crucial to add this line in your script / notebook:
+
+```python
+# this line should go before importing cell2location
+os.environ["THEANO_FLAGS"] = 'device=cuda,floatX=float32,force_device=True'
+import cell2location
+```
+which tells theano (cell2location dependency) to use the GPU before importing cell2location (or it's dependencies - theano & pymc3).
+For data with 4039 locations and 10241 genes the analysis should take about 17-40 minutes depending on GPU hardware.
+
+#### 2. `FloatingPointError: NaN occurred in optimization.`
+
+2. `FloatingPointError: NaN occurred in optimization.` During training model parameters get into very unlikely range, resulting in division by 0 when computing gradients and breaking the optimisation:
 ```
 FloatingPointError: NaN occurred in optimization. 
 The current approximation of RV `gene_level_beta_hyp_log__`.ravel()[0] is NaN.
@@ -160,7 +172,8 @@ This usually happens when:
 
 **D.** Many genes are not expressed in the spatial data. **Solution**: try removing genes detected at low levels in spatial data.
 
-2. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images.
+#### 3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...`
+3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images, or try re-creating your conda environment.
 
 ## FAQ
 
