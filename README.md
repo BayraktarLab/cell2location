@@ -91,7 +91,7 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 
        docker run -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
 
-   1. (recommended) For running without GPU support use
+   1. For running without GPU support use
    
           docker run -i --rm -p 8848:8888 quay.io/vitkl/cell2location:latest
    
