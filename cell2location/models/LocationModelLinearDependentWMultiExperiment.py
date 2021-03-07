@@ -118,7 +118,7 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
     spot_fact_mean_var_ratio :
         the parameter that controls the strength of co-located cell combination prior on
         :math:`w_{s,f}` density across locations. It is expressed as mean / variance ratio with low values corresponding to
-        a weakly informative prior. Use the default value of 0.5 unless you know what you are doing.
+        a weakly informative prior. Use the default value of 5 unless you know what you are doing.
 
     Returns
     -------
@@ -138,15 +138,15 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
             var_names=None, var_names_read=None,
             obs_names=None, fact_names=None, sample_id=None,
             gene_level_prior={'mean': 1 / 2, 'sd': 1 / 4},
-            gene_level_var_prior={'mean_var_ratio': 1},
-            cell_number_prior={'cells_per_spot': 8,
-                               'factors_per_spot': 7,
+            gene_level_var_prior={'mean_var_ratio': 1.0},
+            cell_number_prior={'cells_per_spot': 8.0,
+                               'factors_per_spot': 7.0,
                                'combs_per_spot': 2.5},
-            cell_number_var_prior={'cells_mean_var_ratio': 1,
-                                   'factors_mean_var_ratio': 1,
-                                   'combs_mean_var_ratio': 1},
-            phi_hyp_prior={'mean': 3, 'sd': 1},
-            spot_fact_mean_var_ratio=5,
+            cell_number_var_prior={'cells_mean_var_ratio': 1.0,
+                                   'factors_mean_var_ratio': 1.0,
+                                   'combs_mean_var_ratio': 1.0},
+            phi_hyp_prior={'mean': 3.0, 'sd': 1.0},
+            spot_fact_mean_var_ratio=5.0,
             exper_gene_level_mean_var_ratio=10,
     ):
 
