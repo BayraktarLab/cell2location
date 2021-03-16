@@ -38,7 +38,8 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
                    model_kwargs={'init': 'random', 'random_state': 0, 'nmf_kwd_args': {'tol': 0.00001}},
                    posterior_args={},
                    export_args={'path': "./results",
-                                'run_name_suffix': ''}):
+                                'run_name_suffix': '',
+                                 'top_n': 10}):
     r""" Run co-located cell type combination model: train for specified number of factors,
      evaluate the stability, save, export results and save diagnostic plots
 
@@ -75,7 +76,8 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
                      'scanpy_coords_name': 'spatial',
                      'scanpy_plot_vmax': 'p99.2', 'scanpy_plot_size': 1.3,
                      'save_model': True, 'run_name_suffix': '',
-                     'export_q05': False, 'plot_histology': False}
+                     'export_q05': False, 'plot_histology': False,
+                     'top_n': 10}
 
     # replace defaults with parameters supplied
     for k in train_args.keys():
@@ -243,7 +245,8 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
 
         # print the fraction of cells of each type located to each combination
         ct_loadings = mod.print_gene_loadings(loadings_attr='cell_type_fractions',
-                                              gene_fact_name='cell_type_fractions')
+                                              gene_fact_name='cell_type_fractions',
+                                              top_n=export_args['top_n'])
 
         # save
         save_path = path + 'factor_markers/'
