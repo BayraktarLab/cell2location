@@ -46,21 +46,23 @@ def run_cell2location(sc_data, sp_data, model_name=None,
     r"""Run cell2location model pipeline: train the model, sample prior and posterior,
     export results and save diagnostic plots
     
-    The model decomposes multi-cell spatial transcriptomics data into cell type abundance estimates
-    in a spatially resolved manner.
-    The model uses a hierarchical non-negative decomposition of the gene expression profiles
-    at spatial locations (each with multiple cells) into the reference signatures.
-    The reference signatures that are estimated from scRNA-seq profiles using estimation of average gene
-    expression profilves for each cell cluster.
-    The cell2location model parameters are estimated using Varitional Bayesian Inference (ADVI) implemented
-    in the pymc3 framework.
-    This is done by optimisation using ADAM algorithm and taking advantage of the GPU acceleration.
+    Briefly, cell2location is a Bayesian model, which estimates absolute cell density of cell types by 
+    decomposing mRNA counts :math:`d_{s,g}` of each gene :math:`g = {1, .., G}` at locations :math:`s = {1, .., S}`
+    into a set of predefined reference signatures of cell types :math:`g_{f,g}`.
     
-    Anndata object with exported results, W weights representing cell state densities,
+    The cell2location software comes with two implementations for this estimation step: 
+    1) a statistical method based on Negative Binomial regression (see `cell2location.run_regression`); 
+    2) hard-coded computation of per-cluster average mRNA counts for individual genes 
+      (provided anndata object to this function, see below).
+    
+    Approximate Variational Inference is used to estimate all model parameters, 
+    implemented in the pymc3 framework, which supports GPU acceleration.
+    
+    Anndata object with exported results, W weights representing cell abundance for each cell type,
     and the trained model object are saved to `export_args['path']`
     
     .. note:: This pipeline is not specific to a particular model so please look up the relevant parameters
-        in model documentation (the default is CoLocationModelNB4V2).
+        in model documentation (the default is LocationModelLinearDependentWMultiExperiment).
 
     Parameters
     ----------
@@ -100,7 +102,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
           are normalised to sum to 1 gene-wise, then a cutoff is applied. Decrease cutoff to include more genes.
 
     train_args :
-        arguments for training methods. See help(c2l.LocationModel) for more details
+        arguments for training methods. See help(c2l.LocationModelLinearDependentWMultiExperiment) for more details
         
         * **mode** - "normal" or "tracking" parameters? (Default: normal)
         * **use_raw** - extract data from RAW slot of anndata? Applies only to spatial data, not single cell reference.
