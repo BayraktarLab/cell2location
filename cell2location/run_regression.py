@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Run full pipeline of regression model for estimating regulatory programmes of cell types and other covariates
-which accounting for the effects of experimental batch and technology."""
+"""Wrapper for the regression model for estimating reference expression signatures of cell types (and other covariates),
+accounting for the effects of experiment batch and technology."""
 
 import gc
 import os
