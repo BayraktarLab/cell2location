@@ -38,8 +38,15 @@ def run_regression(sc_data, model_name=None,
                    posterior_args={},
                    export_args={'path': "./results", 'save_model': True,
                                 'run_name_suffix': ''}):
-    r""" Run regression model: train, evaluate using cross-validation, choose training time that prevents over-fitting,
-     evaluate the quality of experiment and technology correction, save, export results and save diagnostic plots
+    r""" Estimation of cell type reference signatures from scRNA-seq. 
+    
+    Given cell type annotation for each cell, 
+    the corresponding reference cell type signatures :math:`g_{f,g}`, which represent the average mRNA count 
+    of each gene g in each cell type :math:`f={1, .., F}`, can be estimated using a negative binomial regression model, 
+    which allows for combining data across batches and technologies (see `cell2location.run_regression`).
+    
+    This wrapper function performs the following steps: train, evaluate using cross-validation, choose training time that prevents over-fitting,
+    evaluate how well the model corrected batch (experiment) and technology effect, save the model object, export results and save diagnostic plots.
 
     Parameters
     ----------
