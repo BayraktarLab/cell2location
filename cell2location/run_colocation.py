@@ -47,8 +47,6 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
         ----------
         sp_data:
              Anndata object with cell2location model output in .uns['mod']
-             Alternatively np.ndarray with cell density parameters
-             Alternatively pd.DataFrame with cell density parameters (with location and cell type names)
 
     Returns
         -------
