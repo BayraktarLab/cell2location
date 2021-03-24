@@ -10,6 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash -l {0}
     strategy:
       matrix:
         python-version: [3.7]
@@ -44,10 +47,10 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: cellpymc
-          auto-activate-base: false
           channel-priority: strict
           environment-file: environment.yml
           use-only-tar-bz2: true
+          auto-activate-base: false
       - run : conda env list
       - run : conda list
 
