@@ -43,7 +43,7 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
             hashFiles('**/environment.yml') }}
 
-      - name: Install cell2location
+      - name: Install enviponment
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: cellpymc
@@ -51,10 +51,12 @@ jobs:
           environment-file: environment.yml
           use-only-tar-bz2: true
           auto-activate-base: false
-      - run : conda env list
-      - run : conda list
+
+      - run: cd ..
+      - run: conda list
+      - run: pip install git+https://github.com/BayraktarLab/cell2location.git
 
       - name: Test with pytest
         run: |
-          pytest ../
+          pytest
         continue-on-error: true
