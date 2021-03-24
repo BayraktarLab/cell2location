@@ -44,9 +44,11 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: cellpymc
+          auto-activate-base: false
           channel-priority: strict
           environment-file: environment.yml
           use-only-tar-bz2: true
+      - run : conda env list
       - run : conda list
 
       - name: Test with pytest
