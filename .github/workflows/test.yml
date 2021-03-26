@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash -l {0}
+    strategy:
+      matrix:
+        python-version: [3.7]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-v1-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-v1-
+
+      - name: Cache conda
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
+            hashFiles('**/environment.yml') }}
+
+      - name: Install enviponment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: cellpymc
+          channel-priority: strict
+          environment-file: environment.yml
+          use-only-tar-bz2: true
+          auto-activate-base: false
+
+      - run: cd ..
+      - run: conda list
+      - run: pip install git+https://github.com/BayraktarLab/cell2location.git
+
+      - name: Test with pytest
+        run: |
+          pytest
