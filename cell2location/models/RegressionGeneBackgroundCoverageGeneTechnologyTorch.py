@@ -318,7 +318,9 @@ class RegressionGeneBackgroundCoverageGeneTechnologyTorch(RegressionTorchModel):
         self.mu = np.dot(self.cell2sample_covar_mat,
                          self.samples['post_sample_means']['gene_factors']) \
                   * np.dot(self.cell2sample_mat,
-                           self.samples['post_sample_means']['sample_scaling'])
+                           self.samples['post_sample_means']['sample_scaling']) \
+                  * np.dot(self.cell2tech_mat,
+                           self.samples['post_sample_means']['tech_scaling'])
 
     def compute_expected_fact(self, fact_ind,
                               sample_scaling=True):
