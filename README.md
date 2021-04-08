@@ -172,8 +172,20 @@ This usually happens when:
 
 **D.** Many genes are not expressed in the spatial data. **Solution**: try removing genes detected at low levels in spatial data.
 
-#### 3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...`
-3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` If you see this error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. **Solution**: use our docker and singularity images, or try re-creating your conda environment.
+#### 3. Theano fails to use the GPU at all (or cuDNN in particular)
+3. `Can not use cuDNN on context None: cannot compile with cuDNN. ...` and other related errors. If you see these error when importing cell2location it means that you have incorrectly installed theano and it's dependencies (fix depends on the platform). Without cuDNN support training takes >3 times longer. There are **2 solutions** to this:
+
+1. Use dockers/singularity images that are fully set up to work with the GPU (recommended).
+2. Add path to system CUDA installation to the following environmental variables by adding these lines to your `.bashrc` (modify accordingly for your system):
+
+```bash
+# cuda v
+cuda_v=-10.2
+export CUDA_HOME=/usr/local/cuda$cuda_v
+export CUDA_PATH=$CUDA_HOME
+export LD_LIBRARY_PATH=/usr/local/cuda$cuda_v/lib64:$LD_LIBRARY_PATH
+export PATH=/usr/local/cuda$cuda_v/bin:$PATH
+```
 
 ## FAQ
 
