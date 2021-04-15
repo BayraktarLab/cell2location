@@ -68,7 +68,7 @@ mkl-service pygpu --channel bioconda --channel conda-forge
 Do not install pymc3 and theano with conda because it will not use the system cuda (GPU drivers) and we had problems with cuda installed in the local environment, install them with pip:
 
 ```bash
-pip install plotnine "pymc3>=3.8,<3.10" torch pyro-ppl
+pip install plotnine "arviz==0.10.0" "pymc3>=3.8,<3.10" torch pyro-ppl
 ```
 
 ### 2. Install `cell2location` package
