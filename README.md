@@ -90,6 +90,10 @@ pip install git+https://github.com/BayraktarLab/cell2location.git
 3. Run docker container with GPU support
 
        docker run -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
+       
+   Docker is an isolated execution environment, so by default it doesn't have access to your local files. You need to mount your local directory to your docker container:
+   
+       docker run -v /host/directory:/container/directory -i --rm -p 8848:8888 --gpus all quay.io/vitkl/cell2location:latest
 
    1. For running without GPU support use
    
