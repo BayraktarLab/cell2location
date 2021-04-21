@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-r"""Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF."""
+r"""Archetypal tissue zones."""
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -7,37 +7,33 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from cell2location.models.base_model import BaseModel
+from cell2location.models.base.base_model import BaseModel
 
 
 # defining the model itself
-class CoLocatedGroupsSklearnNMF(BaseModel):
-    r"""Co-located cell combination model - de-novo factorisation of cell type density using sklearn NMF.
+class ArchetypalAnalysis(BaseModel):
+    r"""This model identified archetypal tissue zones using PCHA algorithm.
+
+    If you would like to use this function please first run `pip install py_pcha` to install the dependency.
     
     This model takes the absolute cell density inferred by cell2location as input
-    to non-negative matrix factorisation to identify groups of cell types with similar locations or 'tissue zones'.
-    
-    If you want to find the most disctinct cell type combinations, use a small number of factors.
-    
-    If you want to find very strong co-location signal and assume that most cell types are on their own,
-    use a lot of factors (> 30).
-    
+    to archetypal analysis aimed to find a set of most distinct tissue zones,
+    which can be spatially interlaced unlike standard clustering.
+
     To perform this analysis we initialise the model and train it several times to evaluate consitency.
-    This class wraps around scikit-learn NMF to perform training, visualisation, export of the results.
+    This class wraps around py_pcha package to perform training, visualisation, export of the results.
+
+    For more details on Archetypal Analysis using Principle Convex Hull Analysis (PCHA)
+    see https://github.com/ulfaslak/py_pcha.
     
     Note
     -----
-        Factors are exchangeable so while you find factors with consistent cell type composition,
-        every time you train the model you get those factors in a different order.
-    
-    This analysis is most revealing for tissues (such as lymph node) and cell types (such as glial cells)
-    where signals between cell types mediate their location patterns.
-    In the mouse brain locations of neurones are determined during development
-    so most neurones stand alone in their location pattern.
+        Archetypes are exchangeable so while you find archetypes with consistent cell type composition,
+        every time you train the model you get those archetypes in a different order.
     
     Density :math:`w_{sf}` of each cell type `f` across locations `s` is modelled as an additive function of
-    the cell combinations (micro-environments) `r`. This means the density of one cell type in one location can
-    be explained by 2 distinct combinations `r`.
+    the archetype `r`. This means the density of one cell type in one location can
+    be explained by 2 distinct archetypes `r`.
     
     Cell type density is therefore a function of the following non-negative components:
     
@@ -45,15 +41,18 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         w_{sf} = \sum_{r} ({i_{sr} \: k_{rf} \: m_{f}})
     
     Components
-      * :math:`k_{rf}` represents the proportion of cells of each type (regulatory programmes) `f` that correspond to each
+      * :math:`k_{rf}` represents the proportion of cells of each type `f` that correspond to each
         co-located combination `r`, normalised for total abundance of each cell type :math:`m_{f}`.
-      * :math:`m_{f}` cell type budget accounts for the difference in abundance between cell types,
-        thus focusing the interpretation of :math:`k_{rf}` on cell co-location.
-      * :math:`i_{sr}` is proportional to the number of cells from each neighbourhood `r` in each location `s`,
-        and shows the abundance of combinations `r` in locations `s`.
+      * :math:`m_{f}` total abundance of each cell type.
+      * :math:`i_{sr}` represents the contribution of each archetype `r` in each location `s`,
+        constrained as follows:
+
+      .. math::
+          \sum_{r} i_{sr} = 1
+    .
     
-    In practice :math:`q_{rf} = k_{rf} \: m_{f}` is obtained from scikit-learn NMF and normalised by the sum across
-    combinations `r` to obtain :math:`k_{rf}`:
+    In practice :math:`q_{rf} = k_{rf} \: m_{f}` is obtained by performing archetypal analysis
+    and normalised by the sum across combinations `r` to obtain :math:`k_{rf}`:
     
     .. math::
         k_{rf} = q_{rf} / (\sum_{r} q_{rf})
@@ -68,7 +67,7 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
     Parameters
     ----------
     n_fact :
-        Maximum number of cell type groups, or factors
+        Maximum number archetypes
     X_data :
         Numpy array of the cell abundance (cols) in locations (rows)
     n_iter :
@@ -77,8 +76,8 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         var_names, var_names_read, obs_names, fact_names, sample_id: See parent class BaseModel for details.
     init, random_state, alpha, l1_ratio:
         arguments for sklearn.decomposition.NMF with sensible defaults see help(sklearn.decomposition.NMF) for more details
-    nmf_kwd_args :
-        dictionary with more keyword arguments for sklearn.decomposition.NMF
+    pcha_kwd_args :
+        dictionary with more keyword arguments for py_pcha.PCHA
 
     """
 
@@ -86,12 +85,11 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
             self,
             n_fact: int,
             X_data: np.ndarray,
-            n_iter=10000,
+            n_iter=5000,
             verbose=True,
             var_names=None, var_names_read=None,
             obs_names=None, fact_names=None, sample_id=None,
-            init='random', random_state=0, alpha=0.1, l1_ratio=0.5,
-            nmf_kwd_args={}
+            random_state=0, pcha_kwd_args={}
     ):
 
         ############# Initialise parameters ################
@@ -104,15 +102,12 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         self.location_factors_df = None
         self.X_data_sample = None
 
-        self.init = init
         self.random_state = random_state
         np.random.seed(random_state)
-        self.alpha = alpha
-        self.l1_ratio = l1_ratio
-        self.nmf_kwd_args = nmf_kwd_args
+        self.pcha_kwd_args = pcha_kwd_args
 
     def fit(self, n=3, n_type='restart'):
-        """Find parameters using sklearn.decomposition.NMF, optionally restart several times,
+        """Find parameters using py_pcha.PCHA, optionally restart several times,
         and export parameters to self.samples['post_sample_means']
 
         Parameters
@@ -159,26 +154,26 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
             else:
                 self.x_data = self.X_data
 
-            from sklearn.decomposition import NMF
-            self.models[name] = NMF(n_components=self.n_fact, init=self.init,
-                                    alpha=self.alpha, l1_ratio=self.l1_ratio,
-                                    max_iter=self.n_iter, **self.nmf_kwd_args)
-            W = self.models[name].fit_transform(self.x_data)
-            H = self.models[name].components_
-            self.results[name] = {'post_sample_means': {'location_factors': W,
-                                                        'cell_type_factors': H.T,
-                                                        'nUMI_factors': (W * H.T.sum(0))},
+            from py_pcha import PCHA
+            XC, S, C, SSE, varexpl = PCHA(self.x_data.T, noc=self.n_fact,
+                                          maxiter=self.n_iter, **self.pcha_kwd_args)
+            self.results[name] = {'post_sample_means': {'location_factors': np.array(S.T),
+                                                        'cell_type_factors': np.array(XC),
+                                                        'nUMI_factors': (np.array(S.T) * np.array(XC).sum(0)),
+                                                        'C': np.array(C),
+                                                        'SSE': np.array(SSE),
+                                                        'varexpl': np.array(varexpl)},
                                   'post_sample_sds': None,
                                   'post_sample_q05': None, 'post_sample_q95': None}
             self.samples = self.results[name]
 
             # plot training history
             if self.verbose:
-                print(name + ' - iterations until convergence: ' + str(self.models[name].n_iter_));
+                print(f'{name} - variance explained: {varexpl}');
 
     def evaluate_stability(self, node_name, align=True, n_samples=1000):
         """Evaluate stability of the solution between training initialisations
-        (correlates the values of factors between training initialisations)
+        (correlates the values of archetypes between training initialisations)
 
         Parameters
         ----------
@@ -221,7 +216,7 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
 
     def compute_expected_fact(self, fact_ind=None):
         """Compute expected abundance of each cell type in each location
-        that comes from a subset of factors. E.g. expressed factors in self.fact_filt
+        that comes from a subset of archetypes.
 
         Parameters
         ----------
@@ -268,7 +263,7 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
 
     def sample2df(self, node_name='nUMI_factors',
                   ct_node_name='cell_type_factors'):
-        """Export cell combinations and their profile across locations as Pandas data frames.
+        """Export archetypes and their profile across locations as Pandas data frames.
 
         Parameters
         ----------

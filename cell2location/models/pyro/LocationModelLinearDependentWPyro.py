@@ -5,7 +5,7 @@ import pyro.distributions as dist
 import torch
 from pyro import poutine
 
-from cell2location.models.pyro_loc_model import PyroLocModel
+from cell2location.models.pyro.pyro_loc_model import PyroLocModel
 from cell2location.distributions.Gamma import Gamma
 from cell2location.distributions.NegativeBinomial import NegativeBinomial
 

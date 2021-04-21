@@ -5,14 +5,13 @@ import os
 from collections import defaultdict, Iterable
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from pyro import poutine
 from tqdm.auto import tqdm
 
 import pyro
 import torch
-from pyro.infer import SVI, Trace_ELBO, JitTrace_ELBO
+from pyro.infer import SVI, JitTrace_ELBO
 from pyro.infer import Predictive
 from pyro.infer.autoguide import AutoDelta, AutoGuideList
 from cell2location.distributions.AutoNormal import AutoNormal
@@ -22,7 +21,7 @@ from sklearn.model_selection import train_test_split
 
 from torch.utils.data import Dataset, DataLoader
 
-from cell2location.models.base_model import BaseModel
+from cell2location.models.base.base_model import BaseModel
 
 
 def flatten_iterable(iterable):

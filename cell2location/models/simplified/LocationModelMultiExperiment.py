@@ -4,19 +4,17 @@ r"""The Co-Location model decomposes the expression of genes across locations me
     across locations with similar cell composition.
     Overdispersion alpha_eg & additive background s_eg for each experiment and gene."""
 
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc3 as pm
 import theano.tensor as tt
 import theano
 
-from cell2location.models.pymc3_loc_model import Pymc3LocModel
+from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
 
 # defining the model itself
-class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
+class LocationModelMultiExperiment(Pymc3LocModel):
     r"""Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved rate :math:`mu` and a gene-specific over-dispersion parameter :math:`\alpha_g`
     which describes variance in expression of individual genes that is not explained by the regulatory programs:
@@ -31,16 +29,16 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
     as the sum of five non-negative components:
     
     .. math::
-        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) 
+        \mu_{s,g} = m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + l_s + s_{e,g}
     
     Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
     :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g` - input to the model;
     :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
     in the global expression estimates between technologies;
+    :math:`l_{s}` and :math:`s_{e,g}` are additive components that capture additive background variation
+    that is not explained by the bi-variate decomposition.
     
-    The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale and account for correlation of programs
-    across locations with similar cell composition. This is done by inferring a hierarchical prior representing
-    the co-located cell type combinations.
+    The prior distribution on :math:`w_{s,f}` is chosen to reflect the absolute scale - however only a grobal hierarchical prior is used.
     
     This prior is specified using 3 `cell_number_prior` input parameters:
     
@@ -49,21 +47,8 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
     
     * **factors_per_spot** reflects the number of regulatory programmes / cell types you expect to find in each location.
     
-    * **combs_per_spot** prior tells the model how much co-location signal to expect between the programmes / cell types.
-    
-    A number close to `factors_per_spot` tells that all cell types have independent locations,
-    and a number close 1 tells that each cell type is co-located with `factors_per_spot` other cell types.
-    Choosing a number halfway in-between is a sensible default: some cell types are co-located with others but some stand alone.
-    
     The prior distribution on :math:`m_{g}` is informed by the expected change in sensitivity from single cell to spatial
     technology, and is specified in `gene_level_prior`.
-    
-    Note
-    ----
-        `gene_level_prior` and `cell_number_prior` determine the absolute scale of :math:`w_{s,f}` density across locations,
-        but have a very limited effect on the absolute count of mRNA molecules attributed to each cell type.
-        Comparing your prior on **cells_per_spot** to average nUMI in the reference and spatial data helps to choose
-        the gene_level_prior and guide the model to learn :math:`w_{s,f}` close to the true cell count.
 
     Parameters
     ----------
@@ -98,12 +83,8 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
           count from the paired histology image segmentation.
         * **factors_per_spot** - what is the number of cell types
           number of factors expressed per location?
-        * **combs_per_spot** - what is the average number of factor combinations per location?
-          a number halfway in-between `factors_per_spot` and 1 is a sensible default
-          Low numbers mean more factors are co-located with other factors.
     cell_number_var_prior :
-        Certainty in the cell_number_prior (cells_mean_var_ratio, factors_mean_var_ratio,
-        combs_mean_var_ratio)
+        Certainty in the cell_number_prior (cells_mean_var_ratio, factors_mean_var_ratio)
         - by default the variance in the value of this prior is equal to the value of this itself.
         decreasing this number means having higher uncertainty in the prior
     phi_hyp_prior :
@@ -138,11 +119,9 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
             gene_level_prior={'mean': 1 / 2, 'sd': 1 / 4},
             gene_level_var_prior={'mean_var_ratio': 1},
             cell_number_prior={'cells_per_spot': 8,
-                               'factors_per_spot': 7,
-                               'combs_per_spot': 2.5},
+                               'factors_per_spot': 7},
             cell_number_var_prior={'cells_mean_var_ratio': 1,
-                                   'factors_mean_var_ratio': 1,
-                                   'combs_mean_var_ratio': 1},
+                                   'factors_mean_var_ratio': 1},
             phi_hyp_prior={'mean': 3, 'sd': 1},
             spot_fact_mean_var_ratio=5,
             exper_gene_level_mean_var_ratio=10,
@@ -172,9 +151,7 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
         # assign extra data to dictionary with (1) shared parameters (2) input data
         self.extra_data_tt = {'spot2sample': theano.shared(self.spot2sample_mat.astype(self.data_type))}
         self.extra_data = {'spot2sample': self.spot2sample_mat.astype(self.data_type)}
-
-        cell_number_prior['factors_per_combs'] = (cell_number_prior['factors_per_spot'] /
-                                                  cell_number_prior['combs_per_spot'])
+        
         for k in cell_number_var_prior.keys():
             cell_number_prior[k] = cell_number_var_prior[k]
         self.cell_number_prior = cell_number_prior
@@ -215,31 +192,31 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
                                            mu=cell_number_prior['cells_per_spot'],
                                            sigma=np.sqrt(cell_number_prior['cells_per_spot'] \
                                                          / cell_number_prior['cells_mean_var_ratio']),
-                                           shape=(self.n_obs, 1))
-            self.comb_per_spot = pm.Gamma('combs_per_spot',
-                                          mu=cell_number_prior['combs_per_spot'],
-                                          sigma=np.sqrt(cell_number_prior['combs_per_spot'] \
-                                                        / cell_number_prior['combs_mean_var_ratio']),
-                                          shape=(self.n_obs, 1))
+                                           shape=(1, 1))
+            self.factors_per_spot = pm.Gamma('factors_per_spot',
+                                             mu=cell_number_prior['factors_per_spot'],
+                                             sigma=np.sqrt(cell_number_prior['factors_per_spot'] \
+                                                           / cell_number_prior['factors_mean_var_ratio']),
+                                             shape=(1, 1))
 
-            shape = self.comb_per_spot / np.array(self.n_comb).reshape((1, 1))
-            rate = tt.ones((1, 1)) / self.cells_per_spot * self.comb_per_spot
-            self.combs_factors = pm.Gamma('combs_factors', alpha=shape, beta=rate,
-                                          shape=(self.n_obs, self.n_comb))
-
-            self.factors_per_combs = pm.Gamma('factors_per_combs',
-                                              mu=cell_number_prior['factors_per_combs'],
-                                              sigma=np.sqrt(cell_number_prior['factors_per_combs'] \
-                                                            / cell_number_prior['factors_mean_var_ratio']),
-                                              shape=(self.n_comb, 1))
-            c2f_shape = self.factors_per_combs / np.array(self.n_fact).reshape((1, 1))
-            self.comb2fact = pm.Gamma('comb2fact', alpha=c2f_shape, beta=self.factors_per_combs,
-                                      shape=(self.n_comb, self.n_fact))
-
-            self.spot_factors = pm.Gamma('spot_factors', mu=pm.math.dot(self.combs_factors, self.comb2fact),
-                                         sigma=pm.math.sqrt(pm.math.dot(self.combs_factors, self.comb2fact) \
-                                                            / self.spot_fact_mean_var_ratio),
+            shape = self.factors_per_spot / np.array(self.n_fact).reshape((1, 1))
+            rate = tt.ones((1, 1)) / self.cells_per_spot * self.factors_per_spot
+            self.spot_factors = pm.Gamma('spot_factors', alpha=shape, beta=rate,
                                          shape=(self.n_obs, self.n_fact))
+
+            # =====================Spot-specific additive component======================= #
+            # molecule contribution that cannot be explained by cell state signatures
+            # these counts are distributed between all genes not just expressed genes
+            self.spot_add_hyp = pm.Gamma('spot_add_hyp', 1, 1, shape=2)
+            self.spot_add = pm.Gamma('spot_add', self.spot_add_hyp[0],
+                                     self.spot_add_hyp[1], shape=(self.n_obs, 1))
+
+            # =====================Gene-specific additive component ======================= #
+            # per gene molecule contribution that cannot be explained by cell state signatures
+            # these counts are distributed equally between all spots (e.g. background, free-floating RNA)
+            self.gene_add_hyp = pm.Gamma('gene_add_hyp', 1, 1, shape=2)
+            self.gene_add = pm.Gamma('gene_add', self.gene_add_hyp[0],
+                                     self.gene_add_hyp[1], shape=(self.n_exper, self.n_var))
 
             # =====================Gene-specific overdispersion ======================= #
             self.phi_hyp = pm.Gamma('phi_hyp', mu=phi_hyp_prior['mean'],
@@ -249,7 +226,8 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
             # =====================Expected expression ======================= #
             # expected expression
             self.mu_biol = pm.math.dot(self.spot_factors, self.gene_factors.T) \
-                           * self.gene_level.T 
+                           * self.gene_level.T \
+                           + pm.math.dot(self.extra_data_tt['spot2sample'], self.gene_add) + self.spot_add
             # tt.printing.Print('mu_biol')(self.mu_biol.shape)
 
             # =====================DATA likelihood ======================= #
@@ -272,6 +250,9 @@ class LocationModelLinearDependentWMultiExperimentNoSegLs(Pymc3LocModel):
         # compute the poisson rate
         self.mu = (np.dot(self.samples['post_sample_means']['spot_factors'],
                           self.samples['post_sample_means']['gene_factors'].T)
-                   * self.samples['post_sample_means']['gene_level'].T)
+                   * self.samples['post_sample_means']['gene_level'].T
+                   + np.dot(self.extra_data['spot2sample'],
+                            self.samples['post_sample_means']['gene_add'])
+                   + self.samples['post_sample_means']['spot_add'])
         self.alpha = np.dot(self.extra_data['spot2sample'],
                             1 / (self.samples['post_sample_means']['gene_E'] * self.samples['post_sample_means']['gene_E']))

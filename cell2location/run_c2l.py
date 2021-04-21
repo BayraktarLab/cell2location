@@ -18,7 +18,7 @@ from os import mkdir
 from cell2location.cluster_averages import get_cluster_averages
 from cell2location.cluster_averages import select_features
 import cell2location.plt as c2lpl
-from cell2location.models.pymc3_loc_model import Pymc3LocModel
+from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 import cell2location.models as models
 
 
