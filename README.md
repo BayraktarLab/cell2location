@@ -29,6 +29,19 @@ Please report buga via https://github.com/BayraktarLab/cell2location/issues and 
 
 We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. 
 
+Cell2location package is implemented in a general way to support multiple related models - both for spatial mapping and estimating signatures of cell types (tutorials use default models - no need to change):
+1. `LocationModelLinearDependentWMultiExperiment` - main model for estimating cell abundance by decomposing spatial data into reference expression signatures of cell types.
+2. `LocationModelWTA` - same as in #1 but adapted to work with Nanostring WTA data
+3. Similified versions of model #1 that lack particular features of the full model, accessible from `cell2location.models.simplified`
+
+Models for estimating reference expression signatures of cell types from scRNA data:
+1. `RegressionGeneBackgroundCoverageTorch` - estimating expression signatures of cell types, accounting for variable sequencing depth between batches (e.g. 10X reaction) and additive background (contaminating RNA).
+2. `RegressionGeneBackgroundCoverageGeneTechnologyTorch` - similar to #1 but additionally accounts for multiplicative platform effect between scRNA technologies.
+
+Additionally we provide 2 models for downstream analysis of cell abundance estimates, accessible from `cell2location.models.downstream`:
+1. `CoLocatedGroupsSklearnNMF` - identifying groups of cell types with similar locations using NMF (wrapper around sklearn NMF). See tutorial #3 for usage.
+2. `ArchetypalAnalysis` - identifying smoothly varying and mutually exclusive tissue zones with Archetypa Analysis.
+
 ## Configure your own conda environment
 
 1. Installation of dependecies and configuring environment (Method 1 (preferred) and Method 2)
