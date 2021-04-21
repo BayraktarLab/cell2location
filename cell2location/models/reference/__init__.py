@@ -1,0 +1,7 @@
+from .RegressionGeneBackgroundCoverageTorch import RegressionGeneBackgroundCoverageTorch
+from .RegressionGeneBackgroundCoverageGeneTechnologyTorch import RegressionGeneBackgroundCoverageGeneTechnologyTorch
+
+__all__ = [
+    "RegressionGeneBackgroundCoverageTorch",
+    "RegressionGeneBackgroundCoverageGeneTechnologyTorch"
+]
