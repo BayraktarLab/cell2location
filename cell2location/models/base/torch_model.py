@@ -1,9 +1,8 @@
 # +
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
-from cell2location.models.base_model import BaseModel
+from cell2location.models.base.base_model import BaseModel
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm

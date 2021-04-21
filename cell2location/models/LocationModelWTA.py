@@ -13,10 +13,9 @@ import numpy as np
 import pymc3 as pm
 import theano
 import theano.tensor as tt
-from pymc3.distributions.dist_math import bound, logpow, factln, binomln
 from matplotlib.pyplot import figure
     
-from cell2location.models.pymc3_loc_model import Pymc3LocModel
+from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
 # defining the model itself
 class LocationModelWTA(Pymc3LocModel):

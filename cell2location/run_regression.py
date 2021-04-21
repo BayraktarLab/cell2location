@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import cell2location.models as models
+import cell2location.models.reference as models
 
 
 def save_plot(path, filename, extension='png'):

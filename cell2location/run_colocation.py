@@ -95,7 +95,7 @@ def run_colocation(sp_data, n_neighbours=None, model_name='CoLocatedGroupsSklear
 
     # import the specified version of the model
     if type(model_name) is str:
-        import cell2location.models as models
+        import cell2location.models.downstream as models
         Model = getattr(models, model_name)
     else:
         Model = model_name

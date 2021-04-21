@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from cell2location.models.torch_model import TorchModel
+from cell2location.models.base.torch_model import TorchModel
 
 
 class RegressionTorchModel(TorchModel):

@@ -8,7 +8,7 @@ import pyro
 import pyro.distributions as dist
 from pyro import poutine
 
-from cell2location.models.pyro_loc_model import PyroLocModel
+from cell2location.models.pyro.pyro_loc_model import PyroLocModel
 from cell2location.distributions.NegativeBinomial import NegativeBinomial
 
 import torch

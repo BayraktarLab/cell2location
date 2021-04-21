@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Negative binomial regression model that accounts for multiplicative sample scaling and additive sample background
+r"""Negative binomial regression model that accounts for multiplicative sample scaling, gene-specific technology scaling
+and additive sample background
 (MLE/MAP in pytorch).
 
 To address the usage of challenging reference data composed of multiple batches :math:`e=\{1..E\}`
-the expression of each gene `g` in each single cell reference cluster `f` (possibly other meaningful covariates)
-is inferred using a regularised Negative Binomial regression.
+and technologies :math:`t=\{1..T\}` the expression of each gene `g` in each single cell reference
+cluster `f` (possibly other meaningful covariates) is inferred using a regularised Negative Binomial regression.
 
-The model accounts for the sequencing coverage :math:`h_e` and background expression :math:`b_{eg}` in each sample `e`.
+The model accounts for the sequencing coverage :math:`h_e`, difference in expression level between
+technologies :math:`p_{tg}` and background expression :math:`b_{eg}` in each sample `e`.
 It models unexplained variance (overdispersion :math:`\\alpha_g`) and count nature of the data using
 the Negative Binomial distribution:
 
@@ -14,11 +16,11 @@ the Negative Binomial distribution:
     J_{cg} \sim \mathtt{NB}(\mu_{cg}, 1 / \\alpha_g^2)
 
 .. math::
-    \mu_{cg} = (g_{fg} + b_{eg}) \: {h_e}
+    \mu_{cg} = (g_{fg} + b_{eg}) \: {h_e} \: p_{tg}
 
 All model parameters are constrained to be positive to simplify interpretation.
 Weak L2 regularisation of :math:`g_{fg}` / :math:`b_{eg}` / :math:`\\alpha_g` and penalty for large deviations of
-:math:`h_e` from 1 is used. :math:`g_{fg}` is initialised at analytical average for each `f`,
+:math:`h_e` and :math:`p_{tg}` from 1 is used. :math:`g_{fg}` is initialised at analytical average for each `f`,
 :math:`b_{eg}` is initialised at average expression of each gene `g` in each sample `e` divided by a factor of 10.
 The informative initialisation leads to fast convergence.
 
@@ -31,12 +33,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 
-from cell2location.models.regression_torch_model import RegressionTorchModel
+from cell2location.models.base.regression_torch_model import RegressionTorchModel
 
 
 # defining the model itself
-class RegressionGeneBackgroundCoverageModule(nn.Module):
-    """Module class that defines the model graph and parameters.
+class RegressionGeneBackgroundCoverageGeneTechnologyTorchModule(nn.Module):
+    r"""Module class that defines the model graph and parameters.
     A module class should have the following methods:
     
       * __init__ which defines parameters (real scale)
@@ -53,6 +55,8 @@ class RegressionGeneBackgroundCoverageModule(nn.Module):
         number of genes / variables
     n_fact :
         number of factors / covariates / reference signatures (extracted from `cell_state_mat.shape[1]`)
+    n_tech :
+        number of technologies
     clust_average_mat :
         initial value of factors / covariates (if None, initialised as normal_(mean=0, std=1/2)
     which_sample :
@@ -64,13 +68,13 @@ class RegressionGeneBackgroundCoverageModule(nn.Module):
 
     """
 
-    def __init__(self, n_cells, n_genes, n_fact, clust_average_mat,
+    def __init__(self, n_cells, n_genes, n_fact, n_tech, clust_average_mat,
                  which_sample, data_type='float32', eps=1e-8):
-
         super().__init__()
         self.n_cells = n_cells
         self.n_genes = n_genes
         self.n_fact = n_fact
+        self.n_tech = n_tech
         self.data_type = data_type
         self.which_sample = which_sample
         self.n_samples = np.sum(self.which_sample)
@@ -83,11 +87,14 @@ class RegressionGeneBackgroundCoverageModule(nn.Module):
         # =====================Sample-specific scaling of expression levels ======================= #
         self.sample_scaling_log = nn.Parameter(torch.Tensor(self.n_samples, 1))
 
+        # =====================Technology-specific scaling of expression levels ======================= #
+        self.tech_scaling_log = nn.Parameter(torch.Tensor(self.n_tech, self.n_genes))
+
         # =====================Gene-specific overdispersion ======================= #
         self.gene_E_log = nn.Parameter(torch.Tensor(1, self.n_genes))
 
-    def forward(self, cell2sample_covar):
-        """Computes NB distribution parameters using input covariates for each cell:
+    def forward(self, cell2sample_covar, cell2tech):
+        r"""Computes NB distribution parameters using input covariates for each cell:
         expected value of expression (mu_biol, cells (minibatch * genes) and overdispersion (gene_E).
 
         Parameters
@@ -95,10 +102,12 @@ class RegressionGeneBackgroundCoverageModule(nn.Module):
         cell2sample_covar :
             np.narray that gives sample membership (first X columns)
             and covariate values (all other columns) for each cell / observation (rows) - could be done in in mini batches.
+        cell2tech :
+            np.narray that gives technology membership (columns) for each cell / observation (rows)
 
         Returns
         -------
-        list
+        list :
             a list with [mu_biol, gene_E]
 
         """
@@ -106,55 +115,69 @@ class RegressionGeneBackgroundCoverageModule(nn.Module):
         # sample-specific scaling of expression levels
         self.cell2sample_scaling = torch.mm(cell2sample_covar[:, self.which_sample],
                                             torch.exp(self.sample_scaling_log))
+
+        # technology- and gene-specific scaling of expression levels
+        self.cell2tech_scaling = torch.mm(cell2tech, torch.exp(self.tech_scaling_log))
+
+        # expected value of expression
         self.mu_biol = torch.mm(cell2sample_covar,
-                                torch.exp(self.gene_factors_log)) * self.cell2sample_scaling
+                                torch.exp(self.gene_factors_log)) \
+                       * self.cell2sample_scaling * self.cell2tech_scaling
 
         self.gene_E = torch.tensor(1) / (torch.exp(self.gene_E_log) * torch.exp(self.gene_E_log))
 
         return [self.mu_biol, self.gene_E]
 
     def initialize_parameters(self):
-        """Initialise parameters, using `clust_average_mat` for covariate and sample effects,
+        r"""Initialise parameters, using `clust_average_mat` for covariate and sample effects,
         random initialisation in a sensible range (see code) for all other parameters.
 
-        Parameters
-        ----------
         """
 
+        # initialise at average for each covariate
         if self.clust_average_mat is not None:
             self.gene_factors_log.data = \
                 nn.Parameter(torch.tensor(np.log(self.clust_average_mat.astype(self.data_type) + self.eps)))
         else:
             self.gene_factors_log.data.normal_(mean=0, std=1 / 2)
 
+        # initialise close to 1
         self.sample_scaling_log.data.normal_(mean=0, std=1 / 20)
+        self.tech_scaling_log.data.normal_(mean=0, std=1 / 20)
+        # initialise close to 0
         self.gene_E_log.data.normal_(mean=-1 / 2, std=1 / 2)
 
     def export_parameters(self):
-        """Compute parameters from their real number representation.
+        r"""Compute parameters from their real number representation.
+
+        Parameters
+        ----------
 
         Returns
         -------
-        dict
-            a dictionary with parameters {'gene_factors', 'sample_scaling', 'gene_E'}
+        dict :
+            a dictionary with parameters {'gene_factors', 'sample_scaling', 'tech_scaling', 'gene_E'}
         """
 
         export = {'gene_factors': torch.exp(self.gene_factors_log),
                   'sample_scaling': torch.exp(self.sample_scaling_log),
+                  'tech_scaling': torch.exp(self.tech_scaling_log),
                   'gene_E': torch.exp(self.gene_E_log)
                   }
 
         return export
 
 
-class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
-    """Negative binomial regression model that accounts for multiplicative sample scaling
-    and additive sample background (MLE/MAP in pytorch).
+class RegressionGeneBackgroundCoverageGeneTechnologyTorch(RegressionTorchModel):
+    r"""Negative binomial regression model that accounts for multiplicative sample scaling,
+    gene-specific technology scaling and additive sample background (MLE/MAP in pytorch).
 
     Parameters
     ----------
     sample_id :
         str with column name in cell2covar that denotes sample
+    tech_id :
+        pd.Series with technology annotation for each cell
     cell2covar :
         pd.DataFrame with covariates in columns and cells in rows, rows should be named.
     X_data :
@@ -162,11 +185,13 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
     n_iter :
         number of iterations, when using minibatch, the number of epochs (passes through all data),
         supersedes self.n_iter
+
     """
-# RegressionNBV2Torch
+# RegressionNBV4Torch
     def __init__(
             self,
             sample_id,
+            tech_id,
             cell2covar: pd.DataFrame,
             X_data: np.ndarray,
             data_type='float32',
@@ -181,7 +206,7 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
             nb_param_conversion_eps=1e-8,
             use_cuda=False,
             use_average_as_initial_value=True,
-            stratify_cv=None,
+            stratify_cv=None
     ):
 
         ############# Initialise parameters ################
@@ -195,17 +220,31 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
                          nb_param_conversion_eps, use_cuda,
                          use_average_as_initial_value, stratify_cv)
 
-        ############# Define the model ################
+        if tech_id is None:
+            raise ValueError(
+                'Use RegressionNBV4Torch model when all samples were generated with the same technology (tech_id=None)')
 
-        self.model = RegressionGeneBackgroundCoverageModule(self.n_obs, self.n_var,
-                                                            self.n_fact, self.clust_average_mat,
-                                                            which_sample=self.which_sample,
-                                                            data_type=self.data_type)
+        # extract technology covariates
+        self.tech_id = tech_id
+        self.cell2tech_df = pd.get_dummies(tech_id)
+        self.n_tech = self.cell2tech_df.shape[1]
+        # convert to np.ndarray
+        self.cell2tech_mat = self.cell2tech_df.values
+        # tell our package to use this data by putting it into extra_data dict
+        # name must match the .forward method argument in RegressionNBV4TorchModule
+        self.extra_data['cell2tech'] = self.cell2tech_mat
+
+        ############# Define the model ################
+        self.model = RegressionGeneBackgroundCoverageGeneTechnologyTorchModule(self.n_obs, self.n_var,
+                                                                               self.n_fact, self.n_tech,
+                                                                               self.clust_average_mat,
+                                                                               which_sample=self.which_sample,
+                                                                               data_type=self.data_type)
 
     # =====================DATA likelihood loss function======================= #
     # define cost function 
     def loss(self, param, data, l2_weight=None):
-        """Method that returns NB loss + L2 penalty on parameters (a single number)
+        r"""Method that returns NB loss + L2 penalty on parameters (a single number)
 
         Parameters
         ----------
@@ -220,22 +259,20 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
             * **l2_weight** - for all parameters but mainly for co-variate effects, this should be very weak to not
               over-penalise good solution (Default: 0.001)
             * **sample_scaling_weight** - strong penalty for deviation from 1 (Default: 0.5)
+            * **tech_scaling_weight** - strong penalty for deviation from 1 (Default: 1)
             * **gene_overdisp_weight** - gene overdispersion penalty to provide containment prior
               (Default: 0.001 but will be changed)
 
-        Returns
-        -------
-
         """
 
-        # initialise extra penalty
+        # initialise extra penalty on each parameter
         l2_reg = 0
 
         if l2_weight is not None:
 
             # set default parameters
             d_l2_weight = {'l2_weight': 0.001, 'sample_scaling_weight': 0.5,
-                           'gene_overdisp_weight': 0.001}
+                           'tech_scaling_weight': 1, 'gene_overdisp_weight': 0.001}
             # replace defaults with parameters supplied
             if l2_weight:  # if True use all defaults
                 l2_weight = d_l2_weight
@@ -245,13 +282,16 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
 
             param_dict = self.model.export_parameters()
             sample_scaling = param_dict['sample_scaling']
+            tech_scaling = param_dict['tech_scaling']
             gene_e = param_dict['gene_E']
 
             param_val = [param_dict[i] for i in param_dict.keys()
-                         if i not in ['sample_scaling', 'gene_E']]
+                         if i not in ['sample_scaling', 'tech_scaling', 'gene_E']]
 
             # regularise sample_scaling
             l2_reg = l2_reg + l2_weight['sample_scaling_weight'] * (sample_scaling - 1).pow(2).sum()
+            # regularise tech_scaling
+            l2_reg = l2_reg + l2_weight['tech_scaling_weight'] * (tech_scaling - 1).pow(2).sum()
             # regularise overdispersion
             l2_reg = l2_reg + l2_weight['gene_overdisp_weight'] * gene_e.pow(2).sum()
 
@@ -272,17 +312,19 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
                                   align=align, transpose=transpose)
 
     def compute_expected(self):
-        """Compute expected expression of each gene in each cell (Poisson mu)."""
+        r"""Compute expected expression of each gene in each cell (Poisson mu)."""
 
         # compute the poisson rate
         self.mu = np.dot(self.cell2sample_covar_mat,
                          self.samples['post_sample_means']['gene_factors']) \
                   * np.dot(self.cell2sample_mat,
-                           self.samples['post_sample_means']['sample_scaling'])
+                           self.samples['post_sample_means']['sample_scaling']) \
+                  * np.dot(self.cell2tech_mat,
+                           self.samples['post_sample_means']['tech_scaling'])
 
     def compute_expected_fact(self, fact_ind,
                               sample_scaling=True):
-        """Compute expected expression of each gene in each cell
+        r"""Compute expected expression of each gene in each cell
         that comes from a subset of factors (Poisson mu). E.g. expressed factors in self.fact_filt (by default)
 
         Parameters
@@ -301,9 +343,10 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
             self.mu = self.mu * np.dot(self.cell2sample_mat,
                                        self.samples['post_sample_means']['sample_scaling'])
 
-    def normalise(self, X_data, remove_additive=True,
+    # check how well the model actually removed batch effect
+    def normalise(self, X_data, remove_additive=True, remove_technology=True,
                   remove_sample_scaling=True):
-        """Normalise expression data by inferred sample scaling parameters
+        r"""Normalise expression data by inferred sample scaling parameters, technology parameters
         and remove additive sample background.
 
         Parameters
@@ -312,15 +355,23 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
              Data to normalise
         remove_additive :
              (Default value = True)
+        remove_technology :
+             (Default value = True)
         remove_sample_scaling :
              (Default value = True)
 
         """
 
-        corrected = X_data.copy()
+        corrected = X_data.toarray().copy()
+
         if remove_sample_scaling:
             corrected = corrected / np.dot(self.cell2sample_mat,
                                            self.samples['post_sample_means']['sample_scaling'])
+
+        # technology- and gene-specific scaling of expression levels
+        if remove_technology:
+            corrected = corrected / np.dot(self.cell2tech_mat,
+                                           self.samples['post_sample_means']['tech_scaling'])
 
         if remove_additive:
             # remove additive sample effects

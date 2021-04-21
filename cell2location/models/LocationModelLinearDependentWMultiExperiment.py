@@ -4,15 +4,13 @@ r"""The Co-Location model decomposes the expression of genes across locations me
     across locations with similar cell composition.
     Overdispersion alpha_eg & additive background s_eg for each experiment and gene."""
 
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc3 as pm
 import theano.tensor as tt
 import theano
 
-from cell2location.models.pymc3_loc_model import Pymc3LocModel
+from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
 
 # defining the model itself
