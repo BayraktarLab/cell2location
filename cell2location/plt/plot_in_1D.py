@@ -1,10 +1,4 @@
-import anndata
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import scanpy as sc
-
-def plot_absolute_abundances_1D(adata_sp, slide=None,radial_position =None, saving = False, celltype_subset = False, 
+def plot_absolute_abundances_1D(adata_sp, roi_subset= False, saving = False, celltype_subset = False, 
                                scaling = 0.15, power = 1, pws = [0,0,100,500,1000,3000,6000],
                                dimName = 'VCDepth', xlab = 'Cortical Depth', colourCode = None, figureSize = (12,8)): 
     r""" Plot absolute abundance of celltypes in a dotplot across 1 dimension
@@ -12,7 +6,7 @@ def plot_absolute_abundances_1D(adata_sp, slide=None,radial_position =None, savi
     :param celltype_subset: list of a subset of cell type names to be plotted 
     :params slide & radial_position: if wanting to plot only data from one slide + one radial position, include in these parameters
     :param cell_types: parameter for only plotting specific cell types where column names in adata_sp.obs are meanSpot[celltype] format
-    :param subset: optionally a boolean for only using part of the data in adata_sp
+    :param roi_subset: optionally a boolean for only using part of the data in adata_sp (corresponding to a specific ROI)
     :param saving: optionally a string value, which will result in the plot to be saved under this name
     :param scaling: how dot size should scale linearly with abundance values, default 0.15
     :param power: how dot size should scale non-linearly with abundance values, default 1 (no non-linear scaling)
@@ -61,12 +55,10 @@ def plot_absolute_abundances_1D(adata_sp, slide=None,radial_position =None, savi
     celltypes = [x.split('mean_spot_factors')[-1] for x in adata_sp.obs.columns if len(x.split('mean_spot_factors')) == 2 ]
     abundances = adata_sp.obs.loc[:,[len(x.split('mean_spot_factors')) == 2 for x in adata_sp.obs.columns]]
     
-    if slide and radial_position:
-        subset = [adata_sp.obs['slide'].iloc[i] == slide and
-        adata_sp.obs['Radial_position'].iloc[i] == 2 for i in range(len(adata_sp.obs['Radial_position']))]
-        celltypesForPlot = np.repeat(celltypes,sum(subset))
-        vcForPlot = np.array([adata_sp.obs[dimName].loc[subset] for j in range(len(celltypes))]).flatten()
-        countsForPlot = np.array([abundances.iloc[:,j].loc[subset] for j in range(len(celltypes))]) 
+    if roi_subset:
+        celltypesForPlot = np.repeat(celltypes,sum(roi_subset))
+        vcForPlot = np.array([adata_sp.obs[dimName].loc[roi_subset] for j in range(len(celltypes))]).flatten()
+        countsForPlot = np.array([abundances.iloc[:,j].loc[roi_subset] for j in range(len(celltypes))]) 
     else:
         celltypesForPlot = np.repeat(celltypes,np.shape(adata_sp)[0])
         vcForPlot = np.array([adata_sp.obs[dimName] for j in range(len(celltypes))]).flatten()
@@ -98,6 +90,7 @@ def plot_absolute_abundances_1D(adata_sp, slide=None,radial_position =None, savi
     
     if saving:
         plt.savefig(saving)
+
 
 
 def plot_density_1D(adata_sp, subset = None, saving = False,
