@@ -375,8 +375,8 @@ def run_cell2location(sc_data, sp_data, model_name=None,
     if verbose:
         print('### Training model ###')
     if train_args['mode'] == 'normal':
-        mod.fit_advi_iterative(n=train_args['n_restarts'], method=train_args['method'],
-                               n_type=train_args['n_type'], progressbar=verbose)
+        mod.train(n=train_args['n_restarts'], method=train_args['method'],
+                  n_type=train_args['n_type'], progressbar=verbose)
 
     elif train_args['mode'] == 'tracking':
         mod.verbose = False
@@ -391,8 +391,8 @@ def run_cell2location(sc_data, sp_data, model_name=None,
                                  sample_type='post_sample_means')
 
         else:  # TODO add isinstance(mod, PyroModel)
-            mod.fit_advi_iterative(n=train_args['n_restarts'], method=train_args['method'],
-                                   n_type=train_args['n_type'], tracking=True)
+            mod.train(n=train_args['n_restarts'], method=train_args['method'],
+                      n_type=train_args['n_type'], tracking=True)
 
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
