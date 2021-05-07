@@ -206,9 +206,9 @@ def run_regression(sc_data, model_name=None,
     if verbose:
         print('### Training model to determine n_epochs with CV ###')
     if train_args['mode'] == 'normal':
-        mod.fit_advi_iterative(**fit_kwards)
+        mod.train(**fit_kwards)
     elif train_args['mode'] == 'tracking':
-        mod.fit_advi_iterative(tracking=True, **fit_kwards)
+        mod.train(tracking=True, **fit_kwards)
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
 
@@ -255,7 +255,7 @@ def run_regression(sc_data, model_name=None,
             if verbose:
                 print('### Re-training model to stop before overfitting ###')
             fit_kwards['n_iter'] = int(new_n_epochs)
-            mod.fit_advi_iterative(**fit_kwards)
+            mod.train(**fit_kwards)
             # save the training and validation loss history
 
             plt.figure(figsize=(5, 5))

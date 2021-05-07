@@ -138,10 +138,10 @@ class TorchModel(BaseModel):
         return res
 
     # =====================Training functions======================= #
-    def fit_advi_iterative(self, n=3, n_type='restart',
-                           n_iter=None, learning_rate=None,
-                           num_workers=2, train_proportion=None,
-                           l2_weight=None):
+    def train(self, n=3, n_type='restart',
+              n_iter=None, learning_rate=None,
+              num_workers=2, train_proportion=None,
+              l2_weight=None):
         """Function is named for consistency but implements MLE and MAP training in pure pytorch rather than ADVI.
 
         Parameters

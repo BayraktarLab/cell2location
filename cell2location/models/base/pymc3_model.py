@@ -133,11 +133,11 @@ class Pymc3Model(BaseModel):
                 if self.verbose:
                     plt.plot(np.log10(self.mean_field[name].hist[15000:]))
 
-    def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
-                           n_iter=None,
-                           learning_rate=None, reducing_lr=False,
-                           progressbar=True,
-                           scale_cost_to_minibatch=True):
+    def train(self, n=3, method='advi', n_type='restart',
+              n_iter=None,
+              learning_rate=None, reducing_lr=False,
+              progressbar=True,
+              scale_cost_to_minibatch=True):
         """Find posterior using pm.ADVI() method directly (allows continuing training through `refine` method.
         (maximising likelihood of the data and minimising KL-divergence of posterior to prior - ELBO loss)
 
@@ -668,7 +668,7 @@ class Pymc3Model(BaseModel):
 
             if i == 0:
                 # initialise and do one step
-                self.fit_advi_iterative(n=n, method='advi', n_type=n_type, n_iter=1, progressbar=False)
+                self.train(n=n, method='advi', n_type=n_type, n_iter=1, progressbar=False)
             else:
                 # Refine 
                 self.fit_advi_refine(every, progressbar=False)

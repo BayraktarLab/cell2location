@@ -234,14 +234,14 @@ class PyroModel(BaseModel):
                 pyro.param(f'{prefix(0)}locs.{k}',
                            torch.Tensor(self.init_vals[k][1](self.init_vals[k][0])))
 
-    def fit_advi_iterative(self, n=3, method='advi', n_type='restart',
-                           n_iter=None, learning_rate=None,
-                           progressbar=True, num_workers=2,
-                           train_proportion=None, stratify_cv=None,
-                           l2_weight=False, sample_scaling_weight=0.5,
-                           checkpoints=None,
-                           checkpoint_dir='./checkpoints',
-                           tracking=False):
+    def train(self, n=3, method='advi', n_type='restart',
+              n_iter=None, learning_rate=None,
+              progressbar=True, num_workers=2,
+              train_proportion=None, stratify_cv=None,
+              l2_weight=False, sample_scaling_weight=0.5,
+              checkpoints=None,
+              checkpoint_dir='./checkpoints',
+              tracking=False):
 
         r""" Train posterior using ADVI method.
         (maximising likehood of the data and minimising KL-divergence of posterior to prior)
