@@ -62,13 +62,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
     The prior distribution on :math:`m_{g}` is informed by the expected change in sensitivity from single cell to spatial
     technology, and is specified in `gene_level_prior`.
     
-    The prior on detection effifincy per location is set to provide normalisation of technical effects but without over-normalising:
-        
+    The prior on detection efficiency per location :math:`y_s` is selected to discourage over-normalisation, such that
+    unless data has evidence of strong technical effect, the effect is assumed to be small and close to
+    the mean sensitivity for each batch :math:`y_e`:
+
     .. math::
         y_s ~ Gamma(200, 200 / y_e)
-        
-    where y_e is average detection efficiency in each experiment:
-        
+
+    where y_e is unknown/latent average detection efficiency in each batch/experiment:
+
     .. math::
         y_e ~ Gamma(1, 1)
     
