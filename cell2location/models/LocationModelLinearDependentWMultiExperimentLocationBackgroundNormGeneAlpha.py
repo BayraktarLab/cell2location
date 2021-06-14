@@ -306,15 +306,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
                                            alpha=detection_mean_hyp_prior['alpha'],
                                            beta=detection_mean_hyp_prior['alpha'] / detection_mean_hyp_prior['mean'], 
                                            shape=(self.n_exper, 1))
-            #self.detection_alpha_hyp = pm.Gamma('detection_alpha_hyp',
-            #                                    mu=detection_alpha_hyp_prior['mean'],
-            #                                    sigma=detection_alpha_hyp_prior['sd'], shape=(1, 1))
-            #self.detection_alpha_e_inv = pm.Exponential('detection_alpha_e_inv', self.detection_alpha_hyp,
-            #                                            shape=(self.n_exper, 1))
-            #self.detection_alpha_e = tt.ones((1, 1)) / tt.pow(self.detection_alpha_e_inv, 2)
-            #self.detection_alpha_s = pm.math.dot(self.extra_data_tt['spot2sample'], self.detection_alpha_e)
-            self.detection_eff_y_s = pm.Gamma('detection_eff_y_s', detection_alpha_hyp_prior['mean'],
-                                              detection_alpha_hyp_prior['mean'] /
+            self.detection_alpha_hyp = pm.Deterministic('detection_alpha_hyp',
+                                                        theano.shared(detection_alpha_hyp_prior['mean'])
+                                                        * tt.ones((self.n_exper, 1)))
+            self.detection_alpha_s = pm.math.dot(self.extra_data_tt['spot2sample'], self.detection_alpha_hyp)
+            self.detection_eff_y_s = pm.Gamma('detection_eff_y_s', self.detection_alpha_s,
+                                              self.detection_alpha_s /
                                               pm.math.dot(self.extra_data_tt['spot2sample'], self.detection_mean),
                                               shape=(self.n_obs, 1))
 
