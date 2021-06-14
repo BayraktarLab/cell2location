@@ -89,6 +89,8 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
     if sample_id is None:
         sample_id = np.array(['sample' for i in range(coords.shape[0])])
 
+    total_ind = np.arange(0, coords.shape[0]).astype(int)
+
     for sam in np.unique(sample_id):
         sam_ind = np.isin(sample_id, [sam])
         coord_tree = KDTree(coords[sam_ind, :])
@@ -96,6 +98,9 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
             n_list = coord_tree.query(coords[sam_ind, :],
                                       k=n_sp_neighbors, return_distance=False)
             n_list = np.array(n_list)
+            # replace sample-specific indices with a global index
+            for c in range(n_list.shape[1]):
+                n_list[:, c] = total_ind[sam_ind][n_list[:, c]]
 
             if include_source_location:
                 coord_ind[sam_ind, :] = n_list
