@@ -69,6 +69,7 @@ class RotateCrop():
 
     def get_rotation_matrix(self):
         self.width, self.height = self.compute_distances()[self.flip_axes]
+        self.width, self.height = self.width.astype(np.int32), self.height.astype(np.int32)
 
         self.dst_pts = [[0, self.height],
                         [0, 0],
