@@ -5,7 +5,7 @@ from setuptools import setup
 
 
 def setup_package():
-    install_requires = ['pymc3', 'pyro-ppl', 'scvi-tools', 'torch', 'theano', 'pygpu', 'numpy', 'pandas', 'scanpy']
+    install_requires = ['pymc3', 'pyro-ppl', 'scvi-tools', 'torch', 'pygpu', 'numpy', 'pandas', 'scanpy']
     metadata = dict(
         name='cell2location',
         version='0.05',
