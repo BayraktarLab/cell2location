@@ -7,8 +7,8 @@ r"""The Co-Location model decomposes the expression of genes across locations me
 import numpy as np
 import pandas as pd
 import pymc3 as pm
-import theano.tensor as tt
-import theano
+import aesara.tensor as tt
+import aesara
 
 from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
@@ -149,7 +149,7 @@ class LocationModelHierarchicalWMultiExperiment(Pymc3LocModel):
         self.spot2sample_mat = self.spot2sample_df.values
         self.n_exper = self.spot2sample_mat.shape[1]
         # assign extra data to dictionary with (1) shared parameters (2) input data
-        self.extra_data_tt = {'spot2sample': theano.shared(self.spot2sample_mat.astype(self.data_type))}
+        self.extra_data_tt = {'spot2sample': aesara.shared(self.spot2sample_mat.astype(self.data_type))}
         self.extra_data = {'spot2sample': self.spot2sample_mat.astype(self.data_type)}
         
         for k in cell_number_var_prior.keys():

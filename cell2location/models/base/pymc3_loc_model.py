@@ -4,7 +4,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import theano
+import aesara
 from tqdm.auto import tqdm
 
 from cell2location.models.base.pymc3_model import Pymc3Model
@@ -46,8 +46,8 @@ class Pymc3LocModel(Pymc3Model):
         self.spot_factors_df = None
         self.X_data_sample = None
 
-        # Pass extra data to theano
-        self.cell_state = theano.shared(cell_state_mat.astype(self.data_type))
+        # Pass extra data to aesara
+        self.cell_state = aesara.shared(cell_state_mat.astype(self.data_type))
 
     def evaluate_stability(self, n_samples=1000, align=True):
         r""" Evaluate stability in factor contributions to spots.

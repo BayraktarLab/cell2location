@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc3 as pm
-import theano.tensor as tt
-import theano
+import aesara.tensor as tt
+import aesara
 
 from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
@@ -199,7 +199,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
         self.spot2sample_mat = self.spot2sample_df.values
         self.n_exper = self.spot2sample_mat.shape[1]
         # assign extra data to dictionary with (1) shared parameters (2) input data
-        self.extra_data_tt = {'spot2sample': theano.shared(self.spot2sample_mat.astype(self.data_type))}
+        self.extra_data_tt = {'spot2sample': aesara.shared(self.spot2sample_mat.astype(self.data_type))}
         self.extra_data = {'spot2sample': self.spot2sample_mat.astype(self.data_type)}
 
         cell_number_prior['factors_per_combs'] = (cell_number_prior['factors_per_spot'] /
@@ -307,7 +307,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
                                            beta=detection_mean_hyp_prior['alpha'] / detection_mean_hyp_prior['mean'], 
                                            shape=(self.n_exper, 1))
             self.detection_alpha_hyp = pm.Deterministic('detection_alpha_hyp',
-                                                        theano.shared(detection_alpha_hyp_prior['mean'])
+                                                        aesara.shared(detection_alpha_hyp_prior['mean'])
                                                         * tt.ones((self.n_exper, 1)))
             self.detection_alpha_s = pm.math.dot(self.extra_data_tt['spot2sample'], self.detection_alpha_hyp)
             self.detection_eff_y_s = pm.Gamma('detection_eff_y_s', self.detection_alpha_s,

@@ -5,7 +5,7 @@ r"""Location model decomposes the expression of genes across locations into a se
 
 import numpy as np
 import pymc3 as pm
-import theano.tensor as tt
+import aesara.tensor as tt
 
 from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 

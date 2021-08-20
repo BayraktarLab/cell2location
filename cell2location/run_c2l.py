@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import pickle
-import theano
+import aesara
 import scipy
 
 import matplotlib.pyplot as plt
@@ -206,7 +206,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
         d_export_args[k] = export_args[k]
     export_args = d_export_args
 
-    theano.config.allow_gc = True
+    aesara.config.allow_gc = True
 
     # start timing
     start = time.time()
@@ -397,7 +397,7 @@ def run_cell2location(sc_data, sp_data, model_name=None,
     else:
         raise ValueError("train_args['mode'] can be only 'normal' or 'tracking'")
 
-    theano.config.compute_test_value = 'ignore'
+    aesara.config.compute_test_value = 'ignore'
     ####### Evaluate stability of training #######
     if train_args['n_restarts'] > 1:
         n_plots = train_args['n_restarts'] - 1

@@ -18,7 +18,7 @@ class BaseModel():
     :param n_fact: Number of factors
     :param n_iter: Number of training iterations
     :param learning_rate: ADAM learning rate for optimising Variational inference objective
-    :param data_type: theano data type used to store parameters ('float32' for single, 'float64' for double precision)
+    :param data_type: aesara data type used to store parameters ('float32' for single, 'float64' for double precision)
     :param total_grad_norm_constraint: gradient constraints in optimisation
     :param verbose: print diagnostic messages?
     :param var_names: Variable names (e.g. gene identifiers)

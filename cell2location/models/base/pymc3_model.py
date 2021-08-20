@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc3 as pm
-import theano
+import aesara
 from pymc3.variational.callbacks import CheckParametersConvergence
 from tqdm.auto import tqdm
 
@@ -53,8 +53,8 @@ class Pymc3Model(BaseModel):
         self.node_samples = {}
         self.n_type = 'restart' # default
 
-        # Pass data to theano
-        self.x_data = theano.shared(X_data.astype(self.data_type))
+        # Pass data to aesara
+        self.x_data = aesara.shared(X_data.astype(self.data_type))
 
     def sample_prior(self, samples=10):
         r"""Take samples from the prior, see `pymc3.sample_prior_predictive` for details
@@ -187,7 +187,7 @@ class Pymc3Model(BaseModel):
         ### Initialise optimiser ###
         if reducing_lr:
             # initialise the function for adaptive learning rate
-            s = theano.shared(np.array(learning_rate).astype(self.data_type))
+            s = aesara.shared(np.array(learning_rate).astype(self.data_type))
 
             def reduce_rate(a, h, i):
                 s.set_value(np.array(learning_rate / ((i / self.n_obs) + 1) ** .7).astype(self.data_type))
@@ -307,7 +307,7 @@ class Pymc3Model(BaseModel):
         ### Initialise optimiser ###
         if reducing_lr:
             # initialise the function for adaptive learning rate
-            s = theano.shared(np.array(learning_rate).astype(self.data_type))
+            s = aesara.shared(np.array(learning_rate).astype(self.data_type))
 
             def reduce_rate(a, h, i):
                 s.set_value(np.array(learning_rate / ((i / self.n_obs) + 1) ** .7).astype(self.data_type))
@@ -419,7 +419,7 @@ class Pymc3Model(BaseModel):
 
         """
 
-        theano.config.compute_test_value = 'ignore'
+        aesara.config.compute_test_value = 'ignore'
 
         self.n_samples = n_samples
         n_batches = int(n_samples / batch_size)
@@ -482,7 +482,7 @@ class Pymc3Model(BaseModel):
 
         """
 
-        theano.config.compute_test_value = 'ignore'
+        aesara.config.compute_test_value = 'ignore'
         n_batches = int(n_samples / batch_size)
 
         if node == 'all':

@@ -11,8 +11,8 @@ r"""This Location model decomposes the expression of genes across locations into
 import matplotlib.pyplot as plt
 import numpy as np
 import pymc3 as pm
-import theano
-import theano.tensor as tt
+import aesara
+import aesara.tensor as tt
 from matplotlib.pyplot import figure
     
 from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
@@ -161,7 +161,7 @@ class LocationModelWTA(Pymc3LocModel):
         
         self.Y_data = Y_data
         self.n_npro = Y_data.shape[1]
-        self.y_data = theano.shared(Y_data.astype(self.data_type))
+        self.y_data = aesara.shared(Y_data.astype(self.data_type))
         self.n_rois = Y_data.shape[0]
         self.n_genes = X_data.shape[1]
         # Total number of gene counts in each region of interest, divided by 10^5:
