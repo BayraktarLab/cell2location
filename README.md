@@ -60,6 +60,11 @@ bash Miniconda3-latest-Linux-x86_64.sh
 
 #### 1. Method 1 (preferred): Create environment from file
 
+First, make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages, ideally by adding this line to your `~/.bashrc` file , but this would also work during a terminal session:
+```bash
+export PYTHONNOUSERSITE="someletters"
+```
+
 Create `cellpymc` environment from file, which will install all the required conda and pip packages:
 
 ```bash
