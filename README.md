@@ -87,7 +87,7 @@ Add jupyter kernel for this environment:
 
 ```bash
 conda activate cellpymc
-python -m ipykernel install --name=cellpymc --display-name='Environment (cellpymc)'
+python -m ipykernel install --user --name=cellpymc --display-name='Environment (cellpymc)'
 ```
 
 Do not install pymc3 and theano with conda because it will not use the system cuda (GPU drivers) and we had problems with cuda installed in the local environment, install them with pip:
