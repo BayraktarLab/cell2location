@@ -78,15 +78,24 @@ louvain hyperopt loompy cmake nose tornado dill ipython bbknn seaborn matplotlib
 mkl-service pygpu --channel bioconda --channel conda-forge
 ```
 
+Add jupyter kernel for this environment:
+
+```bash
+conda activate cellpymc
+python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc --display-name='Environment (cellpymc)'
+```
+
 Do not install pymc3 and theano with conda because it will not use the system cuda (GPU drivers) and we had problems with cuda installed in the local environment, install them with pip:
 
 ```bash
+conda activate cellpymc
 pip install plotnine "arviz==0.10.0" "pymc3>=3.8,<3.10" torch pyro-ppl
 ```
 
 ### 2. Install `cell2location` package
 
 ```bash
+conda activate cellpymc
 pip install git+https://github.com/BayraktarLab/cell2location.git
 ```
 
