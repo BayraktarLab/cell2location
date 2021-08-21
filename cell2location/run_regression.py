@@ -12,6 +12,7 @@ from os import mkdir
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+#from scipy.sparse import issparse
 
 import cell2location.models.reference as models
 
@@ -364,8 +365,7 @@ def run_regression(sc_data, model_name=None,
 
     # Inferred sample_scaling
     try:
-
-        sc_data.obs['n_counts'] = sc_data.raw.X.sum(1)
+        sc_data.obs['n_counts'] = np.array(sc_data.raw.X.sum(1)).flatten()
         mean_total_count = []
         for s in sc_data.obs[train_args['sample_name_col']].unique():
             a = sc_data.obs.loc[sc_data.obs[train_args['sample_name_col']].isin([s]), 'n_counts'].mean()
