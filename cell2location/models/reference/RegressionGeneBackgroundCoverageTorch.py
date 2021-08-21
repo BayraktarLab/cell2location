@@ -326,6 +326,6 @@ class RegressionGeneBackgroundCoverageTorch(RegressionTorchModel):
             # remove additive sample effects
             corrected = corrected - np.dot(self.cell2sample_mat, self.sample_effects.values.T)
 
-        corrected = corrected - corrected.min()
+        corrected = corrected - corrected.min(0)
 
         return corrected
