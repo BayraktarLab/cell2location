@@ -73,6 +73,8 @@ cd cell2location
 conda env create -f environment.yml
 ```
 
+Using this method will likely resolve any issues that arise when trying to create the environment manually.
+
 #### 1. Method 2: Create conda environment manually
 
 Create conda environment with the required packages pymc3 and scanpy:
@@ -81,13 +83,6 @@ Create conda environment with the required packages pymc3 and scanpy:
 conda create -n cellpymc python=3.7 numpy pandas jupyter leidenalg python-igraph scanpy \
 louvain hyperopt loompy cmake nose tornado dill ipython bbknn seaborn matplotlib request \
 mkl-service pygpu --channel bioconda --channel conda-forge
-```
-
-Add jupyter kernel for this environment:
-
-```bash
-conda activate cellpymc
-python -m ipykernel install --user --name=cellpymc --display-name='Environment (cellpymc)'
 ```
 
 Do not install pymc3 and theano with conda because it will not use the system cuda (GPU drivers) and we had problems with cuda installed in the local environment, install them with pip:
@@ -102,6 +97,13 @@ pip install plotnine "arviz==0.10.0" "pymc3>=3.8,<3.10" torch pyro-ppl
 ```bash
 conda activate cellpymc
 pip install git+https://github.com/BayraktarLab/cell2location.git
+```
+
+Finally, to use this environment in jupyter notebook, add jupyter kernel for this environment:
+
+```bash
+conda activate cellpymc
+python -m ipykernel install --user --name=cellpymc --display-name='Environment (cellpymc)'
 ```
 
 ## Using docker image
