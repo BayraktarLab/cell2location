@@ -38,3 +38,4 @@ model_*.p
 samples_*.p
 *.h5ad
 histo_W_*.png
+docs/notebooks/results
