@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 import pyro
@@ -76,6 +78,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
     """
 
+    # training mode without observed data (just using priors)
+    training_wo_observed = False
+
     def __init__(
         self,
         n_obs,
@@ -99,6 +104,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         },
         detection_hyp_prior={"mean_alpha": 10.0},
         w_sf_mean_var_ratio=5.0,
+        init_vals: Optional[dict] = None,
+        init_alpha=3.0,
     ):
 
         super().__init__()
@@ -118,6 +125,13 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior["mean"] = detection_mean
         detection_hyp_prior["alpha"] = detection_alpha
         self.detection_hyp_prior = detection_hyp_prior
+
+        if (init_vals is not None) & (type(init_vals) is dict):
+            self.np_init_vals = init_vals
+            for k in init_vals.keys():
+                self.register_buffer(f"init_val_{k}", torch.tensor(init_vals[k]))
+            self.init_alpha = init_alpha
+            self.register_buffer("init_alpha_tt", torch.tensor(self.init_alpha))
 
         factors_per_groups = A_factors_per_location / B_groups_per_location
 
