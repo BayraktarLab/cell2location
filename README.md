@@ -138,7 +138,7 @@ Singularity environments are used in the compute cluster environments (check wit
 1. Download the container from our data portal:
 
 ```
-wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-v0.05-alpha.sif
+wget https://cell2location.cog.sanger.ac.uk/singularity/cell2location-v0.06-alpha.sif
 ```
 
 2. Submit a cluster job (LSF system) with GPU requested and start jupyter a notebook within a container (`--nv` option needed to use GPU):
