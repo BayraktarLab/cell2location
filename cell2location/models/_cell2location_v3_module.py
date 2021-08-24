@@ -408,25 +408,26 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )  # (self.n_batch, self.n_vars)
 
         # =====================Expected expression ======================= #
-        # expected expression
-        mu = (
-            (w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)
-        ) * detection_y_s
-        alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
-        # convert mean and overdispersion to total count and logits
-        # total_count, logits = _convert_mean_disp_to_counts_logits(
-        #    mu, alpha, eps=self.eps
-        # )
+        if not self.training_wo_observed:
+            # expected expression
+            mu = (
+                (w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)
+            ) * detection_y_s
+            alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
+            # convert mean and overdispersion to total count and logits
+            # total_count, logits = _convert_mean_disp_to_counts_logits(
+            #    mu, alpha, eps=self.eps
+            # )
 
-        # =====================DATA likelihood ======================= #
-        # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
-        with obs_plate:
-            pyro.sample(
-                "data_target",
-                dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                # dist.NegativeBinomial(total_count=total_count, logits=logits),
-                obs=x_data,
-            )
+            # =====================DATA likelihood ======================= #
+            # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
+            with obs_plate:
+                pyro.sample(
+                    "data_target",
+                    dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
+                    # dist.NegativeBinomial(total_count=total_count, logits=logits),
+                    obs=x_data,
+                )
 
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
