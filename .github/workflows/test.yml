@@ -38,12 +38,12 @@ jobs:
     - name: Lint with flake8
       run: |
         flake8
-      continue-on-error: true
+      if: always()
     - name: Format with black
       run: |
         black --check --line-length 120 .
-      continue-on-error: true
+      if: always()
     - name: Import sort
       run: |
         isort --check-only .
-      continue-on-error: true
+      if: always()
