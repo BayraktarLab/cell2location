@@ -7,7 +7,6 @@ import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
 from scipy.sparse import csr_matrix
-
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.nn import one_hot
@@ -16,9 +15,7 @@ from scvi.nn import one_hot
 #    pass
 
 
-class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
-    PyroModule
-):
+class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
     """
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
@@ -145,36 +142,25 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )
         self.register_buffer(
             "detection_mean_hyp_prior_beta",
-            torch.tensor(
-                self.detection_hyp_prior["mean_alpha"]
-                / self.detection_hyp_prior["mean"]
-            ),
+            torch.tensor(self.detection_hyp_prior["mean_alpha"] / self.detection_hyp_prior["mean"]),
         )
 
         # compute hyperparameters from mean and sd
-        self.register_buffer(
-            "m_g_mu_hyp", torch.tensor(self.m_g_gene_level_prior["mean"])
-        )
+        self.register_buffer("m_g_mu_hyp", torch.tensor(self.m_g_gene_level_prior["mean"]))
         self.register_buffer(
             "m_g_mu_mean_var_ratio_hyp",
             torch.tensor(self.m_g_gene_level_prior["mean_var_ratio"]),
         )
 
-        self.register_buffer(
-            "m_g_alpha_hyp_mean", torch.tensor(self.m_g_gene_level_prior["alpha_mean"])
-        )
+        self.register_buffer("m_g_alpha_hyp_mean", torch.tensor(self.m_g_gene_level_prior["alpha_mean"]))
 
         self.cell_state_mat = cell_state_mat
         self.register_buffer("cell_state", torch.tensor(cell_state_mat.T))
 
         self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
-        self.register_buffer(
-            "B_groups_per_location", torch.tensor(B_groups_per_location)
-        )
-        self.register_buffer(
-            "N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio)
-        )
+        self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
+        self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
 
         self.register_buffer(
             "alpha_g_phi_hyp_prior_alpha",
@@ -201,9 +187,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             torch.tensor(self.gene_add_mean_hyp_prior["beta"]),
         )
 
-        self.register_buffer(
-            "w_sf_mean_var_ratio_tensor", torch.tensor(self.w_sf_mean_var_ratio)
-        )
+        self.register_buffer("w_sf_mean_var_ratio_tensor", torch.tensor(self.w_sf_mean_var_ratio))
 
         self.register_buffer("n_factors_tensor", torch.tensor(self.n_factors))
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
@@ -276,9 +260,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         m_g = pyro.sample(
             "m_g",
-            dist.Gamma(m_g_alpha_e, m_g_alpha_e / m_g_mean)  # self.m_g_mu_hyp)
-            .expand([1, self.n_vars])
-            .to_event(2),
+            dist.Gamma(m_g_alpha_e, m_g_alpha_e / m_g_mean).expand([1, self.n_vars]).to_event(2),  # self.m_g_mu_hyp)
         )  # (1, n_vars)
 
         # =====================Cell abundances w_sf======================= #
@@ -304,25 +286,19 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         with obs_plate:
             z_sr_groups_factors = pyro.sample(
                 "z_sr_groups_factors",
-                dist.Gamma(
-                    shape, rate
-                ),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
+                dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
             )  # (n_obs, n_groups)
 
         k_r_factors_per_groups = pyro.sample(
             "k_r_factors_per_groups",
-            dist.Gamma(self.factors_per_groups, self.ones)
-            .expand([self.n_groups, 1])
-            .to_event(2),
+            dist.Gamma(self.factors_per_groups, self.ones).expand([self.n_groups, 1]).to_event(2),
         )  # (self.n_groups, 1)
 
         c2f_shape = k_r_factors_per_groups / self.n_factors_tensor
 
         x_fr_group2fact = pyro.sample(
             "x_fr_group2fact",
-            dist.Gamma(c2f_shape, k_r_factors_per_groups)
-            .expand([self.n_groups, self.n_factors])
-            .to_event(2),
+            dist.Gamma(c2f_shape, k_r_factors_per_groups).expand([self.n_groups, self.n_factors]).to_event(2),
         )  # (self.n_groups, self.n_factors)
 
         with obs_plate:
@@ -351,9 +327,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             self.ones_n_batch_1 * self.detection_hyp_prior_alpha,
         )
 
-        beta = (obs2sample @ detection_hyp_prior_alpha) / (
-            obs2sample @ detection_mean_y_e
-        )
+        beta = (obs2sample @ detection_hyp_prior_alpha) / (obs2sample @ detection_mean_y_e)
         with obs_plate:
             detection_y_s = pyro.sample(
                 "detection_y_s",
@@ -365,9 +339,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # cell state signatures (e.g. background, free-floating RNA)
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(
-                self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta
-            ),
+            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -380,9 +352,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )  # (self.n_batch)
         s_g_gene_add_alpha_e_inv = pyro.sample(
             "s_g_gene_add_alpha_e_inv",
-            dist.Exponential(s_g_gene_add_alpha_hyp)
-            .expand([self.n_batch, 1])
-            .to_event(2),
+            dist.Exponential(s_g_gene_add_alpha_hyp).expand([self.n_batch, 1]).to_event(2),
         )  # (self.n_batch)
         s_g_gene_add_alpha_e = self.ones / s_g_gene_add_alpha_e_inv.pow(2)
 
@@ -396,23 +366,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(
-                self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta
-            ),
+            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
-            dist.Exponential(alpha_g_phi_hyp)
-            .expand([self.n_batch, self.n_vars])
-            .to_event(2),
+            dist.Exponential(alpha_g_phi_hyp).expand([self.n_batch, self.n_vars]).to_event(2),
         )  # (self.n_batch, self.n_vars)
 
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
             # expected expression
-            mu = (
-                (w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)
-            ) * detection_y_s
+            mu = ((w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
             alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
             # convert mean and overdispersion to total count and logits
             # total_count, logits = _convert_mean_disp_to_counts_logits(
@@ -486,9 +450,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # compute total expected expression
         obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
-        mu = np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples[
-            "m_g"
-        ] + np.dot(obs2sample, samples["s_g_gene_add"])
+        mu = np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"] + np.dot(
+            obs2sample, samples["s_g_gene_add"]
+        )
 
         # compute conditional expected expression per cell type
         mu_ct = [

@@ -10,7 +10,6 @@ import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_mean
 from scipy.sparse import issparse
-
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
@@ -48,18 +47,10 @@ class AutoGuideMixinModule:
                 create_plates=model.create_plates,
             )
         else:
-            encoder_kwargs = (
-                encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
-            )
-            n_hidden = (
-                encoder_kwargs["n_hidden"]
-                if "n_hidden" in encoder_kwargs.keys()
-                else 200
-            )
+            encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
+            n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
             init_param_scale = (
-                encoder_kwargs["init_param_scale"]
-                if "init_param_scale" in encoder_kwargs.keys()
-                else 1 / 50
+                encoder_kwargs["init_param_scale"] if "init_param_scale" in encoder_kwargs.keys() else 1 / 50
             )
             if "init_param_scale" in encoder_kwargs.keys():
                 del encoder_kwargs["init_param_scale"]
@@ -67,17 +58,13 @@ class AutoGuideMixinModule:
             _guide = AutoGuideList(model, create_plates=model.create_plates)
             _guide.append(
                 AutoNormal(
-                    pyro.poutine.block(
-                        model, hide=list(amortised_vars["sites"].keys())
-                    ),
+                    pyro.poutine.block(model, hide=list(amortised_vars["sites"].keys())),
                     init_loc_fn=init_loc_fn,
                 )
             )
             if isinstance(data_transform, np.ndarray):
                 # add extra info about gene clusters to the network
-                self.register_buffer(
-                    "gene_clusters", torch.tensor(data_transform.astype("float32"))
-                )
+                self.register_buffer("gene_clusters", torch.tensor(data_transform.astype("float32")))
                 n_in = model.n_vars + data_transform.shape[1]
                 data_transform = self.data_transform_clusters()
             elif data_transform == "log1p":
@@ -93,15 +80,11 @@ class AutoGuideMixinModule:
                 n_in = model.n_vars
                 self.register_buffer(
                     "var_mean",
-                    torch.tensor(
-                        data_transform["var_mean"].astype("float32").reshape((1, n_in))
-                    ),
+                    torch.tensor(data_transform["var_mean"].astype("float32").reshape((1, n_in))),
                 )
                 self.register_buffer(
                     "var_std",
-                    torch.tensor(
-                        data_transform["var_std"].astype("float32").reshape((1, n_in))
-                    ),
+                    torch.tensor(data_transform["var_std"].astype("float32").reshape((1, n_in))),
                 )
                 data_transform = self.data_transform_scale()
             else:
@@ -114,9 +97,7 @@ class AutoGuideMixinModule:
             amortised_vars["input_transform"][0] = data_transform
             _guide.append(
                 AutoNormalEncoder(
-                    pyro.poutine.block(
-                        model, expose=list(amortised_vars["sites"].keys())
-                    ),
+                    pyro.poutine.block(model, expose=list(amortised_vars["sites"].keys())),
                     amortised_plate_sites=amortised_vars,
                     n_in=n_in,
                     n_hidden=n_hidden,
@@ -161,9 +142,7 @@ class QuantileMixin:
         # create function which fetches different lr for autoencoding guide
         def optim_param(module_name, param_name):
             # detect variables in autoencoding guide
-            if autoencoding_lr is not None and np.any(
-                [n in module_name + "." + param_name for n in module_names]
-            ):
+            if autoencoding_lr is not None and np.any([n in module_name + "." + param_name for n in module_names]):
                 return {
                     "lr": autoencoding_lr,
                     # limit the gradient step from becoming too large
@@ -179,9 +158,7 @@ class QuantileMixin:
         return optim_param
 
     @torch.no_grad()
-    def _posterior_quantile_amortised(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True
-    ):
+    def _posterior_quantile_amortised(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
         and global variables, which is necessary when performing amortised inference.
@@ -235,10 +212,7 @@ class QuantileMixin:
                     name: site["cond_indep_stack"][0].dim
                     for name, site in trace.nodes.items()
                     if site["type"] == "sample"
-                    if any(
-                        f.name == self.module.model.list_obs_plate_vars()["name"]
-                        for f in site["cond_indep_stack"]
-                    )
+                    if any(f.name == self.module.model.list_obs_plate_vars()["name"] for f in site["cond_indep_stack"])
                 }
 
             else:
@@ -247,14 +221,10 @@ class QuantileMixin:
                 means_ = {
                     k: means_[k].cpu().numpy()
                     for k in means_.keys()
-                    if k
-                    in list(self.module.model.list_obs_plate_vars()["sites"].keys())
+                    if k in list(self.module.model.list_obs_plate_vars()["sites"].keys())
                 }
                 means = {
-                    k: np.concatenate(
-                        [means[k], means_[k]], axis=list(obs_plate.values())[0]
-                    )
-                    for k in means.keys()
+                    k: np.concatenate([means[k], means_[k]], axis=list(obs_plate.values())[0]) for k in means.keys()
                 }
             i += 1
 
@@ -280,9 +250,7 @@ class QuantileMixin:
         return means
 
     @torch.no_grad()
-    def _posterior_quantile(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True
-    ):
+    def _posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
 
@@ -315,9 +283,7 @@ class QuantileMixin:
 
         return means
 
-    def posterior_quantile(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True
-    ):
+    def posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
         """
         Compute median of the posterior distribution of each parameter.
 
@@ -333,9 +299,7 @@ class QuantileMixin:
         """
 
         if self.module.is_amortised:
-            return self._posterior_quantile_amortised(
-                q=q, batch_size=batch_size, use_gpu=use_gpu
-            )
+            return self._posterior_quantile_amortised(q=q, batch_size=batch_size, use_gpu=use_gpu)
         else:
             return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu)
 
@@ -452,10 +416,7 @@ class PltExportMixin:
         return pd.DataFrame(
             samples[f"post_sample_{summary_name}"].get(site_name, None),
             index=self.adata.obs_names,
-            columns=[
-                f"{summary_name}{name_prefix}_{site_name}_{i}"
-                for i in self.factor_names_
-            ],
+            columns=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in self.factor_names_],
         )
 
     def sample2df_vars(
@@ -488,10 +449,7 @@ class PltExportMixin:
         return pd.DataFrame(
             samples[f"post_sample_{summary_name}"].get(site_name, None),
             columns=self.adata.var_names,
-            index=[
-                f"{summary_name}{name_prefix}_{site_name}_{i}"
-                for i in self.factor_names_
-            ],
+            index=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in self.factor_names_],
         ).T
 
     def plot_QC(self, summary_name: str = "means", use_n_obs: int = 1000):
@@ -513,13 +471,9 @@ class PltExportMixin:
         """
 
         if getattr(self, "samples", False) is False:
-            raise RuntimeError(
-                "self.samples is missing, please run self.export_posterior() first"
-            )
+            raise RuntimeError("self.samples is missing, please run self.export_posterior() first")
         if use_n_obs is not None:
-            ind_x = np.random.choice(
-                self.adata.n_obs, np.min((use_n_obs, self.adata.n_obs)), replace=False
-            )
+            ind_x = np.random.choice(self.adata.n_obs, np.min((use_n_obs, self.adata.n_obs)), replace=False)
         else:
             ind_x = None
 

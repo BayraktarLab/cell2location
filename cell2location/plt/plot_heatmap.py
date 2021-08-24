@@ -5,10 +5,22 @@ import numpy as np
 from scipy.cluster import hierarchy
 from scipy.spatial import distance
 
-def heatmap(array, ticks=False, log=False, figsize=None, equal=False,
-            row_labels=None, col_labels=None, cbar=True, cmap='RdPu', title='',
-            vmin=None, vmax=None):
-    r""" Plot heatmap with row and column labels using plt.imshow
+
+def heatmap(
+    array,
+    ticks=False,
+    log=False,
+    figsize=None,
+    equal=False,
+    row_labels=None,
+    col_labels=None,
+    cbar=True,
+    cmap="RdPu",
+    title="",
+    vmin=None,
+    vmax=None,
+):
+    r"""Plot heatmap with row and column labels using plt.imshow
 
     :param array: np.ndarray to be visualised, or an object that can be coerced to np.ndarray
     :param ticks: boolean, show x and y axis ticks?
@@ -26,10 +38,9 @@ def heatmap(array, ticks=False, log=False, figsize=None, equal=False,
 
     array = np.array(array)
     if log:
-        plt.imshow(array, interpolation='nearest', cmap=cmap,
-                   norm=matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax))
+        plt.imshow(array, interpolation="nearest", cmap=cmap, norm=matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax))
     else:
-        plt.imshow(array, interpolation='nearest', cmap=cmap)
+        plt.imshow(array, interpolation="nearest", cmap=cmap)
 
     if cbar == True:
         plt.colorbar()
@@ -41,7 +52,7 @@ def heatmap(array, ticks=False, log=False, figsize=None, equal=False,
         plt.ylim(array.shape[0] - 0.5, -0.5)
 
     if equal:
-        plt.gca().set_aspect('equal', adjustable='box')
+        plt.gca().set_aspect("equal", adjustable="box")
 
     if row_labels is not None:
         plt.yticks(range(array.shape[0]), row_labels)
@@ -55,9 +66,20 @@ def heatmap(array, ticks=False, log=False, figsize=None, equal=False,
     plt.tight_layout()
 
 
-def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, equal=False,
-            row_labels=None, col_labels=None, cbar=True, cmap='RdPu', title=''):
-    r""" Plot dotplot with row and column labels
+def dotplot(
+    array_color,
+    array_size=None,
+    ticks=False,
+    log=False,
+    figsize=None,
+    equal=False,
+    row_labels=None,
+    col_labels=None,
+    cbar=True,
+    cmap="RdPu",
+    title="",
+):
+    r"""Plot dotplot with row and column labels
 
     :param array_color: np.ndarray to be visualised as dot color
     :param array_size: np.ndarray to be visualised as dor size
@@ -82,12 +104,25 @@ def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, 
     array_size = (array_size / array_size.max() * 15) ** 2
 
     if log:
-        plt.scatter(x.flatten(), y.flatten(), c=array_color.flatten(),
-                    s=array_size.flatten(), cmap=cmap,
-                    norm=matplotlib.colors.LogNorm(), edgecolor='none')
+        plt.scatter(
+            x.flatten(),
+            y.flatten(),
+            c=array_color.flatten(),
+            s=array_size.flatten(),
+            cmap=cmap,
+            norm=matplotlib.colors.LogNorm(),
+            edgecolor="none",
+        )
     else:
-        plt.scatter(x.flatten(), y.flatten(), c=array_color.flatten(),
-                    s=array_size.flatten(), cmap=cmap, norm=None, edgecolor='none')
+        plt.scatter(
+            x.flatten(),
+            y.flatten(),
+            c=array_color.flatten(),
+            s=array_size.flatten(),
+            cmap=cmap,
+            norm=None,
+            edgecolor="none",
+        )
 
     if cbar == True:
         plt.colorbar()
@@ -100,7 +135,7 @@ def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, 
 
     plt.grid(False)
     if equal:
-        plt.gca().set_aspect('equal', adjustable='box')
+        plt.gca().set_aspect("equal", adjustable="box")
 
     if row_labels is not None:
         plt.yticks(range(array_color.shape[0]), row_labels)
@@ -114,11 +149,21 @@ def dotplot(array_color, array_size=None, ticks=False, log=False, figsize=None, 
     plt.tight_layout()
 
 
-def clustermap(df, cluster_rows=True, cluster_cols=True,
-               figure_size=(5, 5), cmap="RdPu", log=False,
-               return_linkage=False, equal=True, title='',
-               fun_type='heatmap', array_size=None,
-               vmin=None, vmax=None):
+def clustermap(
+    df,
+    cluster_rows=True,
+    cluster_cols=True,
+    figure_size=(5, 5),
+    cmap="RdPu",
+    log=False,
+    return_linkage=False,
+    equal=True,
+    title="",
+    fun_type="heatmap",
+    array_size=None,
+    vmin=None,
+    vmax=None,
+):
     r"""Plot heatmap with hierarchically clustered rows and columns using `cell2location.plt.plot_heatmap.heatmap()`
     and `cell2location.plt.plot_heatmap.dotplot()`.
 
@@ -139,7 +184,7 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
     if cluster_rows:
         # hierarchically cluster rows
         cor_f1 = np.corrcoef(df)
-        row_linkage = hierarchy.linkage(distance.pdist(cor_f1), method='average')
+        row_linkage = hierarchy.linkage(distance.pdist(cor_f1), method="average")
         row_ord = hierarchy.leaves_list(row_linkage)
     else:
         row_linkage = None
@@ -148,7 +193,7 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
     if cluster_cols:
         # hierarchically cluster columns
         cor_f1 = np.corrcoef(df.T)
-        col_linkage = hierarchy.linkage(distance.pdist(cor_f1), method='average')
+        col_linkage = hierarchy.linkage(distance.pdist(cor_f1), method="average")
         col_ord = hierarchy.leaves_list(col_linkage)
     else:
         col_linkage = None
@@ -156,18 +201,37 @@ def clustermap(df, cluster_rows=True, cluster_cols=True,
 
     df = df.iloc[row_ord, col_ord]
 
-    if fun_type == 'heatmap':
+    if fun_type == "heatmap":
         # plot heatmap
-        heatmap(df.values, ticks=False, log=log, figsize=figure_size,
-                equal=equal, cmap=cmap,
-                row_labels=df.index, col_labels=df.columns, cbar=True, title=title,
-                vmin=vmin, vmax=vmax)
-    elif fun_type == 'dotplot':
+        heatmap(
+            df.values,
+            ticks=False,
+            log=log,
+            figsize=figure_size,
+            equal=equal,
+            cmap=cmap,
+            row_labels=df.index,
+            col_labels=df.columns,
+            cbar=True,
+            title=title,
+            vmin=vmin,
+            vmax=vmax,
+        )
+    elif fun_type == "dotplot":
         # plot dotplot
-        dotplot(df.values, array_size=array_size, ticks=False, log=log, figsize=figure_size,
-                equal=equal, cmap=cmap,
-                row_labels=df.index, col_labels=df.columns, cbar=True, title=title)
+        dotplot(
+            df.values,
+            array_size=array_size,
+            ticks=False,
+            log=log,
+            figsize=figure_size,
+            equal=equal,
+            cmap=cmap,
+            row_labels=df.index,
+            col_labels=df.columns,
+            cbar=True,
+            title=title,
+        )
 
     if return_linkage:
-        return {'row_linkage': row_linkage, 'col_linkage': col_linkage,
-                'row_ord': row_ord, 'col_ord': col_ord}
+        return {"row_linkage": row_linkage, "col_linkage": col_linkage, "row_ord": row_ord, "col_ord": col_ord}

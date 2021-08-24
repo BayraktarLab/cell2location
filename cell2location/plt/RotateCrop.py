@@ -26,12 +26,16 @@ def find_rectangle_corners(bottom_left, width):
     x = y1 / z1 * width
     y = x1 / z1 * width
 
-    return np.array([bottom_left[0, :],
-                     [bottom_left[0, 0] - y, bottom_left[0, 1] + x],
-                     [bottom_left[1, 0] - y, bottom_left[1, 1] + x]])
+    return np.array(
+        [
+            bottom_left[0, :],
+            [bottom_left[0, 0] - y, bottom_left[0, 1] + x],
+            [bottom_left[1, 0] - y, bottom_left[1, 1] + x],
+        ]
+    )
 
 
-class RotateCrop():
+class RotateCrop:
     def __init__(self, img, corners, rotate90=0, flip_axes=True):
         r"""
 
@@ -71,15 +75,14 @@ class RotateCrop():
         self.width, self.height = self.compute_distances()[self.flip_axes]
         self.width, self.height = self.width.astype(np.int32), self.height.astype(np.int32)
 
-        self.dst_pts = [[0, self.height],
-                        [0, 0],
-                        [self.width, 0],
-                        [self.width, self.height]]
+        self.dst_pts = [[0, self.height], [0, 0], [self.width, 0], [self.width, self.height]]
 
-        self.dst_pts = [self.dst_pts[self.rotate90 % 4],
-                        self.dst_pts[(self.rotate90 + 1) % 4],
-                        self.dst_pts[(self.rotate90 + 2) % 4],
-                        self.dst_pts[(self.rotate90 + 3) % 4]]
+        self.dst_pts = [
+            self.dst_pts[self.rotate90 % 4],
+            self.dst_pts[(self.rotate90 + 1) % 4],
+            self.dst_pts[(self.rotate90 + 2) % 4],
+            self.dst_pts[(self.rotate90 + 3) % 4],
+        ]
 
         self.dst_pts = np.array(self.dst_pts).astype(np.float32)
 
@@ -97,7 +100,7 @@ class RotateCrop():
         Parameters
         ----------
         points :
-            
+
         return_mask :
              (Default value = False)
 
@@ -117,10 +120,12 @@ class RotateCrop():
 
         new_points = np.array(new_points)
 
-        valid_mask = ((new_points[:, 0] > 0) &
-                      (new_points[:, 1] > 0) &
-                      (new_points[:, 0] < self.width) &
-                      (new_points[:, 1] < self.height))
+        valid_mask = (
+            (new_points[:, 0] > 0)
+            & (new_points[:, 1] > 0)
+            & (new_points[:, 0] < self.width)
+            & (new_points[:, 1] < self.height)
+        )
 
         valid_points = new_points[valid_mask]
 

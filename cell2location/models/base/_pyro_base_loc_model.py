@@ -3,6 +3,7 @@ from scvi.module.base import PyroBaseModuleClass
 
 from ._pyro_base import AutoGuideMixinModule, init_to_value
 
+
 class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
     def __init__(
         self,
@@ -11,7 +12,7 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         encoder_kwargs=None,
         data_transform="log1p",
-        **kwargs
+        **kwargs,
     ):
         """
         Module class which defines AutoGuide given model. Supports multiple model architectures.
@@ -65,10 +66,7 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
     def init_to_value(self, site):
 
         if getattr(self.model, "np_init_vals", None) is not None:
-            init_vals = {
-                k: getattr(self.model, f"init_val_{k}")
-                for k in self.model.np_init_vals.keys()
-            }
+            init_vals = {k: getattr(self.model, f"init_val_{k}") for k in self.model.np_init_vals.keys()}
         else:
             init_vals = dict()
         return init_to_value(site=site, values=init_vals)

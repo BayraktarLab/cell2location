@@ -1,2 +1,1 @@
-from . import pymc3_model
-from . import pymc3_loc_model
+from . import pymc3_loc_model, pymc3_model

@@ -4,7 +4,6 @@ import pyro
 import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
-
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.nn import one_hot
@@ -13,9 +12,7 @@ from scvi.nn import one_hot
 #    pass
 
 
-class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
-    PyroModule
-):
+class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
     """
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
@@ -127,35 +124,24 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         )
         self.register_buffer(
             "detection_mean_hyp_prior_beta",
-            torch.tensor(
-                self.detection_hyp_prior["mean_alpha"]
-                / self.detection_hyp_prior["mean"]
-            ),
+            torch.tensor(self.detection_hyp_prior["mean_alpha"] / self.detection_hyp_prior["mean"]),
         )
 
         # compute hyperparameters from mean and sd
-        self.register_buffer(
-            "m_g_mu_hyp", torch.tensor(self.m_g_gene_level_prior["mean"])
-        )
+        self.register_buffer("m_g_mu_hyp", torch.tensor(self.m_g_gene_level_prior["mean"]))
         self.register_buffer(
             "m_g_mu_mean_var_ratio_hyp",
             torch.tensor(self.m_g_gene_level_prior["mean_var_ratio"]),
         )
 
-        self.register_buffer(
-            "m_g_alpha_hyp_mean", torch.tensor(self.m_g_gene_level_prior["alpha_mean"])
-        )
+        self.register_buffer("m_g_alpha_hyp_mean", torch.tensor(self.m_g_gene_level_prior["alpha_mean"]))
 
         self.cell_state_mat = cell_state_mat
         self.register_buffer("cell_state", torch.tensor(cell_state_mat.T))
 
         self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
-        self.register_buffer(
-            "A_factors_per_location", torch.tensor(A_factors_per_location)
-        )
-        self.register_buffer(
-            "N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio)
-        )
+        self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
+        self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
 
         self.register_buffer(
             "alpha_g_phi_hyp_prior_alpha",
@@ -182,9 +168,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
             torch.tensor(self.gene_add_mean_hyp_prior["beta"]),
         )
 
-        self.register_buffer(
-            "w_sf_mean_var_ratio_tensor", torch.tensor(self.w_sf_mean_var_ratio)
-        )
+        self.register_buffer("w_sf_mean_var_ratio_tensor", torch.tensor(self.w_sf_mean_var_ratio))
 
         self.register_buffer("n_factors_tensor", torch.tensor(self.n_factors))
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
@@ -255,9 +239,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
 
         m_g = pyro.sample(
             "m_g",
-            dist.Gamma(m_g_alpha_e, m_g_alpha_e / m_g_mean)  # self.m_g_mu_hyp)
-            .expand([1, self.n_vars])
-            .to_event(2),
+            dist.Gamma(m_g_alpha_e, m_g_alpha_e / m_g_mean).expand([1, self.n_vars]).to_event(2),  # self.m_g_mu_hyp)
         )  # (1, n_vars)
 
         # =====================Cell abundances w_sf======================= #
@@ -305,9 +287,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
             self.ones_n_batch_1 * self.detection_hyp_prior_alpha,
         )
 
-        beta = (obs2sample @ detection_hyp_prior_alpha) / (
-            obs2sample @ detection_mean_y_e
-        )
+        beta = (obs2sample @ detection_hyp_prior_alpha) / (obs2sample @ detection_mean_y_e)
         with obs_plate:
             detection_y_s = pyro.sample(
                 "detection_y_s",
@@ -319,9 +299,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         # cell state signatures (e.g. background, free-floating RNA)
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(
-                self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta
-            ),
+            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -334,9 +312,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         )  # (self.n_batch)
         s_g_gene_add_alpha_e_inv = pyro.sample(
             "s_g_gene_add_alpha_e_inv",
-            dist.Exponential(s_g_gene_add_alpha_hyp)
-            .expand([self.n_batch, 1])
-            .to_event(2),
+            dist.Exponential(s_g_gene_add_alpha_hyp).expand([self.n_batch, 1]).to_event(2),
         )  # (self.n_batch)
         s_g_gene_add_alpha_e = self.ones / s_g_gene_add_alpha_e_inv.pow(2)
 
@@ -350,22 +326,16 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(
-                self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta
-            ),
+            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
-            dist.Exponential(alpha_g_phi_hyp)
-            .expand([self.n_batch, self.n_vars])
-            .to_event(2),
+            dist.Exponential(alpha_g_phi_hyp).expand([self.n_batch, self.n_vars]).to_event(2),
         )  # (self.n_batch, self.n_vars)
 
         # =====================Expected expression ======================= #
         # expected expression
-        mu = (
-            (w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)
-        ) * detection_y_s
+        mu = ((w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
         alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
         # convert mean and overdispersion to total count and logits
         # total_count, logits = _convert_mean_disp_to_counts_logits(

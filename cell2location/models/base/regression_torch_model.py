@@ -2,6 +2,7 @@
 """RegressionTorchModel Base class for model with no cell specific parameters"""
 
 import matplotlib.pyplot as plt
+
 # +
 import numpy as np
 import pandas as pd
@@ -32,23 +33,26 @@ class RegressionTorchModel(TorchModel):
     """
 
     def __init__(
-            self,
-            sample_id,
-            cell2covar: pd.DataFrame,
-            X_data: np.ndarray,
-            data_type='float32',
-            n_iter=200000,
-            learning_rate=0.001,
-            total_grad_norm_constraint=200,
-            verbose=True,
-            var_names=None, var_names_read=None,
-            obs_names=None, fact_names=None,
-            minibatch_size=None, minibatch_seed=[41, 56, 345],
-            prior_eps=1e-8,
-            nb_param_conversion_eps=1e-8,
-            use_cuda=False,
-            use_average_as_initial_value=True,
-            stratify_cv=None
+        self,
+        sample_id,
+        cell2covar: pd.DataFrame,
+        X_data: np.ndarray,
+        data_type="float32",
+        n_iter=200000,
+        learning_rate=0.001,
+        total_grad_norm_constraint=200,
+        verbose=True,
+        var_names=None,
+        var_names_read=None,
+        obs_names=None,
+        fact_names=None,
+        minibatch_size=None,
+        minibatch_seed=[41, 56, 345],
+        prior_eps=1e-8,
+        nb_param_conversion_eps=1e-8,
+        use_cuda=False,
+        use_average_as_initial_value=True,
+        stratify_cv=None,
     ):
 
         ############# Initialise parameters ################
@@ -65,11 +69,21 @@ class RegressionTorchModel(TorchModel):
         obs_names = cell2covar.index
         sample_id = cell2covar[sample_id]
 
-        super().__init__(X_data, n_fact,
-                         data_type, n_iter,
-                         learning_rate, total_grad_norm_constraint,
-                         verbose, var_names, var_names_read,
-                         obs_names, fact_names, sample_id, use_cuda)
+        super().__init__(
+            X_data,
+            n_fact,
+            data_type,
+            n_iter,
+            learning_rate,
+            total_grad_norm_constraint,
+            verbose,
+            var_names,
+            var_names_read,
+            obs_names,
+            fact_names,
+            sample_id,
+            use_cuda,
+        )
 
         self.nb_param_conversion_eps = nb_param_conversion_eps
 
@@ -96,7 +110,7 @@ class RegressionTorchModel(TorchModel):
 
         self.stratify_cv = stratify_cv
 
-        self.extra_data['cell2sample_covar'] = self.cell2sample_covar_mat
+        self.extra_data["cell2sample_covar"] = self.cell2sample_covar_mat
 
         if use_average_as_initial_value:
             # compute initial value for parameters: cluster averages
@@ -117,13 +131,13 @@ class RegressionTorchModel(TorchModel):
     # =====================Other functions======================= #
     def plot_gene_budget(self):
 
-        plt.hist(np.log10(self.samples['post_sample_means']['gene_level'][:, 0]), bins=50)
-        plt.xlabel('Gene expression level (hierarchical)')
-        plt.title('Gene expression level (hierarchical)')
+        plt.hist(np.log10(self.samples["post_sample_means"]["gene_level"][:, 0]), bins=50)
+        plt.xlabel("Gene expression level (hierarchical)")
+        plt.title("Gene expression level (hierarchical)")
         plt.tight_layout()
 
-    def sample2df(self, gene_node_name='gene_factors', sample_type='means'):
-        r""" Export cell factors as Pandas data frames.
+    def sample2df(self, gene_node_name="gene_factors", sample_type="means"):
+        r"""Export cell factors as Pandas data frames.
 
         :param node_name: name of the cell factor model parameter to be exported
         :param gene_node_name: name of the gene factor model parameter to be exported
@@ -134,21 +148,23 @@ class RegressionTorchModel(TorchModel):
         """
 
         # export parameters for covariate effects
-        cov_ind = ~ self.which_sample
-        self.covariate_effects = \
-            pd.DataFrame.from_records(self.samples['post_sample_'+sample_type][gene_node_name][cov_ind, :].T,
-                                      index=self.var_names,
-                                      columns=[sample_type + '_cov_effect_' + i for i in self.fact_names[cov_ind]])
+        cov_ind = ~self.which_sample
+        self.covariate_effects = pd.DataFrame.from_records(
+            self.samples["post_sample_" + sample_type][gene_node_name][cov_ind, :].T,
+            index=self.var_names,
+            columns=[sample_type + "_cov_effect_" + i for i in self.fact_names[cov_ind]],
+        )
 
         # export parameters for sample effects
         sample_ind = self.which_sample
-        self.sample_effects = \
-            pd.DataFrame.from_records(self.samples['post_sample_'+sample_type][gene_node_name][sample_ind, :].T,
-                                      index=self.var_names,
-                                      columns=[sample_type + '_sample_effect' + i for i in self.fact_names[sample_ind]])
+        self.sample_effects = pd.DataFrame.from_records(
+            self.samples["post_sample_" + sample_type][gene_node_name][sample_ind, :].T,
+            index=self.var_names,
+            columns=[sample_type + "_sample_effect" + i for i in self.fact_names[sample_ind]],
+        )
 
     def annotate_cell_adata(self, adata, use_raw=True):
-        r""" Add covariate and sample coefficients to anndata.var
+        r"""Add covariate and sample coefficients to anndata.var
 
         :param adata: anndata object to annotate
         :return: updated anndata object
@@ -170,7 +186,7 @@ class RegressionTorchModel(TorchModel):
             adata.raw.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
 
         else:
-            
+
             var_index = adata.var.index
 
             ### Covariate effect
@@ -181,4 +197,4 @@ class RegressionTorchModel(TorchModel):
             # add gene factors to adata
             adata.var[self.sample_effects.columns] = self.sample_effects.loc[var_index, :]
 
-        return (adata)
+        return adata

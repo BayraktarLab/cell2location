@@ -11,7 +11,7 @@ from cell2location.plt.plot_heatmap import clustermap
 
 
 # base model class - defining shared methods but not the model itself
-class BaseModel():
+class BaseModel:
     r"""Base class for pymc3 and pyro models.
 
     :param X_data: Numpy array of gene expression (cols) in spatial locations (rows)
@@ -29,16 +29,19 @@ class BaseModel():
     """
 
     def __init__(
-            self,
-            X_data: np.ndarray,
-            n_fact: int = 10,
-            data_type: str = 'float32',
-            n_iter: int = 200000,
-            learning_rate=0.001,
-            total_grad_norm_constraint=200,
-            verbose=True,
-            var_names=None, var_names_read=None,
-            obs_names=None, fact_names=None, sample_id=None
+        self,
+        X_data: np.ndarray,
+        n_fact: int = 10,
+        data_type: str = "float32",
+        n_iter: int = 200000,
+        learning_rate=0.001,
+        total_grad_norm_constraint=200,
+        verbose=True,
+        var_names=None,
+        var_names_read=None,
+        obs_names=None,
+        fact_names=None,
+        sample_id=None,
     ):
 
         # Initialise parameters
@@ -60,11 +63,11 @@ class BaseModel():
 
         # add essential annotations
         if var_names is None:
-            self.var_names = pd.Series(['g_' + str(i) for i in range(self.n_var)],
-                                       index=['g_' + str(i) for i in range(self.n_var)])
+            self.var_names = pd.Series(
+                ["g_" + str(i) for i in range(self.n_var)], index=["g_" + str(i) for i in range(self.n_var)]
+            )
         else:
-            self.var_names = pd.Series(var_names,
-                                       index=var_names)
+            self.var_names = pd.Series(var_names, index=var_names)
 
         if var_names_read is None:
             self.var_names_read = pd.Series(self.var_names, index=self.var_names)
@@ -72,25 +75,24 @@ class BaseModel():
             self.var_names_read = pd.Series(var_names_read, index=self.var_names)
 
         if obs_names is None:
-            self.obs_names = pd.Series(['c_' + str(i) for i in range(self.n_obs)],
-                                       index=['c_' + str(i) for i in range(self.n_obs)])
+            self.obs_names = pd.Series(
+                ["c_" + str(i) for i in range(self.n_obs)], index=["c_" + str(i) for i in range(self.n_obs)]
+            )
         else:
             self.obs_names = pd.Series(obs_names, index=obs_names)
 
         if fact_names is None:
-            self.fact_names = pd.Series(['fact_' + str(i) for i in range(self.n_fact)])
+            self.fact_names = pd.Series(["fact_" + str(i) for i in range(self.n_fact)])
         else:
             self.fact_names = pd.Series(fact_names)
 
         if sample_id is None:
-            self.sample_id = pd.Series(['sample' for i in range(self.n_obs)],
-                                       index=self.obs_names)
+            self.sample_id = pd.Series(["sample" for i in range(self.n_obs)], index=self.obs_names)
         else:
             self.sample_id = pd.Series(sample_id, index=self.obs_names)
 
-    def plot_prior_vs_data(self, data_target_name='data_target', data_node='X_data',
-                           log_transform=True):
-        r""" Plot data vs a single sample from the prior in a 2D histogram
+    def plot_prior_vs_data(self, data_target_name="data_target", data_node="X_data", log_transform=True):
+        r"""Plot data vs a single sample from the prior in a 2D histogram
         Uses self.X_data and self.prior_trace['data_target'].
         :param data_node: name of the object slot containing data
         """
@@ -109,17 +111,14 @@ class BaseModel():
             data_node = np.log10(data_node + 1)
             data_target_name = np.log10(data_target_name + 1)
 
-        plt.hist2d(data_node.flatten(),
-                   data_target_name.flatten(),
-                   bins=50, norm=matplotlib.colors.LogNorm())
-        plt.xlabel('Data, log10(nUMI)')
-        plt.ylabel('Prior sample, log10(nUMI)')
-        plt.title('UMI counts (all spots, all genes)')
+        plt.hist2d(data_node.flatten(), data_target_name.flatten(), bins=50, norm=matplotlib.colors.LogNorm())
+        plt.xlabel("Data, log10(nUMI)")
+        plt.ylabel("Prior sample, log10(nUMI)")
+        plt.title("UMI counts (all spots, all genes)")
         plt.tight_layout()
 
     @staticmethod
-    def align_plot_stability(fac1, fac2, name1, name2,
-                             align=True, return_aligned=False):
+    def align_plot_stability(fac1, fac2, name1, name2, align=True, return_aligned=False):
         r"""Align columns between two np.ndarrays using scipy.optimize.linear_sum_assignment,
             then plot correlations between columns in fac1 and fac2, ordering fac2 according to alignment
 
@@ -143,7 +142,7 @@ class BaseModel():
 
         plt.imshow(img)
 
-        plt.title(f'Training initialisation \n {name1} vs {name2}')
+        plt.title(f"Training initialisation \n {name1} vs {name2}")
         plt.xlabel(name2)
         plt.ylabel(name1)
 
@@ -153,27 +152,25 @@ class BaseModel():
             return linear_sum_assignment(2 - corr12)[1]
 
     def generate_cv_data(self, n=2, discrete=True, non_discrete_mean_var=1):
-        r""" Generate X_data for molecular cross-validation by sampling molecule counts 
+        r"""Generate X_data for molecular cross-validation by sampling molecule counts
              with np.random.binomial
         :param n: number of cross-validation folds of equal size to generate, for now, only n=2 is implemented
         """
 
         if n is not 2:
-            raise ValueError('only n=2 is implemented for molecular cross-validation')
+            raise ValueError("only n=2 is implemented for molecular cross-validation")
 
         self.X_data_sample = {}
         if discrete:
-            self.X_data_sample[0] = np.random.binomial(self.X_data.astype('int64'),
-                                                       1 / n).astype(np.float)
+            self.X_data_sample[0] = np.random.binomial(self.X_data.astype("int64"), 1 / n).astype(np.float)
         else:
             shape = (self.X_data / n) ** 2 / ((self.X_data / n) * non_discrete_mean_var)
             scale = ((self.X_data / n) * non_discrete_mean_var) / (self.X_data / n)
-            self.X_data_sample[0] = np.random.gamma(shape=shape, scale=scale,
-                                                    size=scale.shape).astype(np.float)
+            self.X_data_sample[0] = np.random.gamma(shape=shape, scale=scale, size=scale.shape).astype(np.float)
         self.X_data_sample[1] = np.abs(self.X_data - self.X_data_sample[0])
 
     def bootstrap_data(self, n=10, downsampling_p=0.8, discrete=True, non_discrete_mean_var=1):
-        r""" Generate X_data for bootstrap analysis by sampling molecule counts 
+        r"""Generate X_data for bootstrap analysis by sampling molecule counts
              with np.random.binomial
         :param n: number of bootstrap samples to generate
         :param downsampling_p: sample this proportion of values
@@ -184,16 +181,14 @@ class BaseModel():
 
         for i in range(n):
             if discrete:
-                self.X_data_sample[i] = np.random.binomial(self.X_data.astype('int64'),
-                                                           downsampling_p).astype(np.float)
+                self.X_data_sample[i] = np.random.binomial(self.X_data.astype("int64"), downsampling_p).astype(np.float)
             else:
                 shape = (self.X_data * downsampling_p) ** 2 / (self.X_data * downsampling_p * non_discrete_mean_var)
                 scale = (self.X_data * downsampling_p * non_discrete_mean_var) / (self.X_data * downsampling_p)
-                self.X_data_sample[i] = np.random.gamma(shape=shape, scale=scale,
-                                                        size=scale.shape).astype(np.float)
+                self.X_data_sample[i] = np.random.gamma(shape=shape, scale=scale, size=scale.shape).astype(np.float)
 
-    def plot_posterior_mu_vs_data(self, mu_node_name='mu', data_node='X_data'):
-        r""" Plot expected value of the model (e.g. mean of poisson distribution)
+    def plot_posterior_mu_vs_data(self, mu_node_name="mu", data_node="X_data"):
+        r"""Plot expected value of the model (e.g. mean of poisson distribution)
 
         :param mu_node_name: name of the object slot containing expected value
         :param data_node: name of the object slot containing data
@@ -207,17 +202,17 @@ class BaseModel():
         if type(data_node) is str:
             data_node = getattr(self, data_node)
 
-        plt.hist2d(np.log10(data_node.flatten() + 1), np.log10(mu.flatten() + 1), bins=50,
-                   norm=matplotlib.colors.LogNorm())
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.xlabel('Data, log10(nUMI)')
-        plt.ylabel('Posterior sample, log10(nUMI)')
-        plt.title('UMI counts (all cell, all genes)')
+        plt.hist2d(
+            np.log10(data_node.flatten() + 1), np.log10(mu.flatten() + 1), bins=50, norm=matplotlib.colors.LogNorm()
+        )
+        plt.gca().set_aspect("equal", adjustable="box")
+        plt.xlabel("Data, log10(nUMI)")
+        plt.ylabel("Posterior sample, log10(nUMI)")
+        plt.title("UMI counts (all cell, all genes)")
         plt.tight_layout()
 
-    def plot_history(self, iter_start=0, iter_end=-1,
-                     mean_field_slot=None, log_y=True, ax=None):
-        r""" Plot training history
+    def plot_history(self, iter_start=0, iter_end=-1, mean_field_slot=None, log_y=True, ax=None):
+        r"""Plot training history
 
         :param iter_start: omit initial iterations from the plot
         :param iter_end: omit last iterations from the plot
@@ -242,16 +237,14 @@ class BaseModel():
             y = np.array(self.hist[i]).flatten()[iter_start:iter_end]
             if log_y:
                 y = np.log10(y)
-            ax.plot(np.arange(iter_start, iter_end), y, label='train')
-            ax.set_xlabel('Training epochs')
-            ax.set_ylabel('Reconstruction accuracy (ELBO loss)')
+            ax.plot(np.arange(iter_start, iter_end), y, label="train")
+            ax.set_xlabel("Training epochs")
+            ax.set_ylabel("Reconstruction accuracy (ELBO loss)")
             ax.legend()
             plt.tight_layout()
 
-    def plot_validation_history(self, start_step=0, end_step=-1,
-                                mean_field_slot='init_1', log_y=True, ax=None):
-        r""" Plot model loss (NB likelihood + penalty) using the model on training and validation data
-        """
+    def plot_validation_history(self, start_step=0, end_step=-1, mean_field_slot="init_1", log_y=True, ax=None):
+        r"""Plot model loss (NB likelihood + penalty) using the model on training and validation data"""
 
         if ax is None:
             ax = plt
@@ -264,37 +257,40 @@ class BaseModel():
         y = np.array(self.training_hist[mean_field_slot]).flatten()[start_step:end_step]
         if log_y:
             y = np.log10(y)
-        ax.plot(np.arange(start_step, end_step), y, label='train')
+        ax.plot(np.arange(start_step, end_step), y, label="train")
 
         y = np.array(self.validation_hist[mean_field_slot]).flatten()[start_step:end_step]
         if log_y:
             y = np.log10(y)
-        ax.plot(np.arange(start_step, end_step), y, label='validation')
-        ax.set_xlabel('Training epochs')
-        ax.set_ylabel('Reconstruction accuracy (log10 NB + L2 loss) / ELBO loss')
+        ax.plot(np.arange(start_step, end_step), y, label="validation")
+        ax.set_xlabel("Training epochs")
+        ax.set_ylabel("Reconstruction accuracy (log10 NB + L2 loss) / ELBO loss")
         ax.legend()
         plt.tight_layout()
 
-    def plot_posterior_vs_data(self, gene_fact_name='gene_factors',
-                               cell_fact_name='cell_factors'):
+    def plot_posterior_vs_data(self, gene_fact_name="gene_factors", cell_fact_name="cell_factors"):
 
         # extract posterior samples of scaled gene and cell factors (before the final likelihood step)
-        gene_fact_s = self.samples['post_sample_means'][gene_fact_name]
-        cell_factors_scaled_s = self.samples['post_sample_means'][cell_fact_name]
+        gene_fact_s = self.samples["post_sample_means"][gene_fact_name]
+        cell_factors_scaled_s = self.samples["post_sample_means"][cell_fact_name]
 
         # compute the poisson rate
         self.mu = np.dot(cell_factors_scaled_s, gene_fact_s.T)
 
-        plt.hist2d(np.log10(self.X_data.flatten() + 1), np.log10(self.mu.flatten() + 1), bins=50,
-                   norm=matplotlib.colors.LogNorm())
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.xlabel('Data, log10(nUMI)')
-        plt.ylabel('Posterior sample, log10(nUMI)')
-        plt.title('UMI counts (all cell, all genes)')
+        plt.hist2d(
+            np.log10(self.X_data.flatten() + 1),
+            np.log10(self.mu.flatten() + 1),
+            bins=50,
+            norm=matplotlib.colors.LogNorm(),
+        )
+        plt.gca().set_aspect("equal", adjustable="box")
+        plt.xlabel("Data, log10(nUMI)")
+        plt.ylabel("Posterior sample, log10(nUMI)")
+        plt.title("UMI counts (all cell, all genes)")
         plt.tight_layout()
 
     def set_fact_filt(self, fact_filt):
-        r"""Specify which factors are not relevant/ not expressed. 
+        r"""Specify which factors are not relevant/ not expressed.
             It is currently used to filter results shown by .print_gene_loadings() and .plot_gene_loadings()
         :param fact_filt: logical array specifying which factors are to be retained
         """
@@ -302,16 +298,16 @@ class BaseModel():
 
     def apply_fact_filt(self, df):
         r"""Select DataFrame columns by factor filter which was saved in the model object
-        :param df: pd.DataFrame 
+        :param df: pd.DataFrame
         """
         if self.fact_filt is not None:
             df = df.iloc[:, self.fact_filt]
 
-        return (df)
+        return df
 
-    def print_gene_loadings(self, gene_fact_name='gene_factors',
-                            loadings_attr='gene_loadings',
-                            top_n=10, gene_filt=None, fact_filt=None):
+    def print_gene_loadings(
+        self, gene_fact_name="gene_factors", loadings_attr="gene_loadings", top_n=10, gene_filt=None, fact_filt=None
+    ):
         r"""Print top-10 genes for each factor in gene loadings matrix.
 
         :param gene_fact_name: model parameter name to extract from samples if self.gene_loadings doesn't exist
@@ -322,10 +318,10 @@ class BaseModel():
         """
 
         if getattr(self, loadings_attr) is None:
-            gene_f = self.samples['post_sample_means'][gene_fact_name]
-            setattr(self, loadings_attr,
-                    pd.DataFrame.from_records(gene_f, index=self.var_names,
-                                              columns=self.fact_names))
+            gene_f = self.samples["post_sample_means"][gene_fact_name]
+            setattr(
+                self, loadings_attr, pd.DataFrame.from_records(gene_f, index=self.var_names, columns=self.fact_names)
+            )
 
         gene_loadings = getattr(self, loadings_attr).copy()
 
@@ -337,28 +333,35 @@ class BaseModel():
 
         rows = []
         index = []
-        columns = [f'top-{i + 1}' for i in range(top_n)]
+        columns = [f"top-{i + 1}" for i in range(top_n)]
 
         for clmn_ in gene_loadings.columns:
             loading_ = gene_loadings[clmn_].sort_values(ascending=False)
             index.append(clmn_)
-            row = [f'{self.var_names_read[i]}: {loading_[i]:.2}' for i in loading_.head(top_n).index]
+            row = [f"{self.var_names_read[i]}: {loading_[i]:.2}" for i in loading_.head(top_n).index]
             rows.append(row)
 
         return pd.DataFrame(rows, index=index, columns=columns)
 
-    def plot_gene_loadings(self, sel_var_names, var_names,
-                           gene_fact_name='gene_factors',
-                           loadings_attr='gene_loadings',
-                           figsize=(15, 7),
-                           cluster_factors=False, cluster_genes=True,
-                           cmap='viridis', title='',
-                           fact_filt=None, fun_type='heatmap',
-                           return_linkage=False):
-        r""" Plot gene loadings as a heatmap
+    def plot_gene_loadings(
+        self,
+        sel_var_names,
+        var_names,
+        gene_fact_name="gene_factors",
+        loadings_attr="gene_loadings",
+        figsize=(15, 7),
+        cluster_factors=False,
+        cluster_genes=True,
+        cmap="viridis",
+        title="",
+        fact_filt=None,
+        fun_type="heatmap",
+        return_linkage=False,
+    ):
+        r"""Plot gene loadings as a heatmap
 
         :param sel_var_names: list of variable names to select
-        :param var_names: `sel_var_names` matches some names in var_names 
+        :param var_names: `sel_var_names` matches some names in var_names
             which identifies each gene in gene loadings
         :param gene_fact_name: model parameter name to extract from samples if self.gene_loadings doesn't exist
         :param figsize: histogram figure size
@@ -370,10 +373,10 @@ class BaseModel():
         """
 
         if getattr(self, loadings_attr) is None:
-            gene_f = self.samples['post_sample_means'][gene_fact_name]
-            setattr(self, loadings_attr,
-                    pd.DataFrame.from_records(gene_f, index=self.var_names,
-                                              columns=self.fact_names))
+            gene_f = self.samples["post_sample_means"][gene_fact_name]
+            setattr(
+                self, loadings_attr, pd.DataFrame.from_records(gene_f, index=self.var_names, columns=self.fact_names)
+            )
 
         gene_loadings = getattr(self, loadings_attr).copy()
 
@@ -386,34 +389,45 @@ class BaseModel():
         key_markers.index = self.var_names_read[sel_index]  # use readable names
         key_markers = key_markers.loc[sel_var_names, :]  # reorder
 
-        clustermap(key_markers, cluster_rows=cluster_genes,
-                   cluster_cols=cluster_factors, return_linkage=return_linkage,
-                   figure_size=figsize, cmap=cmap, title=title, fun_type=fun_type)
+        clustermap(
+            key_markers,
+            cluster_rows=cluster_genes,
+            cluster_cols=cluster_factors,
+            return_linkage=return_linkage,
+            figure_size=figsize,
+            cmap=cmap,
+            title=title,
+            fun_type=fun_type,
+        )
 
-    def plot_loading_distribution(self, loadings_name='gene_factors',
-                                  loadings=None):
-        r""" Plot histogram for each loading (column-wise)
+    def plot_loading_distribution(self, loadings_name="gene_factors", loadings=None):
+        r"""Plot histogram for each loading (column-wise)
 
         :param loadings_name: character name to be extracted from `self.samples['post_sample_means']`
         :param loadings: np.ndarray to be plotted column-wise. Supersedes `loadings_name`.
         """
 
         if loadings is None:
-            loadings = np.log10(self.samples['post_sample_means'][loadings_name])
+            loadings = np.log10(self.samples["post_sample_means"][loadings_name])
 
         for i in range(loadings.shape[1]):
             plt.subplot(loadings.shape[1], 1, i + 1)
-            plt.hist(loadings[:, i], bins=20
-                     );
-            plt.xlabel(loadings_name + ' value');
-            plt.title('Factor: ' + str(i));
+            plt.hist(loadings[:, i], bins=20)
+            plt.xlabel(loadings_name + " value")
+            plt.title("Factor: " + str(i))
         plt.tight_layout()
 
-    def factor_expressed_plot(self, shape_cut=4, rate_cut=15,
-                              sample_type='post_sample_means',
-                              shape='cell_fact_shape_hyp', rate='cell_fact_rate_hyp',
-                              shape_lab='cell_factors, Gamma shape', rate_lab='cell_factors, Gamma rate',
-                              invert_selection=False):
+    def factor_expressed_plot(
+        self,
+        shape_cut=4,
+        rate_cut=15,
+        sample_type="post_sample_means",
+        shape="cell_fact_shape_hyp",
+        rate="cell_fact_rate_hyp",
+        shape_lab="cell_factors, Gamma shape",
+        rate_lab="cell_factors, Gamma rate",
+        invert_selection=False,
+    ):
         r"""Show which factors are expressed on a scatterplot of their regularising priors
 
         :param shape_cut: Gamma shape cutoff below which factors are expressed
@@ -429,62 +443,66 @@ class BaseModel():
         # Expression shape and rate across cells
         shape = self.samples[sample_type][shape]
         rate = self.samples[sample_type][rate]
-        plt.scatter(shape, rate);
+        plt.scatter(shape, rate)
         plt.xlabel(shape_lab)
         plt.ylabel(rate_lab)
         plt.vlines(shape_cut, 0, rate_cut)
         plt.hlines(rate_cut, 0, shape_cut)
 
-        low_lab = high_lab = 'expressed'
+        low_lab = high_lab = "expressed"
         if not invert_selection:
-            high_lab = f'not {high_lab}'
+            high_lab = f"not {high_lab}"
         else:
-            low_lab = f'not {low_lab}'
+            low_lab = f"not {low_lab}"
 
         plt.text(shape_cut - 0.5 * shape_cut, rate_cut - 0.5 * rate_cut, low_lab)
         plt.text(shape_cut + 0.1 * shape_cut, rate_cut + 0.1 * rate_cut, high_lab)
 
-        return {'shape': shape, 'rate': rate,
-                'shape_cut': shape_cut, 'rate_cut': rate_cut}
+        return {"shape": shape, "rate": rate, "shape_cut": shape_cut, "rate_cut": rate_cut}
 
-    def plot_reconstruction_history(self, n_type='cv',
-                                    start_step=0, end_step=45):
-        r""" Plot reconstruction error using the model on training and validation data
-        """
+    def plot_reconstruction_history(self, n_type="cv", start_step=0, end_step=45):
+        r"""Plot reconstruction error using the model on training and validation data"""
 
         # Extract RMSE from cross-validation parameter tracking
-        rmse = np.array([[i['rmse_total'], i['rmse_total_cv']] for i in self.tracking['init_1']['rmse']])
+        rmse = np.array([[i["rmse_total"], i["rmse_total_cv"]] for i in self.tracking["init_1"]["rmse"]])
         rmse_cv = (self.X_data_sample[1] - self.X_data_sample[0]) * (self.X_data_sample[1] - self.X_data_sample[0])
 
-        plt.plot(np.arange(start_step, end_step) * self.tracking_every,
-                 np.log10(rmse[start_step:end_step, 0]),
-                 label='model on training data')
-        plt.plot(np.arange(start_step, end_step) * self.tracking_every,
-                 np.log10(rmse[start_step:end_step, 1]),
-                 label='model on cross-validation data')
-        plt.hlines(np.log10(np.sqrt(rmse_cv.mean())),
-                   start_step, end_step * self.tracking_every,
-                   label='reconstructing using cross-validation data')
-        plt.xlabel('Training iterations')
-        plt.ylabel('Reconstruction accuracy (log10 RMSE)')
+        plt.plot(
+            np.arange(start_step, end_step) * self.tracking_every,
+            np.log10(rmse[start_step:end_step, 0]),
+            label="model on training data",
+        )
+        plt.plot(
+            np.arange(start_step, end_step) * self.tracking_every,
+            np.log10(rmse[start_step:end_step, 1]),
+            label="model on cross-validation data",
+        )
+        plt.hlines(
+            np.log10(np.sqrt(rmse_cv.mean())),
+            start_step,
+            end_step * self.tracking_every,
+            label="reconstructing using cross-validation data",
+        )
+        plt.xlabel("Training iterations")
+        plt.ylabel("Reconstruction accuracy (log10 RMSE)")
         plt.legend()
 
-    def export2adata(self, adata, slot_name='mod'):
-        r""" Add posterior mean and sd for all parameters to unstructured data `adata.uns['mod']`.
+    def export2adata(self, adata, slot_name="mod"):
+        r"""Add posterior mean and sd for all parameters to unstructured data `adata.uns['mod']`.
 
         :param adata: anndata object
         """
         # add factor filter and samples of all parameters to unstructured data
         adata.uns[slot_name] = {}
 
-        adata.uns[slot_name]['mod_name'] = str(self.__class__.__name__)
-        adata.uns[slot_name]['fact_filt'] = self.fact_filt
-        adata.uns[slot_name]['fact_names'] = self.fact_names.tolist()
-        adata.uns[slot_name]['var_names'] = self.var_names.tolist()
-        adata.uns[slot_name]['obs_names'] = self.obs_names.tolist()
-        adata.uns[slot_name]['post_sample_means'] = self.samples['post_sample_means']
-        adata.uns[slot_name]['post_sample_sds'] = self.samples['post_sample_sds']
-        adata.uns[slot_name]['post_sample_q05'] = self.samples['post_sample_q05']
-        adata.uns[slot_name]['post_sample_q95'] = self.samples['post_sample_q95']
+        adata.uns[slot_name]["mod_name"] = str(self.__class__.__name__)
+        adata.uns[slot_name]["fact_filt"] = self.fact_filt
+        adata.uns[slot_name]["fact_names"] = self.fact_names.tolist()
+        adata.uns[slot_name]["var_names"] = self.var_names.tolist()
+        adata.uns[slot_name]["obs_names"] = self.obs_names.tolist()
+        adata.uns[slot_name]["post_sample_means"] = self.samples["post_sample_means"]
+        adata.uns[slot_name]["post_sample_sds"] = self.samples["post_sample_sds"]
+        adata.uns[slot_name]["post_sample_q05"] = self.samples["post_sample_q05"]
+        adata.uns[slot_name]["post_sample_q95"] = self.samples["post_sample_q95"]
 
         return adata

@@ -5,22 +5,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import functools
-import operator
-import warnings
-import weakref
 from contextlib import ExitStack  # python 3
-
-import torch
-from torch import nn
-from torch.distributions import biject_to, constraints
 
 import pyro
 import pyro.distributions as dist
+import torch
 from pyro.distributions.util import sum_rightmost
+from pyro.infer.autoguide.guides import AutoGuide
 from pyro.infer.autoguide.initialization import InitMessenger, init_to_mean
 from pyro.nn import PyroModule, PyroParam
 from pyro.ops.tensor_utils import periodic_repeat
-from pyro.infer.autoguide.guides import AutoGuide
+from torch import nn
+from torch.distributions import biject_to, constraints
+
 
 def _deep_setattr(obj, key, val):
     """
@@ -38,8 +35,9 @@ def _deep_setattr(obj, key, val):
     lpart, _, rpart = key.rpartition(".")
     # Recursive getattr while setting any prefix attributes to PyroModule
     if lpart:
-        obj = functools.reduce(_getattr, [obj] + lpart.split('.'))
+        obj = functools.reduce(_getattr, [obj] + lpart.split("."))
     setattr(obj, rpart, val)
+
 
 def _deep_getattr(obj, key):
     for part in key.split("."):
@@ -77,13 +75,11 @@ class AutoNormal(AutoGuide):
         or iterable of plates. Plates not returned will be created
         automatically as usual. This is useful for data subsampling.
     """
-    def __init__(self, model, *,
-                 init_loc_fn=init_to_mean,
-                 init_scale=0.0,
-                 create_plates=None):
+
+    def __init__(self, model, *, init_loc_fn=init_to_mean, init_scale=0.0, create_plates=None):
         self.init_loc_fn = init_loc_fn
 
-        if not isinstance(init_scale, float): # or not (init_scale > 0):
+        if not isinstance(init_scale, float):  # or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
         self._init_scale = init_scale
 
@@ -154,21 +150,20 @@ class AutoNormal(AutoGuide):
                 unconstrained_latent = pyro.sample(
                     name + "_unconstrained",
                     dist.Normal(
-                        site_loc, self.softplus(site_scale),
+                        site_loc,
+                        self.softplus(site_scale),
                     ).to_event(self._event_dims[name]),
-                    infer={"is_auxiliary": True}
+                    infer={"is_auxiliary": True},
                 )
 
                 value = transform(unconstrained_latent)
                 log_density = transform.inv.log_abs_det_jacobian(value, unconstrained_latent)
                 log_density = sum_rightmost(log_density, log_density.dim() - value.dim() + site["fn"].event_dim)
-                delta_dist = dist.Delta(value, log_density=log_density,
-                                        event_dim=site["fn"].event_dim)
+                delta_dist = dist.Delta(value, log_density=log_density, event_dim=site["fn"].event_dim)
 
                 result[name] = pyro.sample(name, delta_dist)
 
         return result
-
 
     def median(self, *args, **kwargs):
         """
@@ -186,7 +181,6 @@ class AutoNormal(AutoGuide):
             medians[name] = median
 
         return medians
-
 
     def quantiles(self, quantiles, *args, **kwargs):
         """

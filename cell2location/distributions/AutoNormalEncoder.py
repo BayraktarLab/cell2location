@@ -13,10 +13,9 @@ from pyro.infer.autoguide.guides import _deep_getattr, _deep_setattr
 from pyro.infer.autoguide.utils import helpful_support_errors
 from pyro.nn import PyroModule, PyroParam
 from pyro.nn.module import to_pyro_module_
-from torch.distributions import biject_to
-
 from scvi._compat import Literal
 from scvi.nn import FCLayers
+from torch.distributions import biject_to
 
 
 class FCLayersPyro(FCLayers, PyroModule):
@@ -161,13 +160,7 @@ class AutoNormalEncoder(AutoGuide):
         self.single_n_in = n_in
         self.multiple_n_in = n_in
         self.n_out = (
-            np.sum(
-                [
-                    np.sum(amortised_plate_sites["sites"][k])
-                    for k in amortised_plate_sites["sites"].keys()
-                ]
-            )
-            * 2
+            np.sum([np.sum(amortised_plate_sites["sites"][k]) for k in amortised_plate_sites["sites"].keys()]) * 2
         )
         self.n_hidden = n_hidden
         self.encoder_class = encoder_class
@@ -180,9 +173,7 @@ class AutoNormalEncoder(AutoGuide):
                 to_pyro_module_(self.one_encoder)
             else:
                 self.one_encoder = encoder_class(
-                    n_in=self.single_n_in,
-                    n_out=self.n_hidden["single"],
-                    **self.encoder_kwargs
+                    n_in=self.single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs
                 )
             if "multiple" in self.encoder_mode:
                 self.multiple_n_in = self.n_hidden["single"]
@@ -206,9 +197,7 @@ class AutoNormalEncoder(AutoGuide):
         for name, site in self.prototype_trace.iter_stochastic_nodes():
             # Collect unconstrained event_dims, which may differ from constrained event_dims.
             with helpful_support_errors(site):
-                init_loc = (
-                    biject_to(site["fn"].support).inv(site["value"].detach()).detach()
-                )
+                init_loc = biject_to(site["fn"].support).inv(site["value"].detach()).detach()
             event_dim = site["fn"].event_dim + init_loc.dim() - site["value"].dim()
             self._event_dims[name] = event_dim
 
@@ -232,11 +221,7 @@ class AutoNormalEncoder(AutoGuide):
             _deep_setattr(
                 self.hidden2locs,
                 name,
-                PyroParam(
-                    torch.tensor(
-                        init_param, device=site["value"].device, requires_grad=True
-                    )
-                ),
+                PyroParam(torch.tensor(init_param, device=site["value"].device, requires_grad=True)),
             )
 
             init_param = np.random.normal(
@@ -246,11 +231,7 @@ class AutoNormalEncoder(AutoGuide):
             _deep_setattr(
                 self.hidden2scales,
                 name,
-                PyroParam(
-                    torch.tensor(
-                        init_param, device=site["value"].device, requires_grad=True
-                    )
-                ),
+                PyroParam(torch.tensor(init_param, device=site["value"].device, requires_grad=True)),
             )
 
             if "multiple" in self.encoder_mode:
@@ -270,11 +251,9 @@ class AutoNormalEncoder(AutoGuide):
                     _deep_setattr(
                         self.multiple_encoders,
                         name,
-                        self.encoder_class(
-                            n_in=self.multiple_n_in,
-                            n_out=n_hidden,
-                            **self.multi_encoder_kwargs
-                        ).to(site["value"].device),
+                        self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs).to(
+                            site["value"].device
+                        ),
                     )
 
     def _get_loc_and_scale(self, name, encoded_hidden):
@@ -436,15 +415,9 @@ class AutoNormalEncoder(AutoGuide):
         for name, site in self.prototype_trace.iter_stochastic_nodes():
             site_loc, site_scale = self._get_loc_and_scale(name, encoded_latent)
 
-            site_quantiles = torch.tensor(
-                quantiles, dtype=site_loc.dtype, device=site_loc.device
-            )
-            site_quantiles_values = dist.Normal(site_loc, site_scale).icdf(
-                site_quantiles
-            )
-            constrained_site_quantiles = biject_to(site["fn"].support)(
-                site_quantiles_values
-            )
+            site_quantiles = torch.tensor(quantiles, dtype=site_loc.dtype, device=site_loc.device)
+            site_quantiles_values = dist.Normal(site_loc, site_scale).icdf(site_quantiles)
+            constrained_site_quantiles = biject_to(site["fn"].support)(site_quantiles_values)
             results[name] = constrained_site_quantiles
 
         return results
