@@ -34,8 +34,7 @@ jobs:
             ${{ runner.os }}-pip-v1-
     - name: Install dependencies
       run: |
-        pip install isort flake8 black
-        pip install .
+        pip install .[dev]
     - name: Lint with flake8
       run: |
         flake8
