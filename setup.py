@@ -6,7 +6,8 @@ from setuptools import setup
 
 def setup_package():
     install_requires = [
-        'pymc3>=3.8,<3.10', 'pyro-ppl>=1.7.0', 'scvi-tools>=0.12.2', 'torch>=1.9.0',
+        'pyro-ppl>=1.7.0', 'scvi-tools>=0.12.2', 'torch>=1.9.0',
+        'pymc3>=3.8,<3.10', 'arviz==0.10.0',
         'numpy', 'pandas', 'scanpy',
         'plotnine'
     ]
