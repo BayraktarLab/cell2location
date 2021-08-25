@@ -31,12 +31,12 @@ def get_sparse_matrix_from_indices_distances_umap(knn_indices, knn_dists, n_obs,
     return result.tocsr()
 
 
-def compute_connectivities_umap(knn_indices, knn_dists,
-                                n_obs, n_neighbors, set_op_mix_ratio=1.0,
-                                local_connectivity=1.0):
+def compute_connectivities_umap(
+    knn_indices, knn_dists, n_obs, n_neighbors, set_op_mix_ratio=1.0, local_connectivity=1.0
+):
     r"""
     Copied out of scanpy.neighbors
-    
+
     This is from umap.fuzzy_simplicial_set [McInnes18]_.
     Given a set of data X, a neighborhood size, and a measure of distance
     compute the fuzzy simplicial set (here represented as a fuzzy graph in
@@ -47,10 +47,16 @@ def compute_connectivities_umap(knn_indices, knn_dists,
     """
     X = coo_matrix(([], ([], [])), shape=(n_obs, 1))
 
-    connectivities = fuzzy_simplicial_set(X, n_neighbors, None, None,
-                                          knn_indices=knn_indices, knn_dists=knn_dists,
-                                          set_op_mix_ratio=set_op_mix_ratio,
-                                          local_connectivity=local_connectivity)
+    connectivities = fuzzy_simplicial_set(
+        X,
+        n_neighbors,
+        None,
+        None,
+        knn_indices=knn_indices,
+        knn_dists=knn_dists,
+        set_op_mix_ratio=set_op_mix_ratio,
+        local_connectivity=local_connectivity,
+    )
 
     if isinstance(connectivities, tuple):
         # In umap-learn 0.4, this returns (result, sigmas, rhos)
@@ -63,9 +69,8 @@ def compute_connectivities_umap(knn_indices, knn_dists,
 
 # ####################--------########################
 
-def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
-                       include_source_location=True,
-                       sample_id=None):
+
+def spatial_neighbours(coords, n_sp_neighbors=7, radius=None, include_source_location=True, sample_id=None):
     """
     Find spatial neighbours using the number of neighbours or radius (KDTree approach).
 
@@ -87,7 +92,7 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
         coord_ind = np.zeros(coords.shape[0])
 
     if sample_id is None:
-        sample_id = np.array(['sample' for i in range(coords.shape[0])])
+        sample_id = np.array(["sample" for i in range(coords.shape[0])])
 
     total_ind = np.arange(0, coords.shape[0]).astype(int)
 
@@ -95,8 +100,7 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
         sam_ind = np.isin(sample_id, [sam])
         coord_tree = KDTree(coords[sam_ind, :])
         if radius is None:
-            n_list = coord_tree.query(coords[sam_ind, :],
-                                      k=n_sp_neighbors, return_distance=False)
+            n_list = coord_tree.query(coords[sam_ind, :], k=n_sp_neighbors, return_distance=False)
             n_list = np.array(n_list)
             # replace sample-specific indices with a global index
             for c in range(n_list.shape[1]):
@@ -109,8 +113,7 @@ def spatial_neighbours(coords, n_sp_neighbors=7, radius=None,
                 coord_ind[sam_ind, :] = n_list[n_list_sel].reshape((sam_ind.sum(), n_sp_neighbors - 1))
 
         else:
-            coord_ind[sam_ind] = coord_tree.query_radius(coords[sam_ind, :],
-                                                         radius, count_only=False)
+            coord_ind[sam_ind] = coord_tree.query_radius(coords[sam_ind, :], radius, count_only=False)
 
     return coord_ind.astype(int)
 
@@ -121,15 +124,17 @@ def sum_neighbours(X_data, neighbours):
 
     :param coords: numpy.ndarray with variable measurements for each observation  (observations * variables)
     :param neighbours: numpy.ndarray with neigbour indices for each observation (observations * neigbours)
-     """
+    """
 
     return np.sum([X_data[neighbours[:, n], :] for n in range(neighbours.shape[1])], axis=0)
 
 
 # ####################--------########################
 
-def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=None,
-                which_exprs_dims=None, sample_id=None):
+
+def spatial_knn(
+    coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=None, which_exprs_dims=None, sample_id=None
+):
     """
     A variant on the standard knn neighbor graph inference procedure that also includes the spatial neighbors of each spot.
     With help from Krzysztof Polanski.
@@ -151,11 +156,13 @@ def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=Non
     for sam in sample_id.unique():
         coord_tree = KDTree(coords[sample_id.isin([sam]), :])
         if radius is None:
-            coord_ind[sample_id.isin([sam]), :] = coord_tree.query(coords[sample_id.isin([sam]), :],
-                                                                   k=n_sp_neighbors, return_distance=False)
+            coord_ind[sample_id.isin([sam]), :] = coord_tree.query(
+                coords[sample_id.isin([sam]), :], k=n_sp_neighbors, return_distance=False
+            )
         else:
-            coord_ind[sample_id.isin([sam])] = coord_tree.query_radius(coords[sample_id.isin([sam]), :],
-                                                                       radius, count_only=False)
+            coord_ind[sample_id.isin([sam])] = coord_tree.query_radius(
+                coords[sample_id.isin([sam]), :], radius, count_only=False
+            )
 
     # if selected dimensions not provided choose all
     if which_exprs_dims is None:
@@ -215,20 +222,29 @@ def spatial_knn(coords, expression, n_neighbors=14, n_sp_neighbors=7, radius=Non
 
     # compute connectivities and export as a dictionary
     dist, cnts = compute_connectivities_umap(knn_indices, knn_distances, knn_indices.shape[0], knn_indices.shape[1])
-    neighbors = {'distances': dist,
-                 'connectivities': cnts,
-                 'params': {'n_neighbors': n_neighbors + n_sp_neighbors,
-                            'method': 'spot_factors2knn', 'metric': 'euclidean'}}
+    neighbors = {
+        "distances": dist,
+        "connectivities": cnts,
+        "params": {"n_neighbors": n_neighbors + n_sp_neighbors, "method": "spot_factors2knn", "metric": "euclidean"},
+    }
     return neighbors
 
 
 # ####################--------########################
 
-def spot_factors2knn(adata, coord_col=['x', 'y'], sample_col='sample.x',
-                     node_name='nUMI_factors', sample_type='mean',
-                     n_neighbors=14, n_sp_neighbors=7,
-                     which_exprs_dims=None, which_sample=None):
-    r""" Construct spatially aware KNN graph using W spot weights
+
+def spot_factors2knn(
+    adata,
+    coord_col=["x", "y"],
+    sample_col="sample.x",
+    node_name="nUMI_factors",
+    sample_type="mean",
+    n_neighbors=14,
+    n_sp_neighbors=7,
+    which_exprs_dims=None,
+    which_sample=None,
+):
+    r"""Construct spatially aware KNN graph using W spot weights
     :param adata: anndata object with spot weights.
     :param coord_col: anndata.obs columns containing spatial coordinates.
     :param sample_col: anndata.obs columns containing individual Visium sample identifier.
@@ -242,7 +258,7 @@ def spot_factors2knn(adata, coord_col=['x', 'y'], sample_col='sample.x',
     :return: updated anndata with neighbour graph in adata.uns['neighbors']
     """
 
-    if not sample_type in ['mean', 'sds', 'q05']:
+    if sample_type not in ["mean", "sds", "q05"]:
         raise ValueError("sample_type should be one of `['mean', 'sds', 'q05']`.")
 
     obs = adata.obs
@@ -255,12 +271,17 @@ def spot_factors2knn(adata, coord_col=['x', 'y'], sample_col='sample.x',
 
     # extract needed info
     coords = obs[coord_col].values
-    col_ind = [sample_type + '_' + node_name in i for i in obs_col.tolist()]
+    col_ind = [sample_type + "_" + node_name in i for i in obs_col.tolist()]
     exprs = obs.loc[:, col_ind].values
     sample_id = obs[sample_col]
 
-    adata.uns['neighbors'] = spatial_knn(coords, expression=exprs,
-                                         n_neighbors=n_neighbors, n_sp_neighbors=n_sp_neighbors,
-                                         which_exprs_dims=which_exprs_dims, sample_id=sample_id)
+    adata.uns["neighbors"] = spatial_knn(
+        coords,
+        expression=exprs,
+        n_neighbors=n_neighbors,
+        n_sp_neighbors=n_sp_neighbors,
+        which_exprs_dims=which_exprs_dims,
+        sample_id=sample_id,
+    )
 
     return adata

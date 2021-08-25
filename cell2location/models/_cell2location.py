@@ -2,25 +2,22 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+import scvi
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
-
-import scvi
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 
-from .base._pyro_base import PltExportMixin, QuantileMixin
-from .base._pyro_base_loc_model import Cell2locationBaseModule
 from ._cell2location_v3_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
+from .base._pyro_base import PltExportMixin, QuantileMixin
+from .base._pyro_base_loc_model import Cell2locationBaseModule
 
 
-class Cell2location(
-    QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass
-):
+class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
     """
     Reimplementation of cell2location [Kleshchevnikov20]_ model. User-end model class.
 
@@ -56,9 +53,7 @@ class Cell2location(
         clear_param_store()
 
         if not np.all(adata.var_names == cell_state_df.index):
-            raise ValueError(
-                "adata.var_names should match cell_state_df.index, find interecting variables/genes first"
-            )
+            raise ValueError("adata.var_names should match cell_state_df.index, find interecting variables/genes first")
 
         # add index for each cell (provided to pyro plate for correct minibatching)
         adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
@@ -83,9 +78,7 @@ class Cell2location(
             sc_total = cell_state_df.sum(0).mean()
             sp_total = get_from_registry(self.adata, _CONSTANTS.X_KEY).sum(1).mean()
             get_from_registry(adata, _CONSTANTS.BATCH_KEY)
-            self.detection_mean_ = (
-                sp_total / model_kwargs.get("N_cells_per_location", 1)
-            ) / sc_total
+            self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction
             model_kwargs["detection_mean"] = self.detection_mean_
         else:
@@ -93,26 +86,17 @@ class Cell2location(
             sc_total = cell_state_df.sum(0).mean()
             sp_total = get_from_registry(self.adata, _CONSTANTS.X_KEY).sum(1)
             batch = get_from_registry(self.adata, _CONSTANTS.BATCH_KEY).flatten()
-            sp_total = np.array(
-                [
-                    sp_total[batch == b].mean()
-                    for b in range(self.summary_stats["n_batch"])
-                ]
-            )
-            self.detection_mean_ = (
-                sp_total / model_kwargs.get("N_cells_per_location", 1)
-            ) / sc_total
+            sp_total = np.array([sp_total[batch == b].mean() for b in range(self.summary_stats["n_batch"])])
+            self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction
-            model_kwargs["detection_mean"] = self.detection_mean_.reshape(
-                (self.summary_stats["n_batch"], 1)
-            ).astype("float32")
+            model_kwargs["detection_mean"] = self.detection_mean_.reshape((self.summary_stats["n_batch"], 1)).astype(
+                "float32"
+            )
 
         detection_alpha = model_kwargs.get("detection_alpha", None)
         if detection_alpha is not None:
             if type(detection_alpha) is dict:
-                batch_mapping = self.adata.uns["_scvi"]["categorical_mappings"][
-                    "_scvi_batch"
-                ]["mapping"]
+                batch_mapping = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_batch"]["mapping"]
                 self.detection_alpha_ = pd.Series(detection_alpha)[batch_mapping]
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
@@ -184,9 +168,7 @@ class Cell2location(
                 name_prefix="cell_abundance",
             )
             try:
-                adata.obsm[f"{k}_cell_abundance_w_sf"] = sample_df.loc[
-                    adata.obs.index, :
-                ]
+                adata.obsm[f"{k}_cell_abundance_w_sf"] = sample_df.loc[adata.obs.index, :]
             except ValueError:
                 # Catching weird error with obsm: `ValueError: value.index does not match parent’s axis 1 names`
                 adata.obs[sample_df.columns] = sample_df.loc[adata.obs.index, :]

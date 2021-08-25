@@ -1,19 +1,27 @@
 #!pip install plotnine
 import numpy as np
 import pandas as pd
-from plotnine import *
+import plotnine
 
 
-def plot_factor_spatial(adata, fact, cluster_names,
-                        fact_ind=[0], trans="log",
-                        sample_name=None, samples_col='sample',
-                        obs_x='imagecol', obs_y='imagerow',
-                        n_columns=6,
-                        max_col=5000,
-                        col_breaks=[0.1, 100, 1000, 3000],
-                        figure_size=(24, 5.7),
-                        point_size=0.8, text_size=9):
-    r"""Plot expression of factors / cell types in space. 
+def plot_factor_spatial(
+    adata,
+    fact,
+    cluster_names,
+    fact_ind=[0],
+    trans="log",
+    sample_name=None,
+    samples_col="sample",
+    obs_x="imagecol",
+    obs_y="imagerow",
+    n_columns=6,
+    max_col=5000,
+    col_breaks=[0.1, 100, 1000, 3000],
+    figure_size=(24, 5.7),
+    point_size=0.8,
+    text_size=9,
+):
+    r"""Plot expression of factors / cell types in space.
         Convenient but not as powerful as scanpy plotting.
     :param adata: anndata object with spatial data
     :param fact: pd.DataFrame with spatial expression of factors (W), e.g. mod.spot_factors_df
@@ -39,86 +47,87 @@ def plot_factor_spatial(adata, fact, cluster_names,
 
     # adata.obsm['X_spatial'][:,0] vs adata.obs['imagecol'] & adata.obs['imagerow']
 
-    for_plot = np.concatenate((adata.obs[obs_x].values.reshape((adata.obs.shape[0], 1)),
-                               -adata.obs[obs_y].values.reshape((adata.obs.shape[0], 1)),
-                               fact.iloc[:, fact_ind[0]].values.reshape((adata.obs.shape[0], 1)),
-                               np.array([cluster_names[fact_ind[0]] for j in range(adata.obs.shape[0])]).reshape(
-                                   (adata.obs.shape[0], 1))),
-                              1)
-    for_plot = pd.DataFrame(for_plot, index=adata.obs.index,
-                            columns=['imagecol', 'imagerow', 'weights', 'cluster'])
+    for_plot = np.concatenate(
+        (
+            adata.obs[obs_x].values.reshape((adata.obs.shape[0], 1)),
+            -adata.obs[obs_y].values.reshape((adata.obs.shape[0], 1)),
+            fact.iloc[:, fact_ind[0]].values.reshape((adata.obs.shape[0], 1)),
+            np.array([cluster_names[fact_ind[0]] for j in range(adata.obs.shape[0])]).reshape((adata.obs.shape[0], 1)),
+        ),
+        1,
+    )
+    for_plot = pd.DataFrame(for_plot, index=adata.obs.index, columns=["imagecol", "imagerow", "weights", "cluster"])
     # select only correct sample
     for_plot = for_plot.loc[sample_ind, :]
 
     for i in fact_ind[1:]:
-        for_plot1 = np.concatenate((adata.obs[obs_x].values.reshape((adata.obs.shape[0], 1)),
-                                    -adata.obs[obs_y].values.reshape((adata.obs.shape[0], 1)),
-                                    fact.iloc[:, i].values.reshape((adata.obs.shape[0], 1)),
-                                    np.array([cluster_names[i] for j in range(adata.obs.shape[0])]).reshape(
-                                        (adata.obs.shape[0], 1))),
-                                   1)
-        for_plot1 = pd.DataFrame(for_plot1, index=adata.obs.index,
-                                 columns=['imagecol', 'imagerow', 'weights', 'cluster'])
+        for_plot1 = np.concatenate(
+            (
+                adata.obs[obs_x].values.reshape((adata.obs.shape[0], 1)),
+                -adata.obs[obs_y].values.reshape((adata.obs.shape[0], 1)),
+                fact.iloc[:, i].values.reshape((adata.obs.shape[0], 1)),
+                np.array([cluster_names[i] for j in range(adata.obs.shape[0])]).reshape((adata.obs.shape[0], 1)),
+            ),
+            1,
+        )
+        for_plot1 = pd.DataFrame(
+            for_plot1, index=adata.obs.index, columns=["imagecol", "imagerow", "weights", "cluster"]
+        )
         # select only correct sample
         for_plot1 = for_plot1.loc[sample_ind, :]
         for_plot = pd.concat((for_plot, for_plot1))
 
-    for_plot['imagecol'] = pd.to_numeric(for_plot['imagecol'])
-    for_plot['imagerow'] = pd.to_numeric(for_plot['imagerow'])
-    for_plot['weights'] = pd.to_numeric(for_plot['weights'])
-    for_plot['cluster'] = pd.Categorical(for_plot['cluster'],
-                                         categories=cluster_names[fact_ind],
-                                         ordered=True)
+    for_plot["imagecol"] = pd.to_numeric(for_plot["imagecol"])
+    for_plot["imagerow"] = pd.to_numeric(for_plot["imagerow"])
+    for_plot["weights"] = pd.to_numeric(for_plot["weights"])
+    for_plot["cluster"] = pd.Categorical(for_plot["cluster"], categories=cluster_names[fact_ind], ordered=True)
 
     # print(np.log(np.max(for_plot['weights'])))
-    ax = (ggplot(for_plot, aes('imagecol', 'imagerow', color='weights'))
-          + geom_point(size=point_size)
-          + scale_color_cmap('magma', trans=trans,
-                             limits=[0.1, max_col],
-                             breaks=col_breaks + [max_col]
-                             )
-          + coord_fixed()
-          + theme_bw()
-          + theme(panel_background=element_rect(fill="black", colour="black",
-                                                size=0, linetype="solid"),
-                  panel_grid_major=element_line(size=0, linetype='solid',
-                                                colour="black"),
-                  panel_grid_minor=element_line(size=0, linetype='solid',
-                                                colour="black"),
-                  strip_text=element_text(size=text_size))
-          + facet_wrap('~cluster', ncol=n_columns)
-          + ggtitle('nUMI from each cell type')
-          + theme(figure_size=figure_size))
+    ax = (
+        plotnine.ggplot(for_plot, plotnine.aes("imagecol", "imagerow", color="weights"))
+        + plotnine.geom_point(size=point_size)
+        + plotnine.scale_color_cmap("magma", trans=trans, limits=[0.1, max_col], breaks=col_breaks + [max_col])
+        + plotnine.coord_fixed()
+        + plotnine.theme_bw()
+        + plotnine.theme(
+            panel_background=plotnine.element_rect(fill="black", colour="black", size=0, linetype="solid"),
+            panel_grid_major=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            panel_grid_minor=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            strip_text=plotnine.element_text(size=text_size),
+        )
+        + plotnine.facet_wrap("~cluster", ncol=n_columns)
+        + plotnine.ggtitle("nUMI from each cell type")
+        + plotnine.theme(figure_size=figure_size)
+    )
 
-    return (ax)
+    return ax
 
 
-def plot_categ_spatial(mod, adata, sample_col, color, n_columns=2,
-                       figure_size=(24, 5.7),
-                       point_size=0.8, text_size=9):
+def plot_categ_spatial(mod, adata, sample_col, color, n_columns=2, figure_size=(24, 5.7), point_size=0.8, text_size=9):
 
-    for_plot = adata.obs[['imagecol', 'imagerow', sample_col]]
-    for_plot['color'] = color
+    for_plot = adata.obs[["imagecol", "imagerow", sample_col]]
+    for_plot["color"] = color
 
     # fix types
-    for_plot['color'] = pd.Categorical(for_plot['color'], ordered=True)
+    for_plot["color"] = pd.Categorical(for_plot["color"], ordered=True)
     # for_plot['color'] = pd.to_numeric(for_plot['color'])
-    for_plot['sample'] = pd.Categorical(for_plot[sample_col], ordered=False)
-    for_plot['imagecol'] = pd.to_numeric(for_plot['imagecol'])
-    for_plot['imagerow'] = -pd.to_numeric(for_plot['imagerow'])
+    for_plot["sample"] = pd.Categorical(for_plot[sample_col], ordered=False)
+    for_plot["imagecol"] = pd.to_numeric(for_plot["imagecol"])
+    for_plot["imagerow"] = -pd.to_numeric(for_plot["imagerow"])
 
-    ax = (ggplot(for_plot, aes(x='imagecol', y='imagerow', color='color'))
-          + geom_point(size=point_size)  # + scale_color_cmap()
-          + coord_fixed()
-          + theme_bw()
-          + theme(panel_background=element_rect(fill="black", colour="black",
-                                                size=0, linetype="solid"),
-                  panel_grid_major=element_line(size=0, linetype='solid',
-                                                colour="black"),
-                  panel_grid_minor=element_line(size=0, linetype='solid',
-                                                colour="black"),
-                  strip_text=element_text(size=text_size))
-          + facet_wrap('~sample', ncol=n_columns)
-          + theme(figure_size=figure_size))
+    ax = (
+        plotnine.ggplot(for_plot, plotnine.aes(x="imagecol", y="imagerow", color="color"))
+        + plotnine.geom_point(size=point_size)  # + plotnine.scale_color_cmap()
+        + plotnine.coord_fixed()
+        + plotnine.theme_bw()
+        + plotnine.theme(
+            panel_background=plotnine.element_rect(fill="black", colour="black", size=0, linetype="solid"),
+            panel_grid_major=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            panel_grid_minor=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            strip_text=plotnine.element_text(size=text_size),
+        )
+        + plotnine.facet_wrap("~sample", ncol=n_columns)
+        + plotnine.theme(figure_size=figure_size)
+    )
 
     return ax

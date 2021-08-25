@@ -6,13 +6,12 @@ import numpy as np
 import pandas as pd
 import pyro
 import pyro.distributions as dist
+import scvi
 import torch
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
 from scipy.sparse import csr_matrix
-
-import scvi
 from scvi import _CONSTANTS
 from scvi._compat import Literal
 from scvi.data._anndata import get_from_registry
@@ -20,7 +19,12 @@ from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.module.base import PyroBaseModuleClass
 from scvi.nn import one_hot
 
-from ..base._pyro_base import AutoGuideMixinModule, PltExportMixin, QuantileMixin, init_to_value
+from ..base._pyro_base import (
+    AutoGuideMixinModule,
+    PltExportMixin,
+    QuantileMixin,
+    init_to_value,
+)
 
 
 def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
@@ -53,9 +57,7 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
             var_names = adata.var_names
         else:
             if not adata.raw:
-                raise ValueError(
-                    "AnnData object has no raw data, change `use_raw=True, layer=None` or fix your object"
-                )
+                raise ValueError("AnnData object has no raw data, change `use_raw=True, layer=None` or fix your object")
             x = adata.raw.X
             var_names = adata.raw.var_names
 
@@ -256,17 +258,13 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
                 dim=1,
             )
 
-        obs_plate = self.create_plates(
-            x_data, idx, batch_index, label_index, extra_categoricals
-        )
+        obs_plate = self.create_plates(x_data, idx, batch_index, label_index, extra_categoricals)
 
         # =====================Per-cluster average mRNA count ======================= #
         # \mu_{f,g}
         per_cluster_mu_fg = pyro.sample(
             "per_cluster_mu_fg",
-            dist.Gamma(self.ones, self.ones)
-            .expand([self.n_factors, self.n_vars])
-            .to_event(2),
+            dist.Gamma(self.ones, self.ones).expand([self.n_factors, self.n_vars]).to_event(2),
         )
 
         # =====================Gene-specific multiplicative component ======================= #
@@ -300,9 +298,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         # s_{e,g} accounting for background, free-floating RNA
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(
-                self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta
-            ),
+            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -315,9 +311,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         )  # (self.n_batch)
         s_g_gene_add_alpha_e_inv = pyro.sample(
             "s_g_gene_add_alpha_e_inv",
-            dist.Exponential(s_g_gene_add_alpha_hyp)
-            .expand([self.n_batch, 1])
-            .to_event(2),
+            dist.Exponential(s_g_gene_add_alpha_hyp).expand([self.n_batch, 1]).to_event(2),
         )  # (self.n_batch)
         s_g_gene_add_alpha_e = self.ones / s_g_gene_add_alpha_e_inv.pow(2)
 
@@ -331,9 +325,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(
-                self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta
-            ),
+            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
@@ -346,8 +338,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         alpha = self.ones / alpha_g_inverse.pow(2)
         # biological expression
         mu = (
-            obs2label @ per_cluster_mu_fg  # contaminating RNA
-            + obs2sample @ s_g_gene_add
+            obs2label @ per_cluster_mu_fg + obs2sample @ s_g_gene_add  # contaminating RNA
         ) * detection_y_c  # cell-specific normalisation
         if self.n_extra_categoricals is not None:
             # gene-specific normalisation for covatiates
@@ -400,10 +391,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
 
         alpha = 1 / np.power(samples["alpha_g_inverse"], 2)
 
-        mu = (
-            np.dot(obs2label, samples["per_cluster_mu_fg"])
-            + np.dot(obs2sample, samples["s_g_gene_add"])
-        ) * np.dot(
+        mu = (np.dot(obs2label, samples["per_cluster_mu_fg"]) + np.dot(obs2sample, samples["s_g_gene_add"])) * np.dot(
             obs2sample, samples["detection_mean_y_e"]
         )  # samples["detection_y_c"][ind_x, :]
         if self.n_extra_categoricals is not None:
@@ -435,27 +423,20 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         if self.n_extra_categoricals is not None:
             extra_categoricals = get_from_registry(adata, _CONSTANTS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
-                [
-                    pd.get_dummies(extra_categoricals.iloc[:, i])
-                    for i, n_cat in enumerate(self.n_extra_categoricals)
-                ],
+                [pd.get_dummies(extra_categoricals.iloc[:, i]) for i, n_cat in enumerate(self.n_extra_categoricals)],
                 axis=1,
             )
 
         alpha = 1 / np.power(samples["alpha_g_inverse"], 2)
 
         mu = (
-            np.dot(
-                obs2label[cell_ind, fact_ind], samples["per_cluster_mu_fg"][fact_ind, :]
-            )
+            np.dot(obs2label[cell_ind, fact_ind], samples["per_cluster_mu_fg"][fact_ind, :])
             + np.dot(obs2sample[cell_ind, :], samples["s_g_gene_add"])
         ) * np.dot(
             obs2sample, samples["detection_mean_y_e"]
         )  # samples["detection_y_c"]
         if self.n_extra_categoricals is not None:
-            mu = mu * np.dot(
-                obs2extra_categoricals[cell_ind, :], samples["detection_tech_gene_tg"]
-            )
+            mu = mu * np.dot(obs2extra_categoricals[cell_ind, :], samples["detection_tech_gene_tg"])
 
         return {"mu": mu, "alpha": alpha}
 
@@ -475,10 +456,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         if self.n_extra_categoricals is not None:
             extra_categoricals = get_from_registry(adata, _CONSTANTS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
-                [
-                    pd.get_dummies(extra_categoricals.iloc[:, i])
-                    for i, n_cat in enumerate(self.n_extra_categoricals)
-                ],
+                [pd.get_dummies(extra_categoricals.iloc[:, i]) for i, n_cat in enumerate(self.n_extra_categoricals)],
                 axis=1,
             )
         # get counts matrix
@@ -487,9 +465,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         corrected = corrected / np.dot(obs2sample, samples["detection_mean_y_e"])
         # normalise per gene effects
         if self.n_extra_categoricals is not None:
-            corrected = corrected / np.dot(
-                obs2extra_categoricals, samples["detection_tech_gene_tg"]
-            )
+            corrected = corrected / np.dot(obs2extra_categoricals, samples["detection_tech_gene_tg"])
 
         # remove additive sample effects
         corrected = corrected - np.dot(obs2sample, samples["s_g_gene_add"])
@@ -562,18 +538,13 @@ class RegressionBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
     def init_to_value(self, site):
 
         if getattr(self.model, "np_init_vals", None) is not None:
-            init_vals = {
-                k: getattr(self.model, f"init_val_{k}")
-                for k in self.model.np_init_vals.keys()
-            }
+            init_vals = {k: getattr(self.model, f"init_val_{k}") for k in self.model.np_init_vals.keys()}
         else:
             init_vals = dict()
         return init_to_value(site=site, values=init_vals)
 
 
-class RegressionModel(
-    QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass
-):
+class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
     """
     Model which estimates per cluster average mRNA count account for batch effects. User-end model class.
 
@@ -620,24 +591,18 @@ class RegressionModel(
 
         # annotations for cell types
         self.n_factors_ = self.summary_stats["n_labels"]
-        self.factor_names_ = self.adata.uns["_scvi"]["categorical_mappings"][
-            "_scvi_labels"
-        ]["mapping"]
+        self.factor_names_ = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_labels"]["mapping"]
         # annotations for extra categorical covariates
         if "extra_categoricals" in self.adata.uns["_scvi"].keys():
             self.extra_categoricals_ = self.adata.uns["_scvi"]["extra_categoricals"]
-            self.n_extra_categoricals_ = self.adata.uns["_scvi"]["extra_categoricals"][
-                "n_cats_per_key"
-            ]
+            self.n_extra_categoricals_ = self.adata.uns["_scvi"]["extra_categoricals"]["n_cats_per_key"]
             model_kwargs["n_extra_categoricals"] = self.n_extra_categoricals_
 
         # use per class average as initial value
         if use_average_as_initial:
             # compute cluster average expression
             aver = self._compute_cluster_averages(key="_scvi_labels")
-            model_kwargs["init_vals"] = {
-                "per_cluster_mu_fg": aver.values.T.astype("float32") + 0.0001
-            }
+            model_kwargs["init_vals"] = {"per_cluster_mu_fg": aver.values.T.astype("float32") + 0.0001}
 
         self.module = RegressionBaseModule(
             model=model_class,
@@ -673,9 +638,7 @@ class RegressionModel(
             layer = None
 
         # compute mean expression of each gene in each cluster/batch
-        aver = compute_cluster_averages(
-            self.adata, labels=label_col, use_raw=use_raw, layer=layer
-        )
+        aver = compute_cluster_averages(self.adata, labels=label_col, use_raw=use_raw, layer=layer)
 
         return aver
 
@@ -734,12 +697,8 @@ class RegressionModel(
                 summary_name=k,
                 name_prefix="",
             )
-            if scale_average_detection and (
-                "detection_y_c" in list(self.samples[f"post_sample_{k}"].keys())
-            ):
-                sample_df = (
-                    sample_df * self.samples[f"post_sample_{k}"]["detection_y_c"].mean()
-                )
+            if scale_average_detection and ("detection_y_c" in list(self.samples[f"post_sample_{k}"].keys())):
+                sample_df = sample_df * self.samples[f"post_sample_{k}"]["detection_y_c"].mean()
             try:
                 adata.varm[f"{k}_per_cluster_mu_fg"] = sample_df.loc[adata.var.index, :]
             except ValueError:
@@ -781,13 +740,8 @@ class RegressionModel(
         plt.show()
 
         inf_aver = self.samples[f"post_sample_{summary_name}"]["per_cluster_mu_fg"].T
-        if scale_average_detection and (
-            "detection_y_c" in list(self.samples[f"post_sample_{summary_name}"].keys())
-        ):
-            inf_aver = (
-                inf_aver
-                * self.samples[f"post_sample_{summary_name}"]["detection_y_c"].mean()
-            )
+        if scale_average_detection and ("detection_y_c" in list(self.samples[f"post_sample_{summary_name}"].keys())):
+            inf_aver = inf_aver * self.samples[f"post_sample_{summary_name}"]["detection_y_c"].mean()
         aver = self._compute_cluster_averages(key="_scvi_labels")
         aver = aver[self.factor_names_]
 
