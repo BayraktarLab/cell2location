@@ -151,13 +151,13 @@ class BaseModel:
         if return_aligned:
             return linear_sum_assignment(2 - corr12)[1]
 
-    def generate_cv_data(self, n=2, discrete=True, non_discrete_mean_var=1):
+    def generate_cv_data(self, n: int = 2, discrete: bool = True, non_discrete_mean_var: float = 1):
         r"""Generate X_data for molecular cross-validation by sampling molecule counts
              with np.random.binomial
         :param n: number of cross-validation folds of equal size to generate, for now, only n=2 is implemented
         """
 
-        if n is not 2:
+        if n != 2:
             raise ValueError("only n=2 is implemented for molecular cross-validation")
 
         self.X_data_sample = {}

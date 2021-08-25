@@ -531,12 +531,12 @@ def plot_video_mapping(
     if crop_y is None:
         img_height = sc_img.shape[1] * 0.99
         y_offset = 0
-        y_offset2 = 0
+        # y_offset2 = 0
         umap_coord[:, 1] = umap_coord[:, 1] / umap_coord[:, 1].max() * img_height
     else:
         img_height = abs(crop_y[0] - crop_y[1]) * 0.99
         y_offset = np.array(crop_y).min()
-        y_offset2 = sp_img.shape[1] - np.array(crop_y).max()
+        # y_offset2 = sp_img.shape[1] - np.array(crop_y).max()
         umap_coord[:, 1] = umap_coord[:, 1] / umap_coord[:, 1].max() * img_height
         umap_coord[:, 1] = umap_coord[:, 1] + y_offset
 

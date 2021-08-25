@@ -2,12 +2,13 @@
 r"""This Location model decomposes the expression of genes across locations into a set
     of reference regulatory programmes, while accounting for correlation of programs
     across locations with similar cell composition.
-    
+
     Unlike the standard LocationModel recommended for Visium data, this model includes a
     non-specific binding term that scales linearly with the total number of counts in the region
     of interest. In addition, it expects negative probe counts in each region of interest to estimate
     a prior distribution for this background."""
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pymc3 as pm

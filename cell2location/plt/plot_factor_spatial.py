@@ -1,7 +1,7 @@
 #!pip install plotnine
 import numpy as np
 import pandas as pd
-from plotnine import *
+import plotnine
 
 
 def plot_factor_spatial(
@@ -84,20 +84,20 @@ def plot_factor_spatial(
 
     # print(np.log(np.max(for_plot['weights'])))
     ax = (
-        ggplot(for_plot, aes("imagecol", "imagerow", color="weights"))
-        + geom_point(size=point_size)
-        + scale_color_cmap("magma", trans=trans, limits=[0.1, max_col], breaks=col_breaks + [max_col])
-        + coord_fixed()
-        + theme_bw()
-        + theme(
-            panel_background=element_rect(fill="black", colour="black", size=0, linetype="solid"),
-            panel_grid_major=element_line(size=0, linetype="solid", colour="black"),
-            panel_grid_minor=element_line(size=0, linetype="solid", colour="black"),
-            strip_text=element_text(size=text_size),
+        plotnine.ggplot(for_plot, plotnine.aes("imagecol", "imagerow", color="weights"))
+        + plotnine.geom_point(size=point_size)
+        + plotnine.scale_color_cmap("magma", trans=trans, limits=[0.1, max_col], breaks=col_breaks + [max_col])
+        + plotnine.coord_fixed()
+        + plotnine.theme_bw()
+        + plotnine.theme(
+            panel_background=plotnine.element_rect(fill="black", colour="black", size=0, linetype="solid"),
+            panel_grid_major=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            panel_grid_minor=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            strip_text=plotnine.element_text(size=text_size),
         )
-        + facet_wrap("~cluster", ncol=n_columns)
-        + ggtitle("nUMI from each cell type")
-        + theme(figure_size=figure_size)
+        + plotnine.facet_wrap("~cluster", ncol=n_columns)
+        + plotnine.ggtitle("nUMI from each cell type")
+        + plotnine.theme(figure_size=figure_size)
     )
 
     return ax
@@ -116,18 +116,18 @@ def plot_categ_spatial(mod, adata, sample_col, color, n_columns=2, figure_size=(
     for_plot["imagerow"] = -pd.to_numeric(for_plot["imagerow"])
 
     ax = (
-        ggplot(for_plot, aes(x="imagecol", y="imagerow", color="color"))
-        + geom_point(size=point_size)  # + scale_color_cmap()
-        + coord_fixed()
-        + theme_bw()
-        + theme(
-            panel_background=element_rect(fill="black", colour="black", size=0, linetype="solid"),
-            panel_grid_major=element_line(size=0, linetype="solid", colour="black"),
-            panel_grid_minor=element_line(size=0, linetype="solid", colour="black"),
-            strip_text=element_text(size=text_size),
+        plotnine.ggplot(for_plot, plotnine.aes(x="imagecol", y="imagerow", color="color"))
+        + plotnine.geom_point(size=point_size)  # + plotnine.scale_color_cmap()
+        + plotnine.coord_fixed()
+        + plotnine.theme_bw()
+        + plotnine.theme(
+            panel_background=plotnine.element_rect(fill="black", colour="black", size=0, linetype="solid"),
+            panel_grid_major=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            panel_grid_minor=plotnine.element_line(size=0, linetype="solid", colour="black"),
+            strip_text=plotnine.element_text(size=text_size),
         )
-        + facet_wrap("~sample", ncol=n_columns)
-        + theme(figure_size=figure_size)
+        + plotnine.facet_wrap("~sample", ncol=n_columns)
+        + plotnine.theme(figure_size=figure_size)
     )
 
     return ax

@@ -258,7 +258,7 @@ def spot_factors2knn(
     :return: updated anndata with neighbour graph in adata.uns['neighbors']
     """
 
-    if not sample_type in ["mean", "sds", "q05"]:
+    if sample_type not in ["mean", "sds", "q05"]:
         raise ValueError("sample_type should be one of `['mean', 'sds', 'q05']`.")
 
     obs = adata.obs

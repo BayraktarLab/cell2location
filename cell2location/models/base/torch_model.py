@@ -306,7 +306,7 @@ class TorchModel(BaseModel):
 
                     self.validation_hist[name].append(iter_loss_val)
                     epochs_iterator.set_description(
-                        f"Loss: " + "{:.4e}".format(iter_loss) + ": Val loss: " + "{:.4e}".format(iter_loss_val)
+                        "Loss: " + "{:.4e}".format(iter_loss) + ": Val loss: " + "{:.4e}".format(iter_loss_val)
                     )
                 else:
                     epochs_iterator.set_description("Loss: " + "{:.4e}".format(iter_loss))

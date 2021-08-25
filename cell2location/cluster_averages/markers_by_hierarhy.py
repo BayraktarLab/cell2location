@@ -43,15 +43,12 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
     :return: When input is :math:`g_{g,f}` the output is pd.DataFrame with values for :math:`f1, f2, f3, ..., fn, all`in columns. When input is :math:`g_{g,f,s}` where `s` represents posterior sample the output is a dictionary with posterior samples for :math:`g_{g,f1-fn+all,s}` and similar dataframes for 'mean' and quantiles of the posterior distribution (e.g. 'q0.05').
     """
 
-    region_aver = pd.DataFrame(index=var_names)
-    celltype_aver = pd.DataFrame(index=var_names)
-
     results = {}
     names = {}
 
     if len(inf_aver.shape) == 2:  # using summarised posterior samples
 
-        results[f"level_1"] = pd.DataFrame(inf_aver, index=var_names, columns=list(hierarhy_df.index))
+        results["level_1"] = pd.DataFrame(inf_aver, index=var_names, columns=list(hierarhy_df.index))
 
         for k in np.arange(hierarhy_df.shape[1]) + 2:
 
@@ -63,9 +60,9 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
             for c in k_names:
                 ind = hierarhy_df.iloc[:, k - 2] == c
                 c_names = hierarhy_df.index[ind]
-                ind_min = results[f"level_1"][c_names].min(1)
+                ind_min = results["level_1"][c_names].min(1)
                 results[f"level_{k_level}"][c] = ind_min
-                results[f"level_1"][c_names] = (results[f"level_1"][c_names].T - ind_min).T
+                results["level_1"][c_names] = (results["level_1"][c_names].T - ind_min).T
 
         if mode == "tree":
             # when mode is tree, add counts from parent levels
@@ -94,8 +91,8 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
         n_genes = inf_aver.shape[0]
         n_samples = inf_aver.shape[2]
 
-        results[f"level_1"] = inf_aver.copy()
-        names[f"level_1"] = list(hierarhy_df.index)
+        results["level_1"] = inf_aver.copy()
+        names["level_1"] = list(hierarhy_df.index)
 
         for k in np.arange(hierarhy_df.shape[1]) + 2:
 
@@ -109,9 +106,9 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
                 ind = hierarhy_df.iloc[:, k - 2] == c
                 k_ind = np.isin(k_names, c)
 
-                ind_min = results[f"level_1"][:, ind, :].min(axis=1).reshape((n_genes, 1, n_samples))
+                ind_min = results["level_1"][:, ind, :].min(axis=1).reshape((n_genes, 1, n_samples))
                 results[f"level_{k_level}"][:, k_ind, :] = ind_min
-                results[f"level_1"][:, ind, :] = results[f"level_1"][:, ind, :] - ind_min
+                results["level_1"][:, ind, :] = results["level_1"][:, ind, :] - ind_min
 
         if mode == "tree":
             # when mode is tree, add counts from parent levels

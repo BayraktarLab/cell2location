@@ -10,7 +10,7 @@ from torch.distributions.utils import broadcast_all, probs_to_logits
 #    Copyright (c) 2020 Romain Lopez, Adam Gayoso, Galen Xing, Yosef Lab
 #    All rights reserved
 
-# +
+
 def log_nb_positive(value, mu, theta, eps=1e-8):
     """NB loss with mu and theta parametrisation - Copied over from scVI
     Note: All inputs should be torch Tensors

@@ -101,10 +101,10 @@ def plot_absolute_abundances_1D(
             [], [], s=((1 - np.amin(countsForPlot * scaling) + pw * scaling)) ** power, c="black", label=str(pw)
         )
 
-    h, l = plt.gca().get_legend_handles_labels()
-    lgd = plt.legend(
+    h, leng = plt.gca().get_legend_handles_labels()
+    plt.legend(
         h[1:],
-        l[1:],
+        leng[1:],
         labelspacing=1.2,
         title="Total Number",
         borderpad=1,
@@ -200,10 +200,10 @@ def plot_density_1D(
             [], [], s=((1 - np.amin(countsForPlot * scaling) + pw * scaling)) ** power, c="black", label=str(pw)
         )
 
-    h, l = plt.gca().get_legend_handles_labels()
-    lgd = plt.legend(
+    h, leng = plt.gca().get_legend_handles_labels()
+    plt.legend(
         h[1:],
-        l[1:],
+        leng[1:],
         labelspacing=1.2,
         title="Density ($cells/mm^2$)",
         borderpad=1,

@@ -17,7 +17,7 @@ def plot_expected_vs_obs(
     """
 
     # remove the cell with maximal value
-    max1 = mu[:, np.where(data.var_names == gene1)].max()
+    # max1 = mu[:, np.where(data.var_names == gene1)].max()
 
     # extract from anndata and convert to numpy if needed
     x = data[:, gene1].X

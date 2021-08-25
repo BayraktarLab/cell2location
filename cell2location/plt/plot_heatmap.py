@@ -42,7 +42,7 @@ def heatmap(
     else:
         plt.imshow(array, interpolation="nearest", cmap=cmap)
 
-    if cbar == True:
+    if cbar is True:
         plt.colorbar()
 
     if ticks:
@@ -124,7 +124,7 @@ def dotplot(
             edgecolor="none",
         )
 
-    if cbar == True:
+    if cbar is True:
         plt.colorbar()
 
     if ticks:

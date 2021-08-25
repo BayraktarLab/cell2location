@@ -543,7 +543,7 @@ class Pymc3Model(BaseModel):
 
                 try:
                     variable_names = post_samples_1.keys()
-                except Exception as e:
+                except Exception:
                     variable_names = post_samples_1.varnames
 
                 # concatenate batches
@@ -551,7 +551,7 @@ class Pymc3Model(BaseModel):
 
             try:
                 variable_names = post_samples.keys()
-            except Exception as e:
+            except Exception:
                 variable_names = post_samples.varnames
 
             self.samples["post_sample_means"] = {v: post_samples[v].mean(axis=0) for v in variable_names}
@@ -825,7 +825,7 @@ class Pymc3Model(BaseModel):
 
         try:
             variable_names = post_samples.keys()
-        except Exception as e:
+        except Exception:
             variable_names = post_samples.varnames
 
         post_samples = {v: np.array([post_samples[v] for i in self.mean_field.keys()]) for v in variable_names}

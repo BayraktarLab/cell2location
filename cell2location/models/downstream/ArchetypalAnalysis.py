@@ -217,7 +217,7 @@ class ArchetypalAnalysis(BaseModel):
         self, node="all", n_samples=1000, save_samples=False, return_samples=True, mean_field_slot="init_1"
     ):
         """This function does nothing but added to preserve call signature with future Bayesian versions of the model."""
-        x = 1
+        pass
 
     def compute_expected(self):
         """Compute expected abundance of each cell type in each location."""
