@@ -17,7 +17,7 @@ import theano
 
 import cell2location.models as models
 import cell2location.plt as c2lpl
-from cell2location.cluster_averages import get_cluster_averages, select_features
+from cell2location.cluster_averages import compute_cluster_averages, select_features
 from cell2location.models.base.pymc3_loc_model import Pymc3LocModel
 
 
@@ -261,7 +261,7 @@ def run_cell2location(
 
     if not isinstance(sc_data, pd.DataFrame):
         # if scanpy compute cluster averages
-        cell_state_df = get_cluster_averages(sc_data, cluster_col=summ_sc_data_args["cluster_col"])
+        cell_state_df = compute_cluster_averages(sc_data, cluster_col=summ_sc_data_args["cluster_col"])
         obs = sc_data.obs
     else:
         # if dataframe assume signature with matching .index to sp_data.var_names
@@ -362,8 +362,8 @@ def run_cell2location(
         sample_name = sp_data.obs[train_args["sample_name_col"]]
         sample_n = len(np.unique(sample_name))
         if sample_n < sp_data.shape[0]:
-            Model = models.LocationModelLinearDependentWMultiExperiment
-            model_name = "LocationModelLinearDependentWMultiExperiment"
+            Model = models.pymc3.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlpha
+            model_name = "LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlpha"
         else:
             ValueError(
                 "train_args['sample_name_col'] points to non-existing column or the number of samples(batches) is equal to the number of observations `adata.n_obs`"

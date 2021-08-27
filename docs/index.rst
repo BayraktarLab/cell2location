@@ -8,32 +8,41 @@ Welcome to cell2location's documentation!
 
 .. toctree::
    :maxdepth: 1
-   :caption: Tutorials:
+   :caption: Quick start tutorial:
 
+   notebooks/cell2location
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Detailed tutorials:
+
+   notebooks/standard_workflow_from_spaceranger_to_saving_common_plots
+   notebooks/downstream_analysis_advanced_plotting
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Pymc3 Tutorials (advanced use, Nanostring WTA):
+
+   notebooks/cell2location_for_NanostringWTA
    notebooks/cell2location_estimating_signatures
    notebooks/cell2location_short_demo
    notebooks/cell2location_short_demo_downstream
-   
-.. toctree::
-   :maxdepth: 1
-   :caption: Cell2location Google Colab tutorial (2/3):
-   
-   notebooks/cell2location_short_demo_colab
 
 .. toctree::
    :maxdepth: 4
    :caption: API:
 
-   cell2location
-   cell2location.location_models
-   cell2location.regression_models
-   cell2location.downstream_models
    cell2location.utils.filtering
+   cell2location.reference_models
    cell2location.cluster_averages
+   cell2location
+   cell2location.downstream_models
    cell2location.plt
-   cell2location.region
-   cell2location.location_models_pyro
-   cell2location.other_architectures.rst
+   cell2location.utils
+   cell2location.pyro_infrastructure
+   cell2location.pymc3
+   cell2location.reference_models_torch
+   cell2location.distributions
 
 Indices and tables
 ==================

@@ -1,18 +1,18 @@
 Downstream Analysis Models
 ============================
 
-CoLocatedGroupsSklearnNMF
-------------------------------------------------------------
+Identifying cellular compartments / tissue zones (sklearn NMF)
+--------------------------------------------------------------
 
-.. automodule:: cell2location.models.CoLocatedGroupsSklearnNMF
+.. automodule:: cell2location.models.downstream.CoLocatedGroupsSklearnNMF
    :members:
    :undoc-members:
    :show-inheritance:
 
-ArchetypalAnalysis
+Archetypal Analysis
 ------------------------------------------------------------
 
-.. automodule:: cell2location.models.ArchetypalAnalysis
+.. automodule:: cell2location.models.downstream.ArchetypalAnalysis
    :members:
    :undoc-members:
    :show-inheritance:

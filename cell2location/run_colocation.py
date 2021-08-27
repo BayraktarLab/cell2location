@@ -18,7 +18,7 @@ import scanpy as sc
 from matplotlib import rcParams
 
 import cell2location.plt as c2lpl
-from cell2location.region.spatial_knn import spatial_neighbours, sum_neighbours
+from cell2location.utils.spatial_knn import spatial_neighbours, sum_neighbours
 
 
 def save_plot(path, filename, extension="png"):

@@ -1,10 +1,10 @@
-Regresion Models (estimating reference signatures)
-============================
+Reference signatures (old implementation, pytorch)
+==================================================
 
 RegressionGeneBackgroundCoverageTorch
 -----------------------------------------------
 
-.. automodule:: cell2location.models.RegressionGeneBackgroundCoverageTorch
+.. automodule:: cell2location.models.reference.RegressionGeneBackgroundCoverageTorch
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +12,7 @@ RegressionGeneBackgroundCoverageTorch
 RegressionGeneBackgroundCoverageGeneTechnologyTorch
 -----------------------------------------------
 
-.. automodule:: cell2location.models.RegressionGeneBackgroundCoverageGeneTechnologyTorch
+.. automodule:: cell2location.models.reference.RegressionGeneBackgroundCoverageGeneTechnologyTorch
    :members:
    :undoc-members:
    :show-inheritance:
@@ -20,7 +20,7 @@ RegressionGeneBackgroundCoverageGeneTechnologyTorch
 BaseModel
 ---------------------------------------
 
-.. automodule:: cell2location.models.base_model
+.. automodule:: cell2location.models.base.base_model
    :members:
    :undoc-members:
    :show-inheritance:
@@ -28,7 +28,7 @@ BaseModel
 TorchModel
 ----------------------------------------
 
-.. automodule:: cell2location.models.torch_model
+.. automodule:: cell2location.models.base.torch_model
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,7 +36,7 @@ TorchModel
 RegressionTorchModel
 ----------------------------------------------------
 
-.. automodule:: cell2location.models.regression_torch_model
+.. automodule:: cell2location.models.base.regression_torch_model
    :members:
    :undoc-members:
    :show-inheritance:
