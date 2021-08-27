@@ -24,6 +24,5 @@ def select_slide(adata, s, batch_key="sample"):
 __all__ = [
     "select_slide",
     "filter_genes",
-    "apply_gene_filter",
     "spatial_knn",
 ]
