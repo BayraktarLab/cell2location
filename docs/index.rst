@@ -6,6 +6,8 @@
 Welcome to cell2location's documentation!
 =========================================
 
+For installation instructions see https://github.com/BayraktarLab/cell2location#Installation
+
 .. toctree::
    :maxdepth: 3
    :caption: Quick start tutorial:
