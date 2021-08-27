@@ -1,7 +1,7 @@
 import numpy as np
 
 from ._spatial_knn import spatial_knn
-from .filtering import check_gene_filter
+from .filtering import filter_genes
 
 
 def select_slide(adata, s, batch_key="sample"):
@@ -23,7 +23,7 @@ def select_slide(adata, s, batch_key="sample"):
 
 __all__ = [
     "select_slide",
-    "check_gene_filter",
+    "filter_genes",
     "apply_gene_filter",
     "spatial_knn",
 ]
