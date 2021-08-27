@@ -1,7 +1,7 @@
 from scvi._compat import Literal
 from scvi.module.base import PyroBaseModuleClass
 
-from ._pyro_base import AutoGuideMixinModule, init_to_value
+from ._pyro_mixin import AutoGuideMixinModule, init_to_value
 
 
 class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):

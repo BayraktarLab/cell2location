@@ -226,6 +226,19 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
                 align=align,
             )
 
+    def plot_cell_type_loadings(self):
+
+        self.plot_gene_loadings(
+            self.var_names_read,
+            self.var_names_read,
+            fact_filt=self.fact_filt,
+            loadings_attr="cell_type_fractions",
+            gene_fact_name="cell_type_fractions",
+            fun_type="dotplot",
+            cmap="RdPu",
+            figsize=[5 + 0.12 * self.n_fact, 5 + 0.1 * self.n_var],
+        )
+
     def sample_posterior(
         self, node="all", n_samples=1000, save_samples=False, return_samples=True, mean_field_slot="init_1"
     ):

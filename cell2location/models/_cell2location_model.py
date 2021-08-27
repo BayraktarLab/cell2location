@@ -10,11 +10,11 @@ from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 
-from ._cell2location_v3_module import (
+from ._cell2location_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
-from .base._pyro_base import PltExportMixin, QuantileMixin
-from .base._pyro_base_loc_model import Cell2locationBaseModule
+from .base._pyro_base_loc_module import Cell2locationBaseModule
+from .base._pyro_mixin import PltExportMixin, QuantileMixin
 
 
 class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
@@ -113,6 +113,36 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         )
         self._model_summary_string = f'cell2location model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
         self.init_params_ = self._get_init_params(locals())
+
+    def train(
+        self, max_epochs: int = 30000, batch_size: int = None, train_size: float = 1, lr: float = 0.002, **kwargs
+    ):
+        """Train the model with useful defaults
+
+        Parameters
+        ----------
+        max_epochs
+            Number of passes through the dataset. If `None`, defaults to
+            `np.min([round((20000 / n_cells) * 400), 400])`
+        train_size
+            Size of training set in the range [0.0, 1.0]. Use all data points in training because
+            we need to estimate cell abundance at all locations.
+        batch_size
+            Minibatch size to use during training. If `None`, no minibatching occurs and all
+            data is copied to device (e.g., GPU).
+        lr
+            Optimiser learning rate (default optimiser is :class:`~pyro.optim.ClippedAdam`).
+            Specifying optimiser via plan_kwargs overrides this choice of lr.
+        kwargs
+            Other arguments to scvi.model.base.PyroSviTrainMixin().train() method
+        """
+
+        kwargs["max_epochs"] = max_epochs
+        kwargs["batch_size"] = batch_size
+        kwargs["train_size"] = train_size
+        kwargs["lr"] = lr
+
+        super().train(**kwargs)
 
     def export_posterior(
         self,

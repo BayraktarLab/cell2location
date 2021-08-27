@@ -7,7 +7,7 @@ Welcome to cell2location's documentation!
 =========================================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 3
    :caption: Quick start tutorial:
 
    notebooks/cell2location

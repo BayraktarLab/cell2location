@@ -33,7 +33,7 @@ def run_colocation(
     sp_data,
     n_neighbours=None,
     model_name="CoLocatedGroupsSklearnNMF",
-    verbose=True,
+    verbose=False,
     return_all=True,
     train_args={
         "n_fact": [30],
@@ -43,7 +43,7 @@ def run_colocation(
         "n_type": "restart",
         "n_restarts": 5,
     },
-    model_kwargs={"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}},
+    model_kwargs={"nmf_kwd_args": {"tol": 0.00001}},
     posterior_args={},
     export_args={"path": "./results", "run_name_suffix": "", "top_n": 10},
 ):
@@ -71,6 +71,8 @@ def run_colocation(
         "use_cuda": False,
         "sample_prior": False,
         "posterior_summary": "post_sample_q05",
+        "cell_abundance_name": "w_sf",
+        "factor_names": "factor_names",
         "sample_name_col": None,
         "mode": "normal",
         "n_type": "restart",
@@ -98,16 +100,24 @@ def run_colocation(
         "top_n": 10,
     }
 
+    d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}}
+
     # replace defaults with parameters supplied
     for k in train_args.keys():
         d_train_args[k] = train_args[k]
     train_args = d_train_args
+
     for k in posterior_args.keys():
         d_posterior_args[k] = posterior_args[k]
     posterior_args = d_posterior_args
+
     for k in export_args.keys():
         d_export_args[k] = export_args[k]
     export_args = d_export_args
+
+    for k in model_kwargs.keys():
+        d_model_kwargs[k] = model_kwargs[k]
+    model_kwargs = d_model_kwargs
 
     # start timing
     start = time.time()
@@ -124,8 +134,8 @@ def run_colocation(
 
     ####### Preparing data #######
     # extract cell density parameter
-    X_data = sp_data.uns["mod"][train_args["posterior_summary"]]["spot_factors"]
-    var_names = sp_data.uns["mod"]["fact_names"]
+    X_data = sp_data.uns["mod"][train_args["posterior_summary"]][train_args["cell_abundance_name"]]
+    var_names = sp_data.uns["mod"][train_args["factor_names"]]
     obs_names = sp_data.obs_names
     if train_args["sample_name_col"] is None:
         # if slots needed to generate scanpy plots are present, use scanpy spatial slot name:
@@ -334,15 +344,7 @@ def run_colocation(
         if not os.path.exists(fig_path):
             mkdir(fig_path)
         # plot co-occuring cell type combinations
-        mod.plot_gene_loadings(
-            mod.var_names_read,
-            mod.var_names_read,
-            fact_filt=mod.fact_filt,
-            loadings_attr="cell_type_fractions",
-            gene_fact_name="cell_type_fractions",
-            cmap="RdPu",
-            figsize=[5 + 0.12 * mod.n_fact, 5 + 0.1 * mod.n_var],
-        )
+        mod.plot_cell_type_loadings()
 
         save_plot(fig_path, filename=f"n_fact{mod.n_fact}", extension=export_args["plot_extension"])
         if verbose:
