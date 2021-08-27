@@ -1,7 +1,9 @@
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scanpy
 import scvi
 from anndata import AnnData
 from pyro import clear_param_store
@@ -10,11 +12,12 @@ from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 
-from ._cell2location_module import (
+from cell2location.models._cell2location_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
-from .base._pyro_base_loc_module import Cell2locationBaseModule
-from .base._pyro_mixin import PltExportMixin, QuantileMixin
+from cell2location.models.base._pyro_base_loc_module import Cell2locationBaseModule
+from cell2location.models.base._pyro_mixin import PltExportMixin, QuantileMixin
+from cell2location.utils import select_slide
 
 
 class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
@@ -182,6 +185,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         # generate samples from posterior distributions for all parameters
         # and compute mean, 5%/95% quantiles and standard deviation
         self.samples = self.sample_posterior(**sample_kwargs)
+        # TODO use add_to_obsm to determine which quantiles need to be computed,
+        # and if means and stds are not in the list - use quantile methods rather than sampling posterior
 
         # export posterior distribution summary for all parameters and
         # annotation (model, date, var, obs and cell type names) to anndata object
@@ -204,3 +209,108 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 adata.obs[sample_df.columns] = sample_df.loc[adata.obs.index, :]
 
         return adata
+
+    def plot_spatial_QC_across_batches(self):
+        """QC plot: compare total RNA count with estimated total cell abundance and detection sensitivity."""
+
+        adata = self.adata
+
+        # get batch key and the list of samples
+        batch_key = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_batch"]["original_key"]
+        samples = adata.obs[batch_key].unique()
+
+        # figure out plot shape
+        ncol = len(samples)
+        nrow = 3
+        fig, axs = plt.subplots(nrow, ncol, figsize=(1 + 4 * ncol, 1 + 4 * nrow))
+        if ncol == 1:
+            axs = axs.reshape((nrow, 1))
+
+        # compute total counts
+        # find data slot
+        x_dict = self.adata.uns["_scvi"]["data_registry"]["X"]
+        if x_dict["attr_name"] == "X":
+            use_raw = False
+        else:
+            use_raw = True
+        if x_dict["attr_name"] == "layers":
+            layer = x_dict["attr_key"]
+        else:
+            layer = None
+
+        # get data
+        if layer is not None:
+            x = adata.layers[layer]
+        else:
+            if not use_raw:
+                x = adata.X
+            else:
+                x = adata.raw.X
+        # compute total counts per location
+        cell_type = "total RNA counts"
+        adata.obs[cell_type] = np.array(x.sum(1)).flatten()
+
+        # figure out colour map scaling
+        vmax = np.quantile(adata.obs[cell_type].values, 0.992)
+        # plot, iterating across samples
+        for i, s in enumerate(samples):
+            sp_data_s = select_slide(adata, s, batch_key=batch_key)
+            scanpy.pl.spatial(
+                sp_data_s,
+                cmap="magma",
+                color=cell_type,
+                size=1.3,
+                img_key="hires",
+                alpha_img=1,
+                vmin=0,
+                vmax=vmax,
+                ax=axs[0, i],
+                show=False,
+            )
+            axs[0, i].title.set_text(cell_type + "\n" + s)
+
+        cell_type = "Total cell abundance (sum_f w_sf)"
+        adata.obs[cell_type] = adata.uns["mod"]["post_sample_means"]["w_sf"].sum(1).flatten()
+        # figure out colour map scaling
+        vmax = np.quantile(adata.obs[cell_type].values, 0.992)
+        # plot, iterating across samples
+        for i, s in enumerate(samples):
+            sp_data_s = select_slide(adata, s, batch_key=batch_key)
+            scanpy.pl.spatial(
+                sp_data_s,
+                cmap="magma",
+                color=cell_type,
+                size=1.3,
+                img_key="hires",
+                alpha_img=1,
+                vmin=0,
+                vmax=vmax,
+                ax=axs[1, i],
+                show=False,
+            )
+            axs[1, i].title.set_text(cell_type + "\n" + s)
+
+        cell_type = "RNA detection sensitivity (y_s)"
+        adata.obs[cell_type] = adata.uns["mod"]["post_sample_q05"]["detection_y_s"]
+        # figure out colour map scaling
+        vmax = np.quantile(adata.obs[cell_type].values, 0.992)
+        # plot, iterating across samples
+        for i, s in enumerate(samples):
+            sp_data_s = select_slide(adata, s, batch_key=batch_key)
+            scanpy.pl.spatial(
+                sp_data_s,
+                cmap="magma",
+                color=cell_type,
+                size=1.3,
+                img_key="hires",
+                alpha_img=1,
+                vmin=0,
+                vmax=vmax,
+                ax=axs[2, i],
+                show=False,
+            )
+            axs[2, i].title.set_text(cell_type + "\n" + s)
+
+        fig.tight_layout(pad=0.5)
+
+        return fig

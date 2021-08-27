@@ -3,37 +3,39 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def check_gene_filter(adata, nonz_mean_cutoff=np.log10(1.12), cell_count_cutoff=np.log10(15), cell_count_cutoff2=None):
-    r"""Plot the gene filter given a set of gene cutoffs and give
-     the resulting shape. To not be filtered out, a gene has
-     to either be expressed in at least in cell_count_cutoff2 cells,
-     or it has to be expressed in at least cell_count_cutoff cells AND
-     have a mean of non-zero values above nonz_mean_cutoff.
+def filter_genes(adata, cell_count_cutoff=15, cell_percentage_cutoff2=0.05, nonz_mean_cutoff=1.12):
+    r"""Plot the gene filter given a set of cutoffs and return resulting list of genes.
 
     Parameters
     ----------
     adata :
-        anndata object with single cell / nucleus data
-    nonz_mean_cutoff :
-        log10-transformed cutoff for mean of non-zero values
+        anndata object with single cell / nucleus data.
     cell_count_cutoff :
-        log10-transformed cell cutoff for lower cutoff (used in
-        combination with nonz_mean_cutoff)
-    cell_count_cutoff2 :
-        log10-transformed cell cutoff for highest cutoff (genes
-        expressed in at least this amount of cells will be included).
-        If None, this will default to adata.shape[0] * 0.05.
+        All genes detected in less than cell_count_cutoff cells will be excluded.
+    cell_percentage_cutoff2 :
+        All genes detected in at least this percentage of cells will be included.
+    nonz_mean_cutoff :
+        genes detected in the number of cells between the above mentioned cutoffs are selected
+        only when their average expression in non-zero cells is above this cutoff.
 
     Returns
     -------
-    None
+    a list of selected var_names
     """
 
     adata.var["n_cells"] = np.array((adata.X > 0).sum(0)).flatten()
     adata.var["nonz_mean"] = np.array(adata.X.sum(0)).flatten() / adata.var["n_cells"]
 
-    if cell_count_cutoff2 is None:
-        cell_count_cutoff2 = np.log10(adata.shape[0] * 0.05)
+    cell_count_cutoff = np.log10(cell_count_cutoff)
+    cell_count_cutoff2 = np.log10(adata.shape[0] * cell_percentage_cutoff2)
+    nonz_mean_cutoff = np.log10(nonz_mean_cutoff)
+
+    gene_selection = (np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff2)) | (
+        np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff)
+        & np.array(np.log10(adata.var["nonz_mean"]) > nonz_mean_cutoff)
+    )
+    gene_selection = adata.var_names[gene_selection]
+    adata_shape = adata[:, gene_selection].shape
 
     fig, ax = plt.subplots()
     ax.hist2d(
@@ -57,60 +59,7 @@ def check_gene_filter(adata, nonz_mean_cutoff=np.log10(1.12), cell_count_cutoff=
     plt.hlines(cell_count_cutoff2, 0, nonz_mean_cutoff, color="darkorange")
     plt.xlabel("Mean non-zero expression level of gene (log)")
     plt.ylabel("Number of cells expressing gene (log)")
-    plt.title(
-        "Gene filter - resulting shape: "
-        + str(
-            adata[
-                :,
-                (np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff2))
-                | (
-                    np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff)
-                    & np.array(np.log10(adata.var["nonz_mean"]) > nonz_mean_cutoff)
-                ),
-            ].shape
-        )
-    )
+    plt.title(f"Gene filter: {adata_shape[0]} cells x {adata_shape[1]} genes")
     plt.show()
 
-
-def apply_gene_filter(adata, nonz_mean_cutoff=np.log10(1.12), cell_count_cutoff=np.log10(15), cell_count_cutoff2=None):
-    r"""Applies a gene filter given a set of gene cutoffs. To not be
-     filtered out, a gene has to either be expressed in at least in
-     cell_count_cutoff2 cells, or it has to be expressed in at least
-     cell_count_cutoff cells AND have a mean of non-zero values above
-     nonz_mean_cutoff.
-
-    Parameters
-    ----------
-    adata :
-        anndata object with single cell / nucleus data
-    nonz_mean_cutoff :
-        log10-transformed cutoff for mean of non-zero values
-    cell_count_cutoff :
-        log10-transformed cell cutoff for lower cutoff (used in
-        combination with nonz_mean_cutoff)
-    cell_count_cutoff2 :
-        log10-transformed cell cutoff for highest cutoff (genes
-        expressed in at least this amount of cells will be included).
-        If None, this will default to adata.shape[0] * 0.05.
-
-    Returns
-    -------
-    adata :
-        filtered adata object with single cell / nucleus data
-    """
-    # calculate the mean of each gene across non-zero cells
-    adata.var["n_cells"] = np.array((adata.X > 0).sum(0)).flatten()
-    adata.var["nonz_mean"] = np.array(adata.X.sum(0)).flatten() / adata.var["n_cells"]
-
-    if cell_count_cutoff2 is None:
-        cell_count_cutoff2 = np.log10(adata.shape[0] * 0.05)
-
-    return adata[
-        :,
-        (np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff2))
-        | (
-            np.array(np.log10(adata.var["n_cells"]) > cell_count_cutoff)
-            & np.array(np.log10(adata.var["nonz_mean"]) > nonz_mean_cutoff)
-        ),
-    ]
+    return gene_selection
