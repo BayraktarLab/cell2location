@@ -27,6 +27,7 @@ def setup_package():
         install_requires=install_requires,
         extras_require={
             "dev": ["black>=21.4b0", "flake8", "pytest>=5.0", "pytest-cov", "isort", "pre-commit"],
+            "tutorials": ["leidenalg>=0.8.0", "python-igraph"],
         },
     )
 
