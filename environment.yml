@@ -1,4 +1,4 @@
-name: cellpymc
+name: cell2loc_env
 channels:
   - conda-forge
   - bioconda
