@@ -26,16 +26,16 @@ RUN /opt/conda/condabin/conda init bash
 # create conda environment yaml file
 COPY environment.yml /tmp/
 RUN /opt/conda/condabin/conda env create -f /tmp/environment.yml \
-    && echo "source activate cellpymc" >> ~/.bashrc \
+    && echo "source activate cell2loc_env" >> ~/.bashrc \
     && /opt/conda/condabin/conda clean --all --yes --quiet
-ENV PATH /opt/conda/envs/cellpymc/bin:/opt/conda/bin:$PATH
+ENV PATH /opt/conda/envs/cell2loc_env/bin:/opt/conda/bin:$PATH
 
 # install cell2location 
 COPY . cell2location
 RUN /bin/bash -c "pip install -e /cell2location"
 
-# add cellpymc kernel for jupyter environment 
-RUN /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cellpymc/ --name=cellpymc --display-name='Container (cellpymc)'" 
+# add cell2loc_env kernel for jupyter environment 
+RUN /bin/bash -c "python -m ipykernel install --prefix=/opt/conda/envs/cell2loc_env/ --name=cell2loc_env --display-name='Container (cell2loc_env)'" 
 
 # copy notebooks to the image
 COPY docs/notebooks notebooks
