@@ -16,7 +16,7 @@ from scvi.nn import one_hot
 
 
 class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
-    """
+    r"""
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
     over-dispersion parameter :math:`\alpha_{e,g}` which accounts for unexplained variance:
@@ -60,12 +60,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     the mean sensitivity for each batch :math:`y_e`:
 
     .. math::
-        y_s ~ Gamma(detection_alpha, detection_alpha / y_e)
+        y_s \sim Gamma(detection_alpha, detection_alpha / y_e)
 
     where y_e is unknown/latent average detection efficiency in each batch/experiment:
 
     .. math::
-        y_e ~ Gamma(10, 10 / detection_mean)
+        y_e \sim Gamma(10, 10 / detection_mean)
 
     """
 
