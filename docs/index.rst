@@ -17,6 +17,16 @@ For reporting bugs or other issues with cell2location please use GitHub Issues: 
    :caption: Quick start tutorial:
 
    notebooks/cell2location_tutorial
+   
+Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping and estimating reference cell type signatures:
+1. Cell2location for spatial mapping of cell types which estimates cell abundance by decomposing spatial data into reference expression signatures of cell types (`LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`). 
+2. Models for estimating reference expression signatures of cell types from scRNA data, accounting for variable sequencing depth between batches (e.g. 10X reaction), additive background (contaminating RNA), multiplicative platform effect between scRNA technologies.
+3. Cell2location model for mapping to Nanostring WTA data (`LocationModelWTA`). See https://github.com/vitkl/SpaceJam for a new more versatile version.
+4. Similified versions of model #1 that lack particular features of the full model, accessible from `cell2location.models.simplified`
+
+Additionally we provide 2 models for downstream analysis of cell abundance estimates, accessible from `cell2location.models.downstream`:
+1. `CoLocatedGroupsSklearnNMF` - identifying groups of cell types with similar locations using NMF (wrapper around sklearn NMF). See tutorial for usage.
+2. `ArchetypalAnalysis` - identifying smoothly varying and mutually exclusive tissue zones with Archetypa Analysis.
 
 .. toctree::
    :maxdepth: 1
