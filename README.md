@@ -18,32 +18,25 @@ Overview of the spatial mapping approach and the workflow enabled by cell2locati
 
 ## Usage and Tutorials
 
-Tutorials covering the estimation of expresson signatures of reference cell types (1/3), spatial mapping with cell2location (2/3) and the downstream analysis (3/3) can be found here: https://cell2location.readthedocs.io/en/latest/
+The tutorial covering the estimation of expresson signatures of reference cell types, spatial mapping with cell2location and the downstream analysis (3/3) can be found here: https://cell2location.readthedocs.io/en/latest/
 
-There are 2 ways to install and use our package: setup your [own conda environment](https://github.com/BayraktarLab/cell2location#installation-of-dependecies-and-configuring-environment) or use the [singularity](https://github.com/BayraktarLab/cell2location#using-singularity-image) and [docker](https://github.com/BayraktarLab/cell2location#using-docker-image) images (recommended). See below for details.
-
-You can also try cell2location on [Google Colab](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location.ipynb) on a smaller data subset containing somatosensory cortex.
+You can also try cell2location on [Google Colab](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb) on a smaller data subset containing somatosensory cortex.
 
 Please report buga via https://github.com/BayraktarLab/cell2location/issues and ask any usage questions in https://github.com/BayraktarLab/cell2location/discussions.
 
-We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. 
-
-Cell2location package is implemented in a general way to support multiple related models - both for spatial mapping and estimating signatures of cell types (tutorials use default models - no need to change):
-1. `LocationModelLinearDependentWMultiExperiment` - main model for estimating cell abundance by decomposing spatial data into reference expression signatures of cell types.
-2. `LocationModelWTA` - same as in #1 but adapted to work with Nanostring WTA data
-3. Similified versions of model #1 that lack particular features of the full model, accessible from `cell2location.models.simplified`
-
-Models for estimating reference expression signatures of cell types from scRNA data:
-1. `RegressionGeneBackgroundCoverageTorch` - estimating expression signatures of cell types, accounting for variable sequencing depth between batches (e.g. 10X reaction) and additive background (contaminating RNA).
-2. `RegressionGeneBackgroundCoverageGeneTechnologyTorch` - similar to #1 but additionally accounts for multiplicative platform effect between scRNA technologies.
+Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping and estimating signatures of cell types:
+1. Cell2location for spatial mapping of cell types which estimates cell abundance by decomposing spatial data into reference expression signatures of cell types (`LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`). 
+2. Models for estimating reference expression signatures of cell types from scRNA data, accounting for variable sequencing depth between batches (e.g. 10X reaction), additive background (contaminating RNA), multiplicative platform effect between scRNA technologies.
+3. Cell2location model for mapping to Nanostring WTA data (`LocationModelWTA`). See https://github.com/vitkl/SpaceJam for a new more versatile version.
+4. Similified versions of model #1 that lack particular features of the full model, accessible from `cell2location.models.simplified`
 
 Additionally we provide 2 models for downstream analysis of cell abundance estimates, accessible from `cell2location.models.downstream`:
-1. `CoLocatedGroupsSklearnNMF` - identifying groups of cell types with similar locations using NMF (wrapper around sklearn NMF). See tutorial #3 for usage.
+1. `CoLocatedGroupsSklearnNMF` - identifying groups of cell types with similar locations using NMF (wrapper around sklearn NMF). See tutorial for usage.
 2. `ArchetypalAnalysis` - identifying smoothly varying and mutually exclusive tissue zones with Archetypa Analysis.
 
 ## Installation
 
-Prior to installing cell2location package you need to install miniconda and create a conda environment containing pymc3 and theano ready for use on GPU. Follow the steps below:
+We suggest using a separate conda environment for installing cell2location.
 
 If you do not have conda please install Miniconda first:
 
@@ -55,41 +48,32 @@ bash Miniconda3-latest-Linux-x86_64.sh
 ```
 
 Before installing cell2location and it's dependencies, make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages, ideally by adding this line to your `~/.bashrc` file , but this would also work during a terminal session:
+
 ```bash
 export PYTHONNOUSERSITE="someletters"
 ```
 
-#### 1. Create conda environment manually
-
-Create conda environment with the required packages pymc3 and scanpy:
+Create conda environment and install `cell2location` package
 
 ```bash
-conda create -n cellpymc python=3.7 numpy pandas jupyter leidenalg python-igraph scanpy \
-louvain hyperopt loompy cmake nose tornado dill ipython bbknn seaborn matplotlib request \
-mkl-service pygpu --channel bioconda --channel conda-forge
-```
+conda create -y -n cell2loc_env python=3.9
 
-#### 2. Install `cell2location` package
-
-```bash
-conda activate cellpymc
-pip install git+https://github.com/BayraktarLab/cell2location.git
+conda activate cell2loc_env
+pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials]
 ```
 
 Finally, to use this environment in jupyter notebook, add jupyter kernel for this environment:
 
 ```bash
-conda activate cellpymc
-python -m ipykernel install --user --name=cellpymc --display-name='Environment (cellpymc)'
+conda activate cell2loc_env
+python -m ipykernel install --user --name=cell2loc_env --display-name='Environment (cell2loc_env)'
 ```
 
 ## Documentation and API details
 
 User documentation is availlable on https://cell2location.readthedocs.io/en/latest/. 
 
-The architecture of the package is briefly described [here](https://github.com/BayraktarLab/cell2location/blob/master/cell2location/models/README.md). Cell2location architecture is designed to simplify extended versions of the model that account for additional technical and biologial information. We plan to provide a tutorial showing how to add new model classes but please get in touch if you would like to contribute or build on top our package.
-
-We also provide an experimental numpyro translation of the model. Note that the pyro translation of cell2location in this repo does not work.
+Cell2location architecture is designed to simplify extended versions of the model that account for additional technical and biologial information. We plan to provide a tutorial showing how to add new model classes but please get in touch if you would like to contribute or build on top our package.
 
 ## Acknowledgements 
 
@@ -101,3 +85,7 @@ We also thank Krzysztof Polanski, Luz Garcia Alonso, Carlos Talavera-Lopez, Ni H
 ## FAQ
 
 See https://github.com/BayraktarLab/cell2location/discussions
+
+## Future development and experimental features
+
+We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. 
