@@ -28,6 +28,7 @@ def setup_package():
         extras_require={
             "dev": ["black>=21.4b0", "flake8", "pytest>=5.0", "pytest-cov", "isort", "pre-commit"],
             "tutorials": ["leidenalg>=0.8.0", "python-igraph"],
+            "docs": ["sphinx==3.2.1", "nbsphinx==0.8.7", "sphinx_rtd_theme==0.5.2"],
         },
     )
 
