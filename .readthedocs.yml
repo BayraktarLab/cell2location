@@ -4,6 +4,11 @@ sphinx:
   configuration: docs/conf.py
   builder: html
 
+build:
+  apt_packages:
+    - cmake
+    - g++
+
 python:
   version: "3.7"
   install:
