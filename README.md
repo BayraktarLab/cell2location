@@ -18,21 +18,13 @@ Overview of the spatial mapping approach and the workflow enabled by cell2locati
 
 ## Usage and Tutorials
 
-The tutorial covering the estimation of expresson signatures of reference cell types, spatial mapping with cell2location and the downstream analysis (3/3) can be found here: https://cell2location.readthedocs.io/en/latest/
+The tutorial covering the estimation of expresson signatures of reference cell types, spatial mapping with cell2location and the downstream analysis can be found here: https://cell2location.readthedocs.io/en/latest/
 
 You can also try cell2location on [Google Colab](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb) on a smaller data subset containing somatosensory cortex.
 
 Please report buga via https://github.com/BayraktarLab/cell2location/issues and ask any usage questions in https://github.com/BayraktarLab/cell2location/discussions.
 
-Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping and estimating reference cell type signatures:
-1. Cell2location for spatial mapping of cell types which estimates cell abundance by decomposing spatial data into reference expression signatures of cell types (`LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`). 
-2. Models for estimating reference expression signatures of cell types from scRNA data, accounting for variable sequencing depth between batches (e.g. 10X reaction), additive background (contaminating RNA), multiplicative platform effect between scRNA technologies.
-3. Cell2location model for mapping to Nanostring WTA data (`LocationModelWTA`). See https://github.com/vitkl/SpaceJam for a new more versatile version.
-4. Similified versions of model #1 that lack particular features of the full model, accessible from `cell2location.models.simplified`
-
-Additionally we provide 2 models for downstream analysis of cell abundance estimates, accessible from `cell2location.models.downstream`:
-1. `CoLocatedGroupsSklearnNMF` - identifying groups of cell types with similar locations using NMF (wrapper around sklearn NMF). See tutorial for usage.
-2. `ArchetypalAnalysis` - identifying smoothly varying and mutually exclusive tissue zones with Archetypa Analysis.
+Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping, estimating reference cell type signatures and downstream analysis.
 
 ## Installation
 
