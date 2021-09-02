@@ -38,21 +38,6 @@ Additionally we provide 2 models for downstream analysis of cell abundance estim
 
 We suggest using a separate conda environment for installing cell2location.
 
-If you do not have conda please install Miniconda first:
-
-```bash
-cd /path/to/software
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh
-# use prefix /path/to/software/miniconda3
-```
-
-Before installing cell2location and it's dependencies, make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages, ideally by adding this line to your `~/.bashrc` file , but this would also work during a terminal session:
-
-```bash
-export PYTHONNOUSERSITE="someletters"
-```
-
 Create conda environment and install `cell2location` package
 
 ```bash
@@ -68,6 +53,22 @@ Finally, to use this environment in jupyter notebook, add jupyter kernel for thi
 conda activate cell2loc_env
 python -m ipykernel install --user --name=cell2loc_env --display-name='Environment (cell2loc_env)'
 ```
+
+If you do not have conda please install Miniconda first:
+
+```bash
+cd /path/to/software
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+# use prefix /path/to/software/miniconda3
+```
+
+Before installing cell2location and it's dependencies, it could be necessary to make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages, ideally by adding this line to your `~/.bashrc` file , but this would also work during a terminal session:
+
+```bash
+export PYTHONNOUSERSITE="someletters"
+```
+
 
 ## Documentation and API details
 
