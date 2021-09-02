@@ -6,13 +6,17 @@
 Welcome to cell2location's documentation!
 =========================================
 
-For installation instructions see https://github.com/BayraktarLab/cell2location#Installation
+For installation instructions see: https://github.com/BayraktarLab/cell2location#Installation
+
+For FAQ and to ask any questions please use GitHub Discussions: https://github.com/BayraktarLab/cell2location/discussions
+
+For reporting bugs or other issues with cell2location please use GitHub Issues: https://github.com/BayraktarLab/cell2location/issues
 
 .. toctree::
    :maxdepth: 3
    :caption: Quick start tutorial:
 
-   notebooks/cell2location
+   notebooks/cell2location_tutorial
 
 .. toctree::
    :maxdepth: 1
@@ -22,9 +26,17 @@ For installation instructions see https://github.com/BayraktarLab/cell2location#
    notebooks/downstream_analysis_advanced_plotting
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Using docker and singularity environments, common errors:
+
+   dockersingularity
+   commonerrors
+
+.. toctree::
    :maxdepth: 1
    :caption: Pymc3 Tutorials (advanced use, Nanostring WTA):
 
+   installing_pymc3
    notebooks/cell2location_for_NanostringWTA
    notebooks/cell2location_estimating_signatures
    notebooks/cell2location_short_demo

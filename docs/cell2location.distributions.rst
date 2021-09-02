@@ -4,7 +4,7 @@ Statistical distribution classes
 AutoNormalEncoder class for automatic generation of amortised Variational approximation
 ---------------------------------------------------------------------------------------
 
-.. automodule:: cell2location.distributions
+.. automodule:: cell2location.distributions.AutoNormalEncoder.AutoNormalEncoder
    :members:
    :undoc-members:
    :show-inheritance:

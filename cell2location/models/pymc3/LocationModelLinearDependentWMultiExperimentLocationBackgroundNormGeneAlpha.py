@@ -33,11 +33,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
 
     Here, :math:`w_{s,f}` denotes regression weight of each program :math:`f` at location :math:`s` ;
     :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g` - input to the model;
-    :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference
-      in the global expression estimates between technologies;
-    :math `y_{s}` denotes a location-specific multiplicative parameter representing
-      the difference global sensitivity between locations. The mean and alpha of this parameter
-      depend on experiment :math:`e`.
+    :math:`m_{g}` denotes a gene-specific scaling parameter which accounts for difference in the global expression estimates between technologies;
+    :math:`y_{s}` denotes a location-specific multiplicative parameter representing the difference global sensitivity between locations. The mean and alpha of this parameter depend on experiment :math:`e`.
     :math:`s_{e,g}` are additive components that capture additive background variation
     that is not explained by the bi-variate decomposition.
 

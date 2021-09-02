@@ -30,17 +30,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     .. math::
         \mu_{s,g} = (m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + s_{e,g}) y_{s}
 
-    Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`,
-      which can be interpreted as the expected number of cells at location :math:`s`
-      that express reference signature :math:`f`;
-    :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`,
-      `cell_state_df` input ;
-    :math:`m_{g}` denotes a gene-specific scaling parameter which adjusts for global differences in sensitivity
-      between technologies (platform effect);
-    :math:`y_{s}` denotes a location/observation-specific scaling parameter which adjusts for differences in sensitivity
-      between observations and batches;
-    :math:`s_{e,g}` is additive component that account for gene- and location-specific shift,
-      such as due to contaminating or free-floating RNA.
+    Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`, which can be interpreted as the expected number of cells at location :math:`s` that express reference signature :math:`f`;
+    :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`, `cell_state_df` input ;
+    :math:`m_{g}` denotes a gene-specific scaling parameter which adjusts for global differences in sensitivity between technologies (platform effect);
+    :math:`y_{s}` denotes a location/observation-specific scaling parameter which adjusts for differences in sensitivity between observations and batches;
+    :math:`s_{e,g}` is additive component that account for gene- and location-specific shift, such as due to contaminating or free-floating RNA.
 
     To account for the similarity of location patterns across cell types, :math:`w_{s,f}` is modelled using
     another layer  of decomposition (factorization) using :math:`r={1, .., R}` groups of cell types,
