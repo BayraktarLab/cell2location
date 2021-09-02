@@ -24,7 +24,7 @@ You can also try cell2location on [Google Colab](https://colab.research.google.c
 
 Please report buga via https://github.com/BayraktarLab/cell2location/issues and ask any usage questions in https://github.com/BayraktarLab/cell2location/discussions.
 
-Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping and estimating signatures of cell types:
+Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping and estimating reference cell type signatures:
 1. Cell2location for spatial mapping of cell types which estimates cell abundance by decomposing spatial data into reference expression signatures of cell types (`LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`). 
 2. Models for estimating reference expression signatures of cell types from scRNA data, accounting for variable sequencing depth between batches (e.g. 10X reaction), additive background (contaminating RNA), multiplicative platform effect between scRNA technologies.
 3. Cell2location model for mapping to Nanostring WTA data (`LocationModelWTA`). See https://github.com/vitkl/SpaceJam for a new more versatile version.
