@@ -9,6 +9,9 @@ build:
     - cmake
     - g++
 
+conda:
+  environment: docs/environment.yml
+
 python:
   version: "3.7"
   install:
