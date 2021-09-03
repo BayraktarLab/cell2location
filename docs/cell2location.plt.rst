@@ -9,7 +9,7 @@ Plot cell abundance for multiple cell types using colour interpolation
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: cell2location.plt.plot_spatial_general
+.. automodule:: cell2location.plt.plot_spatial.plot_spatial_general
    :members:
    :undoc-members:
    :show-inheritance:

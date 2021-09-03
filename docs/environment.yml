@@ -1,0 +1,7 @@
+name: cell2location
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python = 3.7
+  - theano

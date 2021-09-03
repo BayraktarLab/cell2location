@@ -2,7 +2,7 @@ Reference signatures (old implementation, pytorch)
 ==================================================
 
 RegressionGeneBackgroundCoverageTorch
------------------------------------------------
+-------------------------------------
 
 .. automodule:: cell2location.models.reference.RegressionGeneBackgroundCoverageTorch
    :members:
@@ -10,7 +10,7 @@ RegressionGeneBackgroundCoverageTorch
    :show-inheritance:
 
 RegressionGeneBackgroundCoverageGeneTechnologyTorch
------------------------------------------------
+---------------------------------------------------
 
 .. automodule:: cell2location.models.reference.RegressionGeneBackgroundCoverageGeneTechnologyTorch
    :members:

@@ -15,7 +15,7 @@ Pyro and scvi-tools Module classes (inc math description)
 Pyro Module class (defining the model using pyro, math description)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.reference._reference_module.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
+.. autoclass:: cell2location.models._cell2location_module.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Pyro Module class (defining the model using pyro, math description)
 scvi-tools Module class (initialising the model and the guide, PyroBaseModuleClass)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.base._pyro_base_loc_model.Cell2locationBaseModule
+.. autoclass:: cell2location.models._cell2location_model.Cell2locationBaseModule
    :members:
    :undoc-members:
    :show-inheritance:
@@ -34,7 +34,7 @@ Simplified model architectures
 No prior factorisation of w_sf (Pyro Module class, math description)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models._cell2location_v3_no_factorisation_module.LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
+.. autoclass:: cell2location.models.simplified._cell2location_v3_no_factorisation_module.LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -42,7 +42,7 @@ No prior factorisation of w_sf (Pyro Module class, math description)
 No gene-specific platform effect m_g (Pyro Module class, math description)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models._cell2location_v3_no_mg_module.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel
+.. autoclass:: cell2location.models.simplified._cell2location_v3_no_mg_module.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel
    :members:
    :undoc-members:
    :show-inheritance:

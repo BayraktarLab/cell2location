@@ -1,4 +1,7 @@
 from ._cell2location_model import Cell2location
+from ._cell2location_module import (
+    LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
+)
 from .downstream import CoLocatedGroupsSklearnNMF
 from .pymc3.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlpha import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlpha,
@@ -10,6 +13,7 @@ __all__ = [
     "Cell2location",
     "RegressionModel",
     "LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlpha",
+    "LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel",
     "LocationModelWTA",
     "CoLocatedGroupsSklearnNMF",
 ]

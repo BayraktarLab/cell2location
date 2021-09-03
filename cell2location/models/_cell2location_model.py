@@ -22,9 +22,7 @@ from cell2location.utils import select_slide
 
 class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
     """
-    Reimplementation of cell2location [Kleshchevnikov20]_ model. User-end model class.
-
-    https://github.com/BayraktarLab/cell2location
+    Cell2location model. User-end model class. See Module class for description of the model (incl. math).
 
     Parameters
     ----------
@@ -35,7 +33,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     use_gpu
         Use the GPU?
     **model_kwargs
-        Keyword args for :class:`~scvi.external.LocationModelLinearDependentWMultiExperimentModel`
+        Keyword args for :class:`~cell2location.models.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`
 
     Examples
     --------

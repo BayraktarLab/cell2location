@@ -28,6 +28,15 @@ def init_to_value(site=None, values={}):
 
 
 class AutoGuideMixinModule:
+    """
+    This mixin class provides methods for:
+
+    - initialising standard AutoNormal guides
+    - initialising amortised guides (AutoNormalEncoder)
+    - initialising amortised guides with special additional inputs
+
+    """
+
     def _create_autoguide(
         self,
         model,
@@ -125,7 +134,7 @@ class AutoGuideMixinModule:
 
 class QuantileMixin:
     """
-    Reimplementation of cell2location [Kleshchevnikov20]_ model. This mixin class provides methods for:
+    This mixin class provides methods for:
 
     - computing median and quantiles of the posterior distribution using both direct and amortised inference
 
@@ -305,6 +314,10 @@ class QuantileMixin:
 
 
 class PltExportMixin:
+    r"""
+    This mixing class provides methods for common plotting tasks and data export.
+    """
+
     @staticmethod
     def plot_posterior_mu_vs_data(mu, data):
         r"""Plot expected value of the model (e.g. mean of NB distribution) vs observed data

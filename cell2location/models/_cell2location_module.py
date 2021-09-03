@@ -16,7 +16,7 @@ from scvi.nn import one_hot
 
 
 class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
-    """
+    r"""
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
     over-dispersion parameter :math:`\alpha_{e,g}` which accounts for unexplained variance:
@@ -30,17 +30,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     .. math::
         \mu_{s,g} = (m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + s_{e,g}) y_{s}
 
-    Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`,
-      which can be interpreted as the expected number of cells at location :math:`s`
-      that express reference signature :math:`f`;
-    :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`,
-      `cell_state_df` input ;
-    :math:`m_{g}` denotes a gene-specific scaling parameter which adjusts for global differences in sensitivity
-      between technologies (platform effect);
-    :math:`y_{s}` denotes a location/observation-specific scaling parameter which adjusts for differences in sensitivity
-      between observations and batches;
-    :math:`s_{e,g}` is additive component that account for gene- and location-specific shift,
-      such as due to contaminating or free-floating RNA.
+    Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`, which can be interpreted as the expected number of cells at location :math:`s` that express reference signature :math:`f`;
+    :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`, `cell_state_df` input ;
+    :math:`m_{g}` denotes a gene-specific scaling parameter which adjusts for global differences in sensitivity between technologies (platform effect);
+    :math:`y_{s}` denotes a location/observation-specific scaling parameter which adjusts for differences in sensitivity between observations and batches;
+    :math:`s_{e,g}` is additive component that account for gene- and location-specific shift, such as due to contaminating or free-floating RNA.
 
     To account for the similarity of location patterns across cell types, :math:`w_{s,f}` is modelled using
     another layer  of decomposition (factorization) using :math:`r={1, .., R}` groups of cell types,
@@ -66,12 +60,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     the mean sensitivity for each batch :math:`y_e`:
 
     .. math::
-        y_s ~ Gamma(detection_alpha, detection_alpha / y_e)
+        y_s \sim Gamma(detection_alpha, detection_alpha / y_e)
 
     where y_e is unknown/latent average detection efficiency in each batch/experiment:
 
     .. math::
-        y_e ~ Gamma(10, 10 / detection_mean)
+        y_e \sim Gamma(10, 10 / detection_mean)
 
     """
 
