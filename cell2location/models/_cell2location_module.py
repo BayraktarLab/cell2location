@@ -450,18 +450,19 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         # compute conditional expected expression per cell type
         mu_ct = [
-            x_data.multiply(
-                (
-                    np.dot(
-                        samples["w_sf"][ind_x, i, np.newaxis],
-                        self.cell_state_mat.T[np.newaxis, i, :],
+            csr_matrix(
+                x_data.multiply(
+                    (
+                        np.dot(
+                            samples["w_sf"][ind_x, i, np.newaxis],
+                            self.cell_state_mat.T[np.newaxis, i, :],
+                        )
+                        * samples["m_g"]
                     )
-                    * samples["m_g"]
+                    / mu
                 )
-                / mu
             )
             for i in range(self.n_factors)
         ]
-        mu_ct = [csr_matrix(x) for x in mu_ct]
 
         return {"mu": mu_ct, "ind_x": ind_x}
