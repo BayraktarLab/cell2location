@@ -261,7 +261,7 @@ def run_cell2location(
 
     if not isinstance(sc_data, pd.DataFrame):
         # if scanpy compute cluster averages
-        cell_state_df = compute_cluster_averages(sc_data, cluster_col=summ_sc_data_args["cluster_col"])
+        cell_state_df = compute_cluster_averages(sc_data, labels=summ_sc_data_args["cluster_col"])
         obs = sc_data.obs
     else:
         # if dataframe assume signature with matching .index to sp_data.var_names
