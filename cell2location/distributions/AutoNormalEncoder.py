@@ -148,7 +148,7 @@ class AutoNormalEncoder(AutoGuide):
             elif not isinstance(n_hidden, dict):
                 raise ValueError("n_hidden must be either in or dict")
 
-        encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
+        encoder_kwargs = deepcopy(encoder_kwargs) if isinstance(encoder_kwargs, dict) else dict()
         encoder_kwargs["n_hidden"] = n_hidden["single"]
         self.encoder_kwargs = encoder_kwargs
         if multi_encoder_kwargs is None:
