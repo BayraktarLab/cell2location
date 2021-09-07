@@ -57,6 +57,7 @@ def run_cell2location(
         "run_name_suffix": "",
         "scanpy_coords_name": "coords",
     },
+    ignore_deprecation_exception: bool = False,
 ):
     r"""Run cell2location model pipeline: train the model, sample prior and posterior,
     export results and save diagnostic plots
@@ -183,6 +184,10 @@ def run_cell2location(
         Results as a dictionary, use dict.keys() to find the elements. Results are saved to `export_args['path']`.
 
     """
+    if ignore_deprecation_exception is not True:
+        raise Exception(
+            "This workflow is deprecated. Please use pyro/scvi-tools interface. \n See tutorial: https://cell2location.readthedocs.io/en/latest/notebooks/cell2location_tutorial.html \n If you are absolutely sure that you need to use the pymc3 version set `ignore_deprecation_exception=True`"
+        )
 
     # set default parameters
     d_summ_sc_data_args = {

@@ -49,6 +49,7 @@ def run_regression(
     model_kwargs={},
     posterior_args={},
     export_args={"path": "./results", "save_model": True, "run_name_suffix": ""},
+    ignore_deprecation_exception: bool = False,
 ):
     r"""Estimation of cell type reference signatures from scRNA-seq.
 
@@ -74,6 +75,11 @@ def run_regression(
         dict
             dictionary {'mod','sc_data','model_name', 'train_args','posterior_args', 'export_args', 'run_name', 'run_time'}
     """
+
+    if ignore_deprecation_exception is not True:
+        raise Exception(
+            "This workflow is deprecated. Please use pyro/scvi-tools interface. \n See tutorial: https://cell2location.readthedocs.io/en/latest/notebooks/cell2location_tutorial.html"
+        )
 
     # set default parameters
 
