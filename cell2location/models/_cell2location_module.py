@@ -71,6 +71,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
     # training mode without observed data (just using priors)
     training_wo_observed = False
+    training_wo_initial = False
 
     def __init__(
         self,
@@ -295,15 +296,31 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             dist.Gamma(c2f_shape, k_r_factors_per_groups).expand([self.n_groups, self.n_factors]).to_event(2),
         )  # (self.n_groups, self.n_factors)
 
-        with obs_plate:
+        with obs_plate as ind:
             w_sf_mu = z_sr_groups_factors @ x_fr_group2fact
-            w_sf = pyro.sample(
-                "w_sf",
-                dist.Gamma(
-                    w_sf_mu * self.w_sf_mean_var_ratio_tensor,
-                    self.w_sf_mean_var_ratio_tensor,
-                ),
-            )  # (self.n_obs, self.n_factors)
+
+            k = "w_sf"
+            if (
+                self.training_wo_observed
+                and not self.training_wo_initial
+                and getattr(self, f"init_val_{k}", None) is not None
+            ):
+                # pre-training Variational distribution to initial values
+                w_sf = pyro.sample(
+                    k,
+                    dist.Gamma(
+                        self.init_alpha_tt,
+                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                    ),
+                )  # (self.n_obs, self.n_factors)
+            else:
+                w_sf = pyro.sample(
+                    "w_sf",
+                    dist.Gamma(
+                        w_sf_mu * self.w_sf_mean_var_ratio_tensor,
+                        self.w_sf_mean_var_ratio_tensor,
+                    ),
+                )  # (self.n_obs, self.n_factors)
 
         # =====================Location-specific detection efficiency ======================= #
         # y_s with hierarchical mean prior
