@@ -15,14 +15,14 @@ from scvi.nn import one_hot
 #    pass
 
 
-class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
+class LocationModelGammaLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
     r"""
-    Cell2location models the elements of :math:`D` as Negative Binomial distributed,
+    Cell2location models the elements of :math:`D` as Gamma distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
     over-dispersion parameter :math:`\alpha_{e,g}` which accounts for unexplained variance:
 
     .. math::
-        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_{e,g})
+        D_{s,g} \sim \mathtt{Gamma}(\alpha_{e,g}, \alpha_{e,g} / \mu_{s,g})
 
     The expression level of genes :math:`\mu_{s,g}` in the mRNA count space is modelled
     as a linear function of expression signatures of reference cell types :math:`g_{f,g}`:
@@ -389,18 +389,13 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # expected expression
             mu = ((w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
             alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
-            # convert mean and overdispersion to total count and logits
-            # total_count, logits = _convert_mean_disp_to_counts_logits(
-            #    mu, alpha, eps=self.eps
-            # )
 
             # =====================DATA likelihood ======================= #
-            # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
+            # Likelihood (sampling distribution)
             with obs_plate:
                 pyro.sample(
                     "data_target",
-                    dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                    # dist.NegativeBinomial(total_count=total_count, logits=logits),
+                    dist.Gamma(concentration=alpha, rate=alpha / mu),
                     obs=x_data,
                 )
 
