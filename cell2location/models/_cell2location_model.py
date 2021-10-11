@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,11 +11,9 @@ from pyro import clear_param_store
 from pyro.nn import PyroModule
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
-from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
-
-from scvi._compat import Literal
-from scvi._docs import setup_anndata_dsp
 from scvi.data._anndata import _setup_anndata
+from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
+from scvi._docs import setup_anndata_dsp
 
 from cell2location.models._cell2location_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
