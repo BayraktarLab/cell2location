@@ -9,10 +9,9 @@ import scvi
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
-from scvi._docs import setup_anndata_dsp
 from scvi import _CONSTANTS
-from scvi.data._anndata import get_from_registry
-from scvi.data._anndata import _setup_anndata
+from scvi._docs import setup_anndata_dsp
+from scvi.data._anndata import _setup_anndata, get_from_registry
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 
 from cell2location.models._cell2location_module import (
