@@ -47,12 +47,30 @@ class AutoNormal(AutoGuide):
         ``*args,**kwargs`` as ``model()`` and returning a :class:`pyro.plate`
         or iterable of plates. Plates not returned will be created
         automatically as usual. This is useful for data subsampling.
+    :param dict hierarchical_sites: dictionary of sites, the posterior mean of
+        which should depend on the value of their parent sites in the model
+        hierarchy:
+        {
+         "site name 1": ["parent site name 1", "parent site name 2", ... ],
+         "site name 2": ...
+         }
+         In case of multi-level hierarhy, parent sites need to be listed
+         before child site.
     """
 
     scale_constraint = constraints.softplus_positive
 
-    def __init__(self, model, *, init_loc_fn=init_to_feasible, init_scale=0.1, create_plates=None):
+    def __init__(
+        self,
+        model,
+        *,
+        init_loc_fn=init_to_feasible,
+        init_scale=0.1,
+        create_plates=None,
+        hierarchical_sites: dict = dict()
+    ):
         self.init_loc_fn = init_loc_fn
+        self.hierarchical_sites = hierarchical_sites
 
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
@@ -112,7 +130,12 @@ class AutoNormal(AutoGuide):
 
         plates = self._create_plates(*args, **kwargs)
         result = {}
+
+        # sample sites without hierarchical dependency
         for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # Don't sample if the site has hierarchical dependency
+            if name in self.hierarchical_sites.keys():
+                pass
             transform = biject_to(site["fn"].support)
 
             with ExitStack() as stack:
@@ -125,6 +148,58 @@ class AutoNormal(AutoGuide):
                     name + "_unconstrained",
                     dist.Normal(
                         site_loc,
+                        site_scale,
+                    ).to_event(self._event_dims[name]),
+                    infer={"is_auxiliary": True},
+                )
+
+                value = transform(unconstrained_latent)
+                if poutine.get_mask() is False:
+                    log_density = 0.0
+                else:
+                    log_density = transform.inv.log_abs_det_jacobian(
+                        value,
+                        unconstrained_latent,
+                    )
+                    log_density = sum_rightmost(
+                        log_density,
+                        log_density.dim() - value.dim() + site["fn"].event_dim,
+                    )
+                delta_dist = dist.Delta(
+                    value,
+                    log_density=log_density,
+                    event_dim=site["fn"].event_dim,
+                )
+
+                result[name] = pyro.sample(name, delta_dist)
+
+        # Sample sites with hierarchical dependency
+        for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # Don't sample if the site does not have a hierarchical dependency
+            if name not in self.hierarchical_sites.keys():
+                pass
+            transform = biject_to(site["fn"].support)
+
+            # Get the expected value of the site based on hierarchy
+            parent_names = self.hierarchical_sites[name]
+            parent_result = {k: result[k] for k in parent_names}
+            with poutine.block(
+                self.model(args, kwargs, expose=[name] + parent_names)
+            ), poutine.trace() as tr, poutine.replay(data=parent_result):
+                site_loc_hierarhical_constrained = tr.nodes[name]["value"]
+            # transform to unconstrained space
+            site_loc_hierarhical_unconstrained = transform.inverse(site_loc_hierarhical_constrained)
+
+            with ExitStack() as stack:
+                for frame in site["cond_indep_stack"]:
+                    if frame.vectorized:
+                        stack.enter_context(plates[frame.name])
+
+                site_loc, site_scale = self._get_loc_and_scale(name)
+                unconstrained_latent = pyro.sample(
+                    name + "_unconstrained",
+                    dist.Normal(
+                        site_loc + site_loc_hierarhical_unconstrained,
                         site_scale,
                     ).to_event(self._event_dims[name]),
                     infer={"is_auxiliary": True},
