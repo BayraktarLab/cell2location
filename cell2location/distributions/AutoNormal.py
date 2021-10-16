@@ -119,6 +119,23 @@ class AutoNormal(AutoGuide):
         site_scale = _deep_getattr(self.scales, name)
         return site_loc, site_scale
 
+    def get_child_site_via_model_block(self, name, parent_names, parent_values, args, kwargs):
+        """
+        Propagate through a section of the model (block) to get the expected value of the site
+
+        :param str name: site name
+        :param list parent_names: list with parent site names
+        :param dict parent_values: dictionary with parent node values
+        :param list args: model args
+        :param dict kwargs: model kwargs
+        :return: value at the site conditioned on values of parent sites
+        """
+        with poutine.block():
+            model_block = poutine.block(self.model, expose=[name] + parent_names)
+            conditioned = poutine.condition(model_block, data=parent_values)
+            conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
+            return conditioned_trace.nodes[name]["value"]
+
     def forward(self, *args, **kwargs):
         """
         An automatic guide with the same ``*args, **kwargs`` as the base ``model``.
@@ -189,16 +206,12 @@ class AutoNormal(AutoGuide):
             # Get values of parent sites
             parent_names = self.hierarchical_sites[name]
             parent_result = {k: result[k] for k in parent_names}
-
             # Propagate through a section of the model (block)
             # to get the expected value of the site
-            with poutine.block():
-                model_block = poutine.block(self.model, expose=[name] + parent_names)
-                conditioned = poutine.condition(model_block, data=parent_result)
-                conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
-                site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
-
-            # transform to unconstrained space
+            site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                name=name, parent_names=parent_names, parent_values=parent_result, args=args, kwargs=kwargs
+            )
+            # Transform to unconstrained space
             site_loc_hierarhical_unconstrained = transform.inv(site_loc_hierarhical_constrained)
 
             with ExitStack() as stack:
@@ -261,11 +274,9 @@ class AutoNormal(AutoGuide):
 
                 # Propagate through a section of the model (block)
                 # to get the expected value of the site
-                with poutine.block():
-                    model_block = poutine.block(self.model, expose=[name] + parent_names)
-                    conditioned = poutine.condition(model_block, data=parent_medians)
-                    conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
-                    site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
+                site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                    name=name, parent_names=parent_names, parent_values=parent_medians, args=args, kwargs=kwargs
+                )
 
                 # transform to unconstrained space
                 site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
@@ -304,11 +315,9 @@ class AutoNormal(AutoGuide):
 
                 # Propagate through a section of the model (block)
                 # to get the expected value of the site
-                with poutine.block():
-                    model_block = poutine.block(self.model, expose=[name] + parent_names)
-                    conditioned = poutine.condition(model_block, data=parent_medians)
-                    conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
-                    site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
+                site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                    name=name, parent_names=parent_names, parent_values=parent_medians, args=args, kwargs=kwargs
+                )
 
                 # transform to unconstrained space and add independent component
                 site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
