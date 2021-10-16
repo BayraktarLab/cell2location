@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 from ._spatial_knn import spatial_knn
@@ -21,8 +23,26 @@ def select_slide(adata, s, batch_key="sample"):
     return slide
 
 
+def list_imported_modules():
+    for module in sys.modules:
+        try:
+            print(module, sys.modules[module].__version__)
+        except Exception:
+            try:
+                if type(sys.modules[module].version) is str:
+                    print(module, sys.modules[module].version)
+                else:
+                    print(module, sys.modules[module].version())
+            except Exception:
+                try:
+                    print(module, sys.modules[module].VERSION)
+                except Exception:
+                    pass
+
+
 __all__ = [
     "select_slide",
     "filter_genes",
     "spatial_knn",
+    "list_imported_modules",
 ]
