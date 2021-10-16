@@ -53,6 +53,9 @@ class AutoNormal(AutoGuide):
          }
          In case of multi-level hierarhy, parent sites need to be listed
          before child site.
+         Initial values for child sites are set to 0 in unconstrained space.
+         At the moment, if you need to use informative initialisation you need
+         to use independent sites.
     """
 
     scale_constraint = constraints.softplus_positive
