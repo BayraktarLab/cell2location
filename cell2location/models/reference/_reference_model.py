@@ -123,7 +123,14 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
             copy=copy,
         )
 
-    def train(self, max_epochs: int, batch_size: int = 2500, train_size: float = 1, lr: float = 0.002, **kwargs):
+    def train(
+        self,
+        max_epochs: Optional[int] = None,
+        batch_size: int = 2500,
+        train_size: float = 1,
+        lr: float = 0.002,
+        **kwargs,
+    ):
         """Train the model with useful defaults
 
         Parameters
