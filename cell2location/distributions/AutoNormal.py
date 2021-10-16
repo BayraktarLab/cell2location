@@ -248,13 +248,14 @@ class AutoNormal(AutoGuide):
                 # Get the expected value of the site based on hierarchy
                 # Get values of parent sites
                 parent_names = self.hierarchical_sites[name]
-                parent_result = {k: self._get_loc_and_scale(k)[0] for k in parent_names}
+                parent_support = {k: self.prototype_trace.nodes[k]["fn"].support for k in parent_names}
+                parent_medians = {k: biject_to(parent_support[k])(self._get_loc_and_scale(k)[0]) for k in parent_names}
 
                 # Propagate through a section of the model (block)
                 # to get the expected value of the site
                 with poutine.block():
                     model_block = poutine.block(self.model, expose=[name] + parent_names)
-                    conditioned = poutine.condition(model_block, data=parent_result)
+                    conditioned = poutine.condition(model_block, data=parent_medians)
                     conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
                     site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
 
