@@ -99,6 +99,11 @@ class AutoNormal(AutoGuide):
                     init_loc = periodic_repeat(init_loc, full_size, dim).contiguous()
             init_scale = torch.full_like(init_loc, self._init_scale)
 
+            # If site has hierarchical parent sites,
+            # the hierarchy will determine initial values
+            if name in self.hierarchical_sites.keys():
+                init_loc = torch.zeros_like(init_loc)
+
             _deep_setattr(self.locs, name, PyroParam(init_loc, constraints.real, event_dim))
             _deep_setattr(
                 self.scales,
