@@ -241,7 +241,26 @@ class AutoNormal(AutoGuide):
         """
         medians = {}
         for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # independent locs
             site_loc, _ = self._get_loc_and_scale(name)
+            # hierachical component
+            if name in self.hierarchical_sites.keys():
+                # Get the expected value of the site based on hierarchy
+                # Get values of parent sites
+                parent_names = self.hierarchical_sites[name]
+                parent_result = {k: self._get_loc_and_scale(k)[0] for k in parent_names}
+
+                # Propagate through a section of the model (block)
+                # to get the expected value of the site
+                with poutine.block():
+                    model_block = poutine.block(self.model, expose=[name] + parent_names)
+                    conditioned = poutine.condition(model_block, data=parent_result)
+                    conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
+                    site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
+
+                # transform to unconstrained space
+                site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
+
             median = biject_to(site["fn"].support)(site_loc)
             if median is site_loc:
                 median = median.clone()
@@ -264,7 +283,25 @@ class AutoNormal(AutoGuide):
         results = {}
 
         for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # independent locs
             site_loc, site_scale = self._get_loc_and_scale(name)
+            # hierachical component
+            if name in self.hierarchical_sites.keys():
+                # Get the expected value of the site based on hierarchy
+                # Get values of parent sites
+                parent_names = self.hierarchical_sites[name]
+                parent_result = {k: self._get_loc_and_scale(k)[0] for k in parent_names}
+
+                # Propagate through a section of the model (block)
+                # to get the expected value of the site
+                with poutine.block():
+                    model_block = poutine.block(self.model, expose=[name] + parent_names)
+                    conditioned = poutine.condition(model_block, data=parent_result)
+                    conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
+                    site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
+
+                # transform to unconstrained space and add independent component
+                site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
 
             site_quantiles = torch.tensor(quantiles, dtype=site_loc.dtype, device=site_loc.device)
             site_quantiles = site_quantiles.reshape((-1,) + (1,) * site_loc.dim())
