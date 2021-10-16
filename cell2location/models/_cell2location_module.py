@@ -202,6 +202,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     def create_plates(self, x_data, idx, batch_index):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
+    def hierarchical_sites(self):
+        return dict()
+        #    {
+        #    "z_sr_groups_factors": ["n_s_cells_per_location", "b_s_groups_per_location"],
+        #    "x_fr_group2fact": ["k_r_factors_per_groups"],
+        #    "w_sf": ["z_sr_groups_factors", "x_fr_group2fact"],
+        # }
+
     def list_obs_plate_vars(self):
         """Create a dictionary with:
         1. "name" - the name of observation/minibatch plate;

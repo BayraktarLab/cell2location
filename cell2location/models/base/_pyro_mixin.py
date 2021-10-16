@@ -8,13 +8,14 @@ import pandas as pd
 import pyro
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, init_to_mean
+from pyro.infer.autoguide import init_to_mean
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 
+from ...distributions.AutoNormal import AutoNormal
 from ...distributions.AutoNormalEncoder import AutoGuideList, AutoNormalEncoder
 
 
@@ -54,6 +55,7 @@ class AutoGuideMixinModule:
                 model,
                 init_loc_fn=init_loc_fn,
                 create_plates=model.create_plates,
+                hierarchical_sites=getattr(model, "hierarchical_sites", dict()),
             )
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
