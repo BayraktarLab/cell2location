@@ -7,12 +7,9 @@ import torch
 from pyro.distributions import constraints
 from pyro.distributions.util import sum_rightmost
 from pyro.infer.autoguide import AutoGuide
+from pyro.infer.autoguide.guides import _deep_getattr, _deep_setattr
 from pyro.infer.autoguide.initialization import InitMessenger, init_to_feasible
-from pyro.infer.autoguide.utils import (
-    deep_getattr,
-    deep_setattr,
-    helpful_support_errors,
-)
+from pyro.infer.autoguide.utils import helpful_support_errors
 from pyro.nn.module import PyroModule, PyroParam
 from pyro.ops.tensor_utils import periodic_repeat
 from torch.distributions import biject_to
@@ -102,16 +99,16 @@ class AutoNormal(AutoGuide):
                     init_loc = periodic_repeat(init_loc, full_size, dim).contiguous()
             init_scale = torch.full_like(init_loc, self._init_scale)
 
-            deep_setattr(self.locs, name, PyroParam(init_loc, constraints.real, event_dim))
-            deep_setattr(
+            _deep_setattr(self.locs, name, PyroParam(init_loc, constraints.real, event_dim))
+            _deep_setattr(
                 self.scales,
                 name,
                 PyroParam(init_scale, self.scale_constraint, event_dim),
             )
 
     def _get_loc_and_scale(self, name):
-        site_loc = deep_getattr(self.locs, name)
-        site_scale = deep_getattr(self.scales, name)
+        site_loc = _deep_getattr(self.locs, name)
+        site_scale = _deep_getattr(self.scales, name)
         return site_loc, site_scale
 
     def forward(self, *args, **kwargs):
@@ -135,7 +132,7 @@ class AutoNormal(AutoGuide):
         for name, site in self.prototype_trace.iter_stochastic_nodes():
             # Don't sample if the site has hierarchical dependency
             if name in self.hierarchical_sites.keys():
-                pass
+                continue
             transform = biject_to(site["fn"].support)
 
             with ExitStack() as stack:
@@ -177,7 +174,7 @@ class AutoNormal(AutoGuide):
         for name, site in self.prototype_trace.iter_stochastic_nodes():
             # Don't sample if the site does not have a hierarchical dependency
             if name not in self.hierarchical_sites.keys():
-                pass
+                continue
             transform = biject_to(site["fn"].support)
 
             # Get the expected value of the site based on hierarchy

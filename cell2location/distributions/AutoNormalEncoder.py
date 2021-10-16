@@ -9,11 +9,8 @@ from pyro.distributions.transforms import SoftplusTransform
 from pyro.distributions.util import sum_rightmost
 from pyro.infer.autoguide import AutoGuide
 from pyro.infer.autoguide import AutoGuideList as PyroAutoGuideList
-from pyro.infer.autoguide.utils import (
-    deep_getattr,
-    deep_setattr,
-    helpful_support_errors,
-)
+from pyro.infer.autoguide.guides import _deep_getattr, _deep_setattr
+from pyro.infer.autoguide.utils import helpful_support_errors
 from pyro.nn import PyroModule, PyroParam
 from pyro.nn.module import to_pyro_module_
 from scvi._compat import Literal
@@ -221,7 +218,7 @@ class AutoNormalEncoder(AutoGuide):
                 np.zeros(param_dim),
                 (np.ones(param_dim) * self.init_param_scale) / np.sqrt(n_hidden),
             ).astype("float32")
-            deep_setattr(
+            _deep_setattr(
                 self.hidden2locs,
                 name,
                 PyroParam(torch.tensor(init_param, device=site["value"].device, requires_grad=True)),
@@ -231,7 +228,7 @@ class AutoNormalEncoder(AutoGuide):
                 np.zeros(param_dim),
                 (np.ones(param_dim) * self.init_param_scale) / np.sqrt(n_hidden),
             ).astype("float32")
-            deep_setattr(
+            _deep_setattr(
                 self.hidden2scales,
                 name,
                 PyroParam(torch.tensor(init_param, device=site["value"].device, requires_grad=True)),
@@ -244,14 +241,14 @@ class AutoNormalEncoder(AutoGuide):
                     encoder_ = deepcopy(self.encoder_instance).to(site["value"].device)
                     # convert to pyro module
                     to_pyro_module_(encoder_)
-                    deep_setattr(
+                    _deep_setattr(
                         self.multiple_encoders,
                         name,
                         encoder_,
                     )
                 else:
                     # create instances
-                    deep_setattr(
+                    _deep_setattr(
                         self.multiple_encoders,
                         name,
                         self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs).to(
@@ -272,8 +269,8 @@ class AutoNormalEncoder(AutoGuide):
 
         """
 
-        linear_locs = deep_getattr(self.hidden2locs, name)
-        linear_scales = deep_getattr(self.hidden2scales, name)
+        linear_locs = _deep_getattr(self.hidden2locs, name)
+        linear_scales = _deep_getattr(self.hidden2scales, name)
 
         if "multiple" in self.encoder_mode:
             # when using multiple encoders extract hidden layer for this parameter
@@ -308,13 +305,13 @@ class AutoNormalEncoder(AutoGuide):
                 # when there is a second layer of multiple encoders fetch encoders and encode data
                 x_in[0] = res
                 res = {
-                    name: deep_getattr(self.multiple_encoders, name)(*x_in)
+                    name: _deep_getattr(self.multiple_encoders, name)(*x_in)
                     for name, site in self.prototype_trace.iter_stochastic_nodes()
                 }
         else:
             # when there are multiple encoders fetch encoders and encode data
             res = {
-                name: deep_getattr(self.multiple_encoders, name)(*x_in)
+                name: _deep_getattr(self.multiple_encoders, name)(*x_in)
                 for name, site in self.prototype_trace.iter_stochastic_nodes()
             }
         return res
