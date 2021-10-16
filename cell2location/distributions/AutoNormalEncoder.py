@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 import pyro
 import pyro.distributions as dist
+import pyro.poutine as poutine
 import torch
 from pyro.distributions.transforms import SoftplusTransform
 from pyro.distributions.util import sum_rightmost
@@ -73,6 +74,7 @@ class AutoNormalEncoder(AutoGuide):
         multi_encoder_kwargs=None,
         encoder_instance: torch.nn.Module = None,
         create_plates=None,
+        hierarchical_sites: dict = dict(),
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
     ):
         """
@@ -128,12 +130,23 @@ class AutoNormalEncoder(AutoGuide):
             Encoder network instance, overrides class input and the input instance is copied with deepcopy.
         create_plates
             Function for creating plates
+        hierarchical_sites
+            dictionary of sites, the posterior mean of which should depend on the value of their
+            parent sites in the model hierarchy:
+            {
+             "site name 1": ["parent site name 1", "parent site name 2", ... ],
+             "site name 2": ...
+            }
+            In case of multi-level hierarhy, parent sites need to be listed before child site.
+            Initial values for child sites are set to 0 in unconstrained space.
+            At the moment, if you need to use informative initialisation you need to use independent sites.
         encoder_mode
             Use single encoder for all variables ("single"), one encoder per variable ("multiple")
             or a single encoder in the first step and multiple encoders in the second step ("single-multiple").
         """
 
         super().__init__(model, create_plates=create_plates)
+        self.hierarchical_sites = hierarchical_sites
         self.amortised_plate_sites = amortised_plate_sites
         self.encoder_mode = encoder_mode
         self.scales_offset = scales_offset
@@ -316,6 +329,23 @@ class AutoNormalEncoder(AutoGuide):
             }
         return res
 
+    def get_child_site_via_model_block(self, name, parent_names, parent_values, args, kwargs):
+        """
+        Propagate through a section of the model (block) to get the expected value of the site
+
+        :param str name: site name
+        :param list parent_names: list with parent site names
+        :param dict parent_values: dictionary with parent node values
+        :param list args: model args
+        :param dict kwargs: model kwargs
+        :return: value at the site conditioned on values of parent sites
+        """
+        with poutine.block():
+            model_block = poutine.block(self.model, expose=[name] + parent_names)
+            conditioned = poutine.condition(model_block, data=parent_values)
+            conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
+            return conditioned_trace.nodes[name]["value"]
+
     def forward(self, *args, **kwargs):
         """
         An automatic guide with the same ``*args, **kwargs`` as the base ``model``.
@@ -334,7 +364,11 @@ class AutoNormalEncoder(AutoGuide):
 
         plates = self._create_plates(*args, **kwargs)
         result = {}
+        # sample sites without hierarchical dependency
         for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # Don't sample if the site has hierarchical dependency
+            if name in self.hierarchical_sites.keys():
+                continue
             transform = biject_to(site["fn"].support)
 
             with ExitStack() as stack:
@@ -372,6 +406,60 @@ class AutoNormalEncoder(AutoGuide):
 
                 result[name] = pyro.sample(name, delta_dist)
 
+        # Sample sites with hierarchical dependency
+        for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # Don't sample if the site does not have a hierarchical dependency
+            if name not in self.hierarchical_sites.keys():
+                continue
+            transform = biject_to(site["fn"].support)
+
+            # Get the expected value of the site based on hierarchy
+            # Get values of parent sites
+            parent_names = self.hierarchical_sites[name]
+            parent_result = {k: result[k] for k in parent_names}
+            # Propagate through a section of the model (block)
+            # to get the expected value of the site
+            site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                name=name, parent_names=parent_names, parent_values=parent_result, args=args, kwargs=kwargs
+            )
+            # Transform to unconstrained space
+            site_loc_hierarhical_unconstrained = transform.inv(site_loc_hierarhical_constrained)
+
+            with ExitStack() as stack:
+                for frame in site["cond_indep_stack"]:
+                    if frame.vectorized:
+                        stack.enter_context(plates[frame.name])
+
+                site_loc, site_scale = self._get_loc_and_scale(name, encoded_hidden)
+                # use a combination of hierarchical and independent loc
+                unconstrained_latent = pyro.sample(
+                    name + "_unconstrained",
+                    dist.Normal(
+                        site_loc + site_loc_hierarhical_unconstrained,
+                        site_scale,
+                    ).to_event(self._event_dims[name]),
+                    infer={"is_auxiliary": True},
+                )
+
+                value = transform(unconstrained_latent)
+                if pyro.poutine.get_mask() is False:
+                    log_density = 0.0
+                else:
+                    log_density = transform.inv.log_abs_det_jacobian(
+                        value,
+                        unconstrained_latent,
+                    )
+                    log_density = sum_rightmost(
+                        log_density,
+                        log_density.dim() - value.dim() + site["fn"].event_dim,
+                    )
+                delta_dist = dist.Delta(
+                    value,
+                    log_density=log_density,
+                    event_dim=site["fn"].event_dim,
+                )
+
+                result[name] = pyro.sample(name, delta_dist)
         return result
 
     @torch.no_grad()
@@ -387,7 +475,27 @@ class AutoNormalEncoder(AutoGuide):
 
         medians = {}
         for name, site in self.prototype_trace.iter_stochastic_nodes():
+            # Independent component
             site_loc, _ = self._get_loc_and_scale(name, encoded_latent)
+            # Hierachical component
+            if name in self.hierarchical_sites.keys():
+                # Get the expected value of the site based on hierarchy
+                # Get values of parent sites
+                parent_names = self.hierarchical_sites[name]
+                parent_support = {k: self.prototype_trace.nodes[k]["fn"].support for k in parent_names}
+                parent_medians = {
+                    k: biject_to(parent_support[k])(self._get_loc_and_scale(k, encoded_latent)[0]) for k in parent_names
+                }
+
+                # Propagate through a section of the model (block)
+                # to get the expected value of the site
+                site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                    name=name, parent_names=parent_names, parent_values=parent_medians, args=args, kwargs=kwargs
+                )
+
+                # transform to unconstrained space
+                site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
+
             median = biject_to(site["fn"].support)(site_loc)
             if median is site_loc:
                 median = median.clone()
@@ -414,6 +522,24 @@ class AutoNormalEncoder(AutoGuide):
 
         for name, site in self.prototype_trace.iter_stochastic_nodes():
             site_loc, site_scale = self._get_loc_and_scale(name, encoded_latent)
+            # hierachical component
+            if name in self.hierarchical_sites.keys():
+                # Get the expected value of the site based on hierarchy
+                # Get values of parent sites
+                parent_names = self.hierarchical_sites[name]
+                parent_support = {k: self.prototype_trace.nodes[k]["fn"].support for k in parent_names}
+                parent_medians = {
+                    k: biject_to(parent_support[k])(self._get_loc_and_scale(k, encoded_latent)[0]) for k in parent_names
+                }
+
+                # Propagate through a section of the model (block)
+                # to get the expected value of the site
+                site_loc_hierarhical_constrained = self.get_child_site_via_model_block(
+                    name=name, parent_names=parent_names, parent_values=parent_medians, args=args, kwargs=kwargs
+                )
+
+                # transform to unconstrained space and add independent component
+                site_loc = site_loc + biject_to(site["fn"].support).inv(site_loc_hierarhical_constrained)
 
             site_quantiles = torch.tensor(quantiles, dtype=site_loc.dtype, device=site_loc.device)
             site_quantiles_values = dist.Normal(site_loc, site_scale).icdf(site_quantiles)
