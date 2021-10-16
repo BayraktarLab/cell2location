@@ -178,14 +178,20 @@ class AutoNormal(AutoGuide):
             transform = biject_to(site["fn"].support)
 
             # Get the expected value of the site based on hierarchy
+            # Get values of parent sites
             parent_names = self.hierarchical_sites[name]
             parent_result = {k: result[k] for k in parent_names}
-            with poutine.block(
-                self.model(args, kwargs, expose=[name] + parent_names)
-            ), poutine.trace() as tr, poutine.replay(data=parent_result):
-                site_loc_hierarhical_constrained = tr.nodes[name]["value"]
+
+            # Propagate through a section of the model (block)
+            # to get the expected value of the site
+            with poutine.block():
+                model_block = poutine.block(self.model, expose=[name] + parent_names)
+                conditioned = poutine.condition(model_block, data=parent_result)
+                conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
+                site_loc_hierarhical_constrained = conditioned_trace.nodes[name]["value"]
+
             # transform to unconstrained space
-            site_loc_hierarhical_unconstrained = transform.inverse(site_loc_hierarhical_constrained)
+            site_loc_hierarhical_unconstrained = transform.inv(site_loc_hierarhical_constrained)
 
             with ExitStack() as stack:
                 for frame in site["cond_indep_stack"]:
@@ -193,6 +199,7 @@ class AutoNormal(AutoGuide):
                         stack.enter_context(plates[frame.name])
 
                 site_loc, site_scale = self._get_loc_and_scale(name)
+                # use a combination of hierarchical and independent loc
                 unconstrained_latent = pyro.sample(
                     name + "_unconstrained",
                     dist.Normal(
