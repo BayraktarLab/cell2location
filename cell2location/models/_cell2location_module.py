@@ -98,6 +98,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
         init_alpha=3.0,
+        hierarchical_guide: bool = False,
     ):
 
         super().__init__()
@@ -117,6 +118,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior["mean"] = detection_mean
         detection_hyp_prior["alpha"] = detection_alpha
         self.detection_hyp_prior = detection_hyp_prior
+
+        self.hierarchical_guide = hierarchical_guide
 
         if (init_vals is not None) & (type(init_vals) is dict):
             self.np_init_vals = init_vals
@@ -204,12 +207,16 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
     @property
     def hierarchical_sites(self):
-        return {
-            # "z_sr_groups_factors": ["n_s_cells_per_location", "b_s_groups_per_location"],
-            # "x_fr_group2fact": ["k_r_factors_per_groups"],
-            "w_sf": ["z_sr_groups_factors", "x_fr_group2fact"],
-            # "detection_y_s": ["detection_mean_y_e"],
-        }
+        if self.hierarchical_guide is True:
+            hierarchy_dict = {
+                # "z_sr_groups_factors": ["n_s_cells_per_location", "b_s_groups_per_location"],
+                # "x_fr_group2fact": ["k_r_factors_per_groups"],
+                "w_sf": ["z_sr_groups_factors", "x_fr_group2fact"],
+                # "detection_y_s": ["detection_mean_y_e"],
+            }
+        else:
+            hierarchy_dict = dict()
+        return hierarchy_dict
 
     def list_obs_plate_vars(self):
         """Create a dictionary with:
