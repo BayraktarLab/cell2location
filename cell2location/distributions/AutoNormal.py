@@ -228,13 +228,12 @@ class AutoNormal(AutoGuide):
                 # regularise independent site_loc
                 if self.regularise_hierarchical_loc is True:
                     # regularisation_sigma = _deep_getattr(self.locs, name + '_regularisation_sigma')
-                    regularisation_sigma = (
-                        torch.ones_like(site_loc, device=site["value"].device, requires_grad=False),
-                    )
+                    regularisation_mu = torch.zeros_like(site_loc, device=site["value"].device, requires_grad=False)
+                    regularisation_sigma = torch.ones_like(site_loc, device=site["value"].device, requires_grad=False)
                     pyro.sample(
                         name + "_regularisation_loc",
                         dist.Normal(
-                            torch.zeros_like(site_loc, device=site["value"].device, requires_grad=False),
+                            regularisation_mu,
                             regularisation_sigma,
                         ).to_event(self._event_dims[name]),
                         obs=site_loc,
