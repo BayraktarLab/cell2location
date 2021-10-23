@@ -6,9 +6,9 @@ import numpy as np
 import scvi
 from anndata import AnnData
 from pyro import clear_param_store
-from scvi._docs import setup_anndata_dsp
 from scvi.data._anndata import _setup_anndata
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
+from scvi.utils import setup_anndata_dsp
 
 from ...cluster_averages import compute_cluster_averages
 from ..base._pyro_base_reference_module import RegressionBaseModule
