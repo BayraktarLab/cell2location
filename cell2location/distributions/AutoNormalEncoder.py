@@ -344,7 +344,7 @@ class AutoNormalEncoder(AutoGuide):
             model_block = poutine.block(self.model, expose=[name] + parent_names)
             conditioned = poutine.condition(model_block, data=parent_values)
             conditioned_trace = poutine.trace(conditioned).get_trace(*args, **kwargs)
-            return conditioned_trace.nodes[name]["value"]
+            return conditioned_trace.nodes[name]["fn"].mean  # conditioned_trace.nodes[name]["value"]  #
 
     def forward(self, *args, **kwargs):
         """
