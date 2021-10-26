@@ -68,11 +68,9 @@ class AutoNormal(AutoGuide):
         init_scale=0.1,
         create_plates=None,
         hierarchical_sites: dict = dict(),
-        regularise_hierarchical_loc: bool = False,
     ):
         self.init_loc_fn = init_loc_fn
         self.hierarchical_sites = hierarchical_sites
-        self.regularise_hierarchical_loc = regularise_hierarchical_loc
 
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
@@ -108,16 +106,6 @@ class AutoNormal(AutoGuide):
             # the hierarchy will determine initial values
             if name in self.hierarchical_sites.keys():
                 init_loc = torch.zeros_like(init_loc)
-                if self.regularise_hierarchical_loc is True:
-                    _deep_setattr(
-                        self.locs,
-                        name + "_regularisation_sigma",
-                        PyroParam(
-                            torch.ones((1, 1), device=site["value"].device, requires_grad=True),
-                            constraints.positive,
-                            event_dim,
-                        ),
-                    )
 
             _deep_setattr(self.locs, name, PyroParam(init_loc, constraints.real, event_dim))
             _deep_setattr(
@@ -232,23 +220,7 @@ class AutoNormal(AutoGuide):
                         stack.enter_context(plates[frame.name])
 
                 site_loc, site_scale = self._get_loc_and_scale(name)
-                # regularise independent site_loc
-                if self.regularise_hierarchical_loc is True:
-                    regularisation_sigma = _deep_getattr(self.locs, name + "_regularisation_sigma")
-                    regularisation_mu = torch.zeros_like(site_loc, device=site_loc.device, requires_grad=False)
-                    # regularisation_sigma = torch.ones_like(site_loc, device=site_loc.device, requires_grad=False)
-                    regularisation_normal = dist.Normal(regularisation_mu, regularisation_sigma).to_event(
-                        self._event_dims[name]
-                    )
-                    pyro.sample(
-                        name + "_regularisation_loc",
-                        dist.Delta(
-                            site_loc,
-                            log_density=-regularisation_normal.log_prob(site_loc),
-                            event_dim=self._event_dims[name],
-                        ),
-                        infer={"is_auxiliary": True},
-                    )
+
                 # use a combination of hierarchical and independent loc
                 unconstrained_latent = pyro.sample(
                     name + "_unconstrained",
