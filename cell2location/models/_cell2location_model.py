@@ -105,6 +105,22 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                     (self.summary_stats["n_batch"], 1)
                 ).astype("float32")
 
+        hierarhy_df = model_kwargs.get("hierarhy_df", None)
+        if hierarhy_df is not None:
+            self.hierarhy_df_ = hierarhy_df
+            hierarchy_n_levels = hierarhy_df.shape[1] + 1
+            hierarchy_names = {
+                f"level_{i+1}": np.array(hierarhy_df.iloc[:, i].unique()) for i in range(hierarchy_n_levels - 1)
+            }
+            hierarhy_df.columns = hierarchy_names
+            hierarchy_names["level_0"] = np.array(hierarhy_df.index)
+            hierarhy_df["level_0"] = np.array(hierarhy_df.index)
+            hierarchy_adjacency = {
+                f"level_{1}_level_{i + 1}": hierarhy_df[[f"level_{i}", f"level_{i+1}"]].drop_duplicates()
+                for i in range(hierarchy_n_levels - 1)
+            }
+            hierarchy_adjacency = {k: pd.dcast(v, ...) for k, v in hierarchy_adjacency.items()}
+
         self.module = Cell2locationBaseModule(
             model=model_class,
             n_obs=self.summary_stats["n_cells"],
