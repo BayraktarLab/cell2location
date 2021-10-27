@@ -209,10 +209,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     def hierarchical_sites(self):
         if self.hierarchical_guide is True:
             hierarchy_dict = {
-                # "z_sr_groups_factors": ["n_s_cells_per_location", "b_s_groups_per_location"],
-                # "x_fr_group2fact": ["k_r_factors_per_groups"],
+                "z_sr_groups_factors": ["n_s_cells_per_location", "b_s_groups_per_location"],
+                "x_fr_group2fact": ["k_r_factors_per_groups"],
                 "w_sf": ["z_sr_groups_factors", "x_fr_group2fact"],
-                # "detection_y_s": ["detection_mean_y_e"],
+                "detection_y_s": ["detection_mean_y_e"],
             }
         else:
             hierarchy_dict = dict()
