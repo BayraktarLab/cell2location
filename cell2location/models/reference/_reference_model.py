@@ -6,9 +6,9 @@ import numpy as np
 import scvi
 from anndata import AnnData
 from pyro import clear_param_store
-from scvi._docs import setup_anndata_dsp
 from scvi.data._anndata import _setup_anndata
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
+from scvi.utils import setup_anndata_dsp
 
 from ...cluster_averages import compute_cluster_averages
 from ..base._pyro_base_reference_module import RegressionBaseModule
@@ -123,7 +123,14 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
             copy=copy,
         )
 
-    def train(self, max_epochs: int, batch_size: int = 2500, train_size: float = 1, lr: float = 0.002, **kwargs):
+    def train(
+        self,
+        max_epochs: Optional[int] = None,
+        batch_size: int = 2500,
+        train_size: float = 1,
+        lr: float = 0.002,
+        **kwargs,
+    ):
         """Train the model with useful defaults
 
         Parameters
