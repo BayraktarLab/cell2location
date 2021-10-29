@@ -86,7 +86,7 @@ def test_cell2location():
         dataset,
         model_name="CoLocatedGroupsSklearnNMF",
         train_args={
-            "n_fact": np.arange(4),  # IMPORTANT: use a wider range of the number of factors (5-30)
+            "n_fact": np.arange(3, 4),  # IMPORTANT: use a wider range of the number of factors (5-30)
             "sample_name_col": "batch",  # columns in adata_vis.obs that identifies sample
             "n_restarts": 2,  # number of training restarts
         },
