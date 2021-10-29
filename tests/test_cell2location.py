@@ -4,10 +4,10 @@ from scvi.data import synthetic_iid
 from cell2location import run_colocation
 from cell2location.models import Cell2location, RegressionModel
 from cell2location.models.simplified._cell2location_v3_no_factorisation_module import (
-    LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel,
+    LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
 from cell2location.models.simplified._cell2location_v3_no_mg_module import (
-    LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
+    LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel,
 )
 
 
