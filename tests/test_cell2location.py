@@ -11,7 +11,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 )
 
 
-def test_stereoscope(save_path):
+def test_cell2location(save_path):
     dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
