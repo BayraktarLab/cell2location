@@ -15,7 +15,7 @@ def test_cell2location(save_path):
     dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
-    # train regression model to get signatures of cell types
+    # train regression model to get signatures of cell types 
     sc_model = RegressionModel(dataset)
     # test full data training
     sc_model.train(max_epochs=1)
