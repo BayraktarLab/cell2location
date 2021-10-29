@@ -308,7 +308,9 @@ def run_colocation(
 
         # print the fraction of cells of each type located to each combination
         ct_loadings = mod.print_gene_loadings(
-            loadings_attr="cell_type_fractions", gene_fact_name="cell_type_fractions", top_n=export_args["top_n"]
+            loadings_attr="cell_type_fractions",
+            gene_fact_name="cell_type_fractions",
+            top_n=min(export_args["top_n"], len(var_names)),
         )
 
         # save
