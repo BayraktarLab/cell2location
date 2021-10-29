@@ -11,11 +11,12 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 )
 
 
-def test_cell2location(save_path):
+def test_cell2location():
+    save_path = "./cell2location_model_test"
     dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
-    # train regression model to get signatures of cell types 
+    # train regression model to get signatures of cell types
     sc_model = RegressionModel(dataset)
     # test full data training
     sc_model.train(max_epochs=1)
@@ -118,4 +119,4 @@ def test_cell2location(save_path):
     st_model.train(max_epochs=1)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
-    dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+    st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
