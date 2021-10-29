@@ -167,7 +167,7 @@ class QuantileMixin:
         return optim_param
 
     @torch.no_grad()
-    def _posterior_quantile_amortised(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
+    def _posterior_quantile_amortised(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
         and global variables, which is necessary when performing amortised inference.
@@ -259,7 +259,7 @@ class QuantileMixin:
         return means
 
     @torch.no_grad()
-    def _posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
+    def _posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
 
@@ -292,7 +292,7 @@ class QuantileMixin:
 
         return means
 
-    def posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = True):
+    def posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
         """
         Compute median of the posterior distribution of each parameter.
 
