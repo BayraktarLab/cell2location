@@ -8,7 +8,9 @@ import scanpy
 import scvi
 from anndata import AnnData
 from pyro import clear_param_store
+from pyro.infer import Effect_ELBO
 from pyro.nn import PyroModule
+from pyro.poutine.messenger import Messenger
 from scvi import _CONSTANTS
 from scvi.data._anndata import _setup_anndata, get_from_registry
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
@@ -180,6 +182,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         kwargs["batch_size"] = batch_size
         kwargs["train_size"] = train_size
         kwargs["lr"] = lr
+        # if guide is of new type
+        if isinstance(self.module.guide, Messenger):
+            kwargs["plan_kwargs"] = {"loss_fn": Effect_ELBO()}
 
         super().train(**kwargs)
 
