@@ -156,7 +156,13 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         )
 
     def train(
-        self, max_epochs: int = 30000, batch_size: int = None, train_size: float = 1, lr: float = 0.002, **kwargs
+        self,
+        max_epochs: int = 30000,
+        batch_size: int = None,
+        train_size: float = 1,
+        lr: float = 0.002,
+        num_particles: int = 1,
+        **kwargs,
     ):
         """Train the model with useful defaults
 
@@ -184,7 +190,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         kwargs["lr"] = lr
         # if guide is of new type
         if isinstance(self.module.guide, Messenger):
-            kwargs["plan_kwargs"] = {"loss_fn": Effect_ELBO()}
+            kwargs["plan_kwargs"] = {"loss_fn": Effect_ELBO(num_particles=num_particles)}
 
         super().train(**kwargs)
 
