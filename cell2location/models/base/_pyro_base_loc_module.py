@@ -1,3 +1,5 @@
+from typing import Optional
+
 from scvi._compat import Literal
 from scvi.module.base import PyroBaseModuleClass
 
@@ -10,8 +12,9 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         model,
         amortised: bool = False,
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
-        encoder_kwargs=None,
+        encoder_kwargs: Optional[dict] = None,
         data_transform="log1p",
+        create_autoguide_kwargs: Optional[dict] = None,
         **kwargs,
     ):
         """
@@ -34,6 +37,8 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
 
         self._model = model(**kwargs)
         self._amortised = amortised
+        if create_autoguide_kwargs is None:
+            create_autoguide_kwargs = dict()
 
         self._guide = self._create_autoguide(
             model=self.model,
@@ -43,6 +48,7 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
             encoder_mode=encoder_mode,
             init_loc_fn=self.init_to_value,
             n_cat_list=[kwargs["n_batch"]],
+            **create_autoguide_kwargs,
         )
 
         self._get_fn_args_from_batch = self._model._get_fn_args_from_batch

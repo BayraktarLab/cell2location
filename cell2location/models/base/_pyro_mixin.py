@@ -8,7 +8,12 @@ import pandas as pd
 import pyro
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, AutoNormalMessenger, init_to_mean
+from pyro.infer.autoguide import (
+    AutoNormal,
+    AutoNormalMessenger,
+    init_to_feasible,
+    init_to_mean,
+)
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
@@ -24,7 +29,7 @@ def init_to_value(site=None, values={}):
     if site["name"] in values:
         return values[site["name"]]
     else:
-        return init_to_mean(site)
+        return init_to_mean(site, fallback=init_to_feasible)
 
 
 class AutoGuideMixinModule:
@@ -44,13 +49,14 @@ class AutoGuideMixinModule:
         encoder_kwargs,
         data_transform,
         encoder_mode,
-        init_loc_fn=init_to_mean,
+        init_loc_fn=init_to_mean(fallback=init_to_feasible),
         n_cat_list: list = [],
         encoder_instance=None,
+        guide_class=AutoNormalMessenger,
     ):
 
         if not amortised:
-            _guide = AutoNormalMessenger(
+            _guide = guide_class(
                 model,
                 init_loc_fn=init_loc_fn,
                 # create_plates=model.create_plates,
