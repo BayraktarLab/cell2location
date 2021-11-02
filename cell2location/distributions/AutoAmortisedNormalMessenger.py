@@ -130,8 +130,6 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         encoder_kwargs["n_hidden"] = n_hidden["single"]
         if multi_encoder_kwargs is None:
             multi_encoder_kwargs = deepcopy(encoder_kwargs)
-        if "multiple" in n_hidden.keys():
-            multi_encoder_kwargs["n_hidden"] = n_hidden["multiple"]
 
         # save encoder parameters
         self.encoder_kwargs = encoder_kwargs
@@ -209,14 +207,6 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             pass
 
         # Initialize.
-        # determine the number of hidden layers
-        if "multiple" in self.encoder_mode:
-            if "multiple" in self.n_hidden.keys():
-                n_hidden = self.n_hidden["multiple"]
-            else:
-                n_hidden = self.n_hidden[name]
-        elif "single" in self.encoder_mode:
-            n_hidden = self.n_hidden["single"]
         # create single encoder NN
         if "single" in self.encoder_mode:
             if self.encoder_instance is not None:
@@ -235,6 +225,14 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                     ),
                 )
         if "multiple" in self.encoder_mode:
+            # determine the number of hidden layers
+            if name in self.n_hidden.keys():
+                n_hidden = self.n_hidden[name]
+            else:
+                n_hidden = self.n_hidden["multiple"]
+            multi_encoder_kwargs = deepcopy(self.multi_encoder_kwargs)
+            multi_encoder_kwargs["n_hidden"] = n_hidden
+
             # create multiple encoders
             if self.encoder_instance is not None:
                 # copy instances
@@ -251,7 +249,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self,
                     "multiple_encoders." + name,
-                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs).to(
+                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **multi_encoder_kwargs).to(
                         prior.mean.device
                     ),
                 )
@@ -294,10 +292,10 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
 
             # determine the number of hidden layers
             if "multiple" in self.encoder_mode:
-                if "multiple" in self.n_hidden.keys():
-                    n_hidden = self.n_hidden["multiple"]
-                else:
+                if name in self.n_hidden.keys():
                     n_hidden = self.n_hidden[name]
+                else:
+                    n_hidden = self.n_hidden["multiple"]
             elif "single" in self.encoder_mode:
                 n_hidden = self.n_hidden["single"]
             # determine parameter dimensions
