@@ -1,23 +1,18 @@
-from typing import Callable, Dict, Optional, Union
+from copy import deepcopy
+from typing import Callable, Optional, Union
 
+import numpy as np
 import pyro.distributions as dist
-import pyro.poutine as poutine
 import torch
 from pyro.distributions.distribution import Distribution
-
-# from pyro.distributions.transforms import SoftplusTransform
+from pyro.distributions.transforms import SoftplusTransform
 from pyro.infer.autoguide import AutoHierarchicalNormalMessenger
-from pyro.infer.autoguide.initialization import init_to_feasible, init_to_mean
 from pyro.infer.autoguide.utils import (
     deep_getattr,
     deep_setattr,
     helpful_support_errors,
 )
-
-# from pyro.infer.effect_elbo import GuideMessenger
-from pyro.nn.module import PyroModule, PyroParam  # , pyro_method, to_pyro_module_
-
-# from pyro.poutine.runtime import get_plates
+from pyro.nn.module import PyroModule, PyroParam, to_pyro_module_
 from scvi._compat import Literal
 from scvi.nn import FCLayers
 from torch.distributions import biject_to, constraints
@@ -27,11 +22,11 @@ class FCLayersPyro(FCLayers, PyroModule):
     pass
 
 
-class AutoAmortisedNormalMessengerMixin:
+class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
     """
     EXPERIMENTAL Automatic :class:`~pyro.infer.effect_elbo.GuideMessenger` ,
     intended for use with :class:`~pyro.infer.effect_elbo.Effect_ELBO` or
-    similar.
+    similar. Amortise specific sites
 
     The mean-field posterior at any site is a transformed normal distribution,
     the mean of which depends on the value of that site given its dependencies in the model:
@@ -41,148 +36,7 @@ class AutoAmortisedNormalMessengerMixin:
     Where the value of `prior.mean` is conditional on upstream sites in the model.
     This approach doesn't work for distributions that don't have the mean.
 
-    Derived classes may override particular sites and use this simply as a
-    default, see AutoNormalMessenger documentation for example.
-
-    :param callable model: A Pyro model.
-    :param callable init_loc_fn: A per-site initialization function.
-        See :ref:`autoguide-initialization` section for available functions.
-    :param float init_scale: Initial scale for the standard deviation of each
-        (unconstrained transformed) latent variable.
-    :param float init_weight: Initial value for the weight of the contribution
-        of hierarchical sites to posterior mean for each latent variable.
-    :param list hierarchical_sites: List of latent variables (model sites)
-        that have hierarchical dependencies.
-        If None, all sites are assumed to have hierarchical dependencies. If None, for the sites
-        that don't have upstream sites, the guide is representing/learning deviation from the prior.
-    """
-
-    # 'element-wise' or 'scalar'
-    weight_type = "element-wise"
-
-    def __init__(
-        self,
-        model: Callable,
-        *,
-        init_loc_fn: Callable = init_to_mean(fallback=init_to_feasible),
-        init_scale: float = 0.1,
-        init_weight: float = 1.0,
-        hierarchical_sites: Optional[list] = None,
-    ):
-        if not isinstance(init_scale, float) or not (init_scale > 0):
-            raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
-        super().__init__(model)
-        self.init_loc_fn = init_loc_fn
-        self._init_scale = init_scale
-        self._init_weight = init_weight
-        self._hierarchical_sites = hierarchical_sites
-        self._computing_median = False
-
-    def get_posterior(
-        self,
-        name: str,
-        prior: Distribution,
-        upstream_values: Dict[str, torch.Tensor],
-    ) -> Union[Distribution, torch.Tensor]:
-        if self._computing_median:
-            return self._get_posterior_median(name, prior)
-
-        with helpful_support_errors({"name": name, "fn": prior}):
-            transform = biject_to(prior.support)
-        if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-            # If hierarchical_sites not specified all sites are assumed to be hierarchical
-            loc, scale, weight = self._get_params(name, prior)
-            loc = loc + transform.inv(prior.mean) * weight
-            posterior = dist.TransformedDistribution(
-                dist.Normal(loc, scale).to_event(transform.domain.event_dim),
-                transform.with_cache(),
-            )
-            return posterior
-        else:
-            # Fall back to mean field when hierarchical_sites list is not empty and site not in the list.
-            return super().get_posterior(name, prior, upstream_values)
-
-    def _get_params(self, name: str, prior: Distribution):
-        try:
-            loc = deep_getattr(self.locs, name)
-            scale = deep_getattr(self.scales, name)
-            if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-                weight = deep_getattr(self.weights, name)
-                return loc, scale, weight
-            else:
-                return loc, scale
-        except AttributeError:
-            pass
-
-        # Initialize.
-        with poutine.block(), torch.no_grad():
-            transform = biject_to(prior.support)
-            event_dim = transform.domain.event_dim
-            constrained = self.init_loc_fn({"name": name, "fn": prior}).detach()
-            unconstrained = transform.inv(constrained)
-            init_loc = self._remove_outer_plates(unconstrained, event_dim)
-            init_scale = torch.full_like(init_loc, self._init_scale)
-            if self.weight_type == "scalar":
-                # weight is a single value parameter
-                init_weight = torch.full((), self._init_weight)
-            if self.weight_type == "element-wise":
-                # weight is element-wise
-                init_weight = torch.full_like(init_loc, self._init_weight)
-            # if site is hierarchical substract contribution of dependencies from init_loc
-            if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-                init_loc = init_loc - init_weight * transform.inv(prior.mean)
-
-        deep_setattr(self, "locs." + name, PyroParam(init_loc, event_dim=event_dim))
-        deep_setattr(
-            self,
-            "scales." + name,
-            PyroParam(init_scale, constraint=constraints.positive, event_dim=event_dim),
-        )
-        if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-            if self.weight_type == "scalar":
-                # weight is a single value parameter
-                deep_setattr(
-                    self,
-                    "weights." + name,
-                    PyroParam(init_weight, constraint=constraints.positive),
-                )
-            if self.weight_type == "element-wise":
-                # weight is element-wise
-                deep_setattr(
-                    self,
-                    "weights." + name,
-                    PyroParam(
-                        init_weight,
-                        constraint=constraints.positive,
-                        event_dim=event_dim,
-                    ),
-                )
-
-        return self._get_params(name, prior)
-
-    def _get_posterior_median(self, name, prior):
-        transform = biject_to(prior.support)
-        if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-            loc, scale, weight = self._get_params(name, prior)
-            loc = loc + transform.inv(prior.mean) * weight
-        else:
-            loc, scale = self._get_params(name, prior)
-        return transform(loc)
-
-
-class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger, AutoAmortisedNormalMessengerMixin):
-    """
-    EXPERIMENTAL Automatic :class:`~pyro.infer.effect_elbo.GuideMessenger` ,
-    intended for use with :class:`~pyro.infer.effect_elbo.Effect_ELBO` or
-    similar.
-
-    The mean-field posterior at any site is a transformed normal distribution,
-    the mean of which depends on the value of that site given its dependencies in the model:
-
-        loc = loc + transform.inv(prior.mean) * weight
-
-    Where the value of `prior.mean` is conditional on upstream sites in the model.
-    This approach doesn't work for distributions that don't have the mean.
+    loc, scales and element-specific weight are amortised for each site specified in `amortised_plate_sites`.
 
     Derived classes may override particular sites and use this simply as a
     default, see AutoNormalMessenger documentation for example.
@@ -216,8 +70,15 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger, 
             "z_sr": 128,
             "w_sf": 200,
         }
-    :param float init_weight: Initial value for the weight of the contribution
-        of hierarchical sites to posterior mean for each latent variable.
+    :param float init_param_scale: How to scale/normalise initial values for weights converting hidden layers to loc and scales.
+    :param float scales_offset: offset between the output of the NN and scales.
+    :param Callable encoder_class: Class that defines encoder network.
+    :param dict encoder_kwargs: Keyword arguments for encoder class.
+    :param dict multi_encoder_kwargs: Optional separate keyword arguments for encoder_class,
+        useful when encoder_mode == "single-multiple".
+    :param Callable encoder_instance: Encoder network instance, overrides class input and the input instance is copied with deepcopy.
+    :param str encoder_mode: Use single encoder for all variables ("single"), one encoder per variable ("multiple")
+        or a single encoder in the first step and multiple encoders in the second step ("single-multiple").
     :param list hierarchical_sites: List of latent variables (model sites)
         that have hierarchical dependencies.
         If None, all sites are assumed to have hierarchical dependencies. If None, for the sites
@@ -234,31 +95,61 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger, 
         amortised_plate_sites: dict,
         n_in: int,
         n_hidden: dict = None,
-        init_param=0,
         init_param_scale: float = 1 / 50,
-        scales_offset: float = -2,
+        init_scale: float = 0.1,
+        init_weight: float = 1.0,
         encoder_class=FCLayersPyro,
         encoder_kwargs=None,
         multi_encoder_kwargs=None,
         encoder_instance: torch.nn.Module = None,
-        create_plates=None,
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         hierarchical_sites: Optional[list] = None,
     ):
-        # if not isinstance(init_scale, float) or not (init_scale > 0):
-        #    raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
+        if not isinstance(init_scale, float) or not (init_scale > 0):
+            raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
         super().__init__(model)
-        # self.init_loc_fn = init_loc_fn
-        # self._init_scale = init_scale
-        # self._init_weight = init_weight
+        self._init_scale = init_scale
+        self._init_weight = init_weight
         self._hierarchical_sites = hierarchical_sites
+        self.amortised_plate_sites = amortised_plate_sites
+        self.encoder_mode = encoder_mode
         self._computing_median = False
+
+        self.softplus = SoftplusTransform()
+
+        # default n_hidden values and checking input
+        if n_hidden is None:
+            n_hidden = {"single": 200, "multiple": 200}
+        else:
+            if isinstance(n_hidden, int):
+                n_hidden = {"single": n_hidden, "multiple": n_hidden}
+            elif not isinstance(n_hidden, dict):
+                raise ValueError("n_hidden must be either int or dict")
+        # process encoder kwargs, add n_hidden, create argument for multiple encoders
+        encoder_kwargs = deepcopy(encoder_kwargs) if isinstance(encoder_kwargs, dict) else dict()
+        encoder_kwargs["n_hidden"] = n_hidden["single"]
+        if multi_encoder_kwargs is None:
+            multi_encoder_kwargs = deepcopy(encoder_kwargs)
+        if "multiple" in n_hidden.keys():
+            multi_encoder_kwargs["n_hidden"] = n_hidden["multiple"]
+
+        # save encoder parameters
+        self.encoder_kwargs = encoder_kwargs
+        self.multi_encoder_kwargs = multi_encoder_kwargs
+        self.single_n_in = n_in
+        self.multiple_n_in = n_in
+        self.n_hidden = n_hidden
+        if ("single" in encoder_mode) and ("multiple" in encoder_mode):
+            # if single network precedes multiple networks
+            self.multiple_n_in = self.n_hidden["single"]
+        self.encoder_class = encoder_class
+        self.encoder_instance = encoder_instance
+        self.init_param_scale = init_param_scale
 
     def get_posterior(
         self,
         name: str,
         prior: Distribution,
-        upstream_values: Dict[str, torch.Tensor],
     ) -> Union[Distribution, torch.Tensor]:
         if self._computing_median:
             return self._get_posterior_median(name, prior)
@@ -276,14 +167,110 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger, 
             return posterior
         else:
             # Fall back to mean field when hierarchical_sites list is not empty and site not in the list.
-            return super().get_posterior(name, prior, upstream_values)
+            loc, scale = self._get_params(name, prior)
+            posterior = dist.TransformedDistribution(
+                dist.Normal(loc, scale).to_event(transform.domain.event_dim),
+                transform.with_cache(),
+            )
+            return posterior
+
+    def encode(self, name: str, prior: Distribution):
+        """
+        Apply encoder network to input data to obtain hidden layer encoding.
+        Parameters
+        ----------
+        args
+            Pyro model args
+        kwargs
+            Pyro model kwargs
+        -------
+
+        """
+        try:
+            args, kwargs = self.args_kwargs  # stored as a tuple of (tuple, dict)
+            # get the data for NN from
+            in_names = self.amortised_plate_sites["input"]
+            x_in = [kwargs[i] if i in kwargs.keys() else args[i] for i in in_names]
+            # apply data transform before passing to NN
+            in_transforms = self.amortised_plate_sites["input_transform"]
+            x_in = [in_transforms[i](x) for i, x in enumerate(x_in)]
+            if "single" in self.encoder_mode:
+                # encode with a single encoder
+                res = deep_getattr(self, "one_encoder")(*x_in)
+                if "multiple" in self.encoder_mode:
+                    # when there is a second layer of multiple encoders fetch encoders and encode data
+                    x_in[0] = res
+                    res = deep_getattr(self.multiple_encoders, name)(*x_in)
+            else:
+                # when there are multiple encoders fetch encoders and encode data
+                res = deep_getattr(self.multiple_encoders, name)(*x_in)
+            return res
+        except AttributeError:
+            pass
+
+        # Initialize.
+        # determine the number of hidden layers
+        if "multiple" in self.encoder_mode:
+            if "multiple" in self.n_hidden.keys():
+                n_hidden = self.n_hidden["multiple"]
+            else:
+                n_hidden = self.n_hidden[name]
+        elif "single" in self.encoder_mode:
+            n_hidden = self.n_hidden["single"]
+        # create single encoder NN
+        if "single" in self.encoder_mode:
+            if self.encoder_instance is not None:
+                # copy provided encoder instance
+                one_encoder = deepcopy(self.encoder_instance)
+                # convert to pyro module
+                to_pyro_module_(one_encoder)
+                deep_setattr(self, "one_encoder", one_encoder)
+            else:
+                # create encoder instance from encoder class
+                deep_setattr(
+                    self,
+                    "one_encoder",
+                    self.encoder_class(n_in=self.single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs),
+                )
+        if "multiple" in self.encoder_mode:
+            # create multiple encoders
+            if self.encoder_instance is not None:
+                # copy instances
+                encoder_ = deepcopy(self.encoder_instance).to(prior["fn"].mean.device)
+                # convert to pyro module
+                to_pyro_module_(encoder_)
+                deep_setattr(
+                    self,
+                    "multiple_encoders." + name,
+                    encoder_,
+                )
+            else:
+                # create instances
+                deep_setattr(
+                    self,
+                    "multiple_encoders." + name,
+                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs),
+                )
 
     def _get_params(self, name: str, prior: Distribution):
+        args, kwargs = self.args_kwargs  # stored as a tuple of (tuple, dict)
+        hidden = self.encode(name, prior)
         try:
-            loc = deep_getattr(self.locs, name)
-            scale = deep_getattr(self.scales, name)
+            linear_loc = deep_getattr(self.hidden2locs, name)
+            bias_loc = deep_getattr(self.bias4locs, name)
+            loc = hidden @ linear_loc + bias_loc
+            linear_scale = deep_getattr(self.hidden2scales, name)
+            bias_scale = deep_getattr(self.bias4scales, name)
+            scale = self.softplus((hidden @ linear_scale) + bias_scale - self._init_scale_unconstrained)
             if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-                weight = deep_getattr(self.weights, name)
+                if self.weight_type == "element-wise":
+                    # weight is element-wise
+                    linear_weight = deep_getattr(self.hidden2weights, name)
+                    bias_weight = deep_getattr(self.bias4weights, name)
+                    weight = self.softplus((hidden @ linear_weight) + bias_weight - self._init_weight_unconstrained)
+                if self.weight_type == "scalar":
+                    # weight is a single value parameter
+                    weight = deep_getattr(self.weights, name)
                 return loc, scale, weight
             else:
                 return loc, scale
@@ -291,50 +278,50 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger, 
             pass
 
         # Initialize.
-        with poutine.block(), torch.no_grad():
-            transform = biject_to(prior.support)
-            event_dim = transform.domain.event_dim
-            constrained = self.init_loc_fn({"name": name, "fn": prior}).detach()
-            unconstrained = transform.inv(constrained)
-            init_loc = self._remove_outer_plates(unconstrained, event_dim)
-            init_scale = torch.full_like(init_loc, self._init_scale)
-            if self.weight_type == "scalar":
-                # weight is a single value parameter
-                init_weight = torch.full((), self._init_weight)
-            if self.weight_type == "element-wise":
-                # weight is element-wise
-                init_weight = torch.full_like(init_loc, self._init_weight)
-            # if site is hierarchical substract contribution of dependencies from init_loc
-            if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-                init_loc = init_loc - init_weight * transform.inv(prior.mean)
+        with torch.no_grad():
+            init_scale = torch.full((), self._init_scale)
+            self._init_scale_unconstrained = self.softplus.inv(init_scale)
+            init_weight = torch.full((), self._init_weight)
+            self._init_weight_unconstrained = self.softplus.inv(init_weight)
 
-        deep_setattr(self, "locs." + name, PyroParam(init_loc, event_dim=event_dim))
-        deep_setattr(
-            self,
-            "scales." + name,
-            PyroParam(init_scale, constraint=constraints.positive, event_dim=event_dim),
-        )
+            # determine the number of hidden layers
+            if "multiple" in self.encoder_mode:
+                if "multiple" in self.n_hidden.keys():
+                    n_hidden = self.n_hidden["multiple"]
+                else:
+                    n_hidden = self.n_hidden[name]
+            elif "single" in self.encoder_mode:
+                n_hidden = self.n_hidden["single"]
+            # determine parameter dimensions
+            param_dim = (n_hidden, self.amortised_plate_sites["sites"][name])
+            bias_dim = (1, self.amortised_plate_sites["sites"][name])
+            # generate initial value for linear parameters
+            init_param = torch.normal(
+                torch.full(size=param_dim, fill_value=0.0),
+                torch.full(size=param_dim, fill_value=(1 * self.init_param_scale) / np.sqrt(self.n_hidden)),
+            )
+        deep_setattr(self, "hidden2locs." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
+        deep_setattr(self, "hidden2scales." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
+        deep_setattr(self, "bias4locs." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
+        deep_setattr(self, "bias4scales." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
             if self.weight_type == "scalar":
                 # weight is a single value parameter
-                deep_setattr(
-                    self,
-                    "weights." + name,
-                    PyroParam(init_weight, constraint=constraints.positive),
-                )
+                deep_setattr(self, "weights." + name, PyroParam(init_weight, constraint=constraints.positive))
             if self.weight_type == "element-wise":
                 # weight is element-wise
                 deep_setattr(
-                    self,
-                    "weights." + name,
-                    PyroParam(
-                        init_weight,
-                        constraint=constraints.positive,
-                        event_dim=event_dim,
-                    ),
+                    self, "hidden2weights." + name, PyroParam(init_param.clone().detach().requires_grad_(True))
                 )
-
+                deep_setattr(self, "bias4weights." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
         return self._get_params(name, prior)
+
+    def median(self, *args, **kwargs):
+        self._computing_median = True
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_median = False
 
     def _get_posterior_median(self, name, prior):
         transform = biject_to(prior.support)
