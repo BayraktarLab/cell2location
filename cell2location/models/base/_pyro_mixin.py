@@ -5,22 +5,18 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pyro
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import (
-    AutoNormal,
-    AutoNormalMessenger,
-    init_to_feasible,
-    init_to_mean,
-)
+from pyro.infer.autoguide import AutoNormalMessenger, init_to_feasible, init_to_mean
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 
-from ...distributions.AutoNormalEncoder import AutoGuideList, AutoNormalEncoder
+from ...distributions.AutoAmortisedNormalMessenger import (
+    AutoAmortisedHierarchicalNormalMessenger,
+)
 
 
 def init_to_value(site=None, values={}):
@@ -64,25 +60,7 @@ class AutoGuideMixinModule:
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
             n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
-            init_param_scale = (
-                encoder_kwargs["init_param_scale"] if "init_param_scale" in encoder_kwargs.keys() else 1 / 50
-            )
-            if "init_param_scale" in encoder_kwargs.keys():
-                del encoder_kwargs["init_param_scale"]
-            amortised_vars = self.list_obs_plate_vars
-            _guide = AutoGuideList(model, create_plates=model.create_plates)
-            _guide.append(
-                AutoNormal(
-                    pyro.poutine.block(model, hide=list(amortised_vars["sites"].keys())),
-                    init_loc_fn=init_loc_fn,
-                )
-            )
-            if isinstance(data_transform, np.ndarray):
-                # add extra info about gene clusters to the network
-                self.register_buffer("gene_clusters", torch.tensor(data_transform.astype("float32")))
-                n_in = model.n_vars + data_transform.shape[1]
-                data_transform = self.data_transform_clusters()
-            elif data_transform == "log1p":
+            if data_transform == "log1p":
                 # use simple log1p transform
                 data_transform = torch.log1p
                 n_in = self.model.n_vars
@@ -106,29 +84,20 @@ class AutoGuideMixinModule:
                 # use custom data transform
                 data_transform = data_transform
                 n_in = model.n_vars
-
+            amortised_vars = model.list_obs_plate_vars()
             if len(amortised_vars["input"]) >= 2:
                 encoder_kwargs["n_cat_list"] = n_cat_list
             amortised_vars["input_transform"][0] = data_transform
-            _guide.append(
-                AutoNormalEncoder(
-                    pyro.poutine.block(model, expose=list(amortised_vars["sites"].keys())),
-                    amortised_plate_sites=amortised_vars,
-                    n_in=n_in,
-                    n_hidden=n_hidden,
-                    init_param_scale=init_param_scale,
-                    encoder_kwargs=encoder_kwargs,
-                    encoder_mode=encoder_mode,
-                    encoder_instance=encoder_instance,
-                )
+            _guide = AutoAmortisedHierarchicalNormalMessenger(
+                model,
+                amortised_plate_sites=amortised_vars,
+                n_in=n_in,
+                n_hidden=n_hidden,
+                encoder_kwargs=encoder_kwargs,
+                encoder_mode=encoder_mode,
+                encoder_instance=encoder_instance,
             )
         return _guide
-
-    def _data_transform_clusters(self):
-        def _data_transform(x):
-            return torch.log1p(torch.cat([x, x @ self.gene_clusters], dim=1))
-
-        return _data_transform
 
     def _data_transform_scale(self):
         def _data_transform(x):
