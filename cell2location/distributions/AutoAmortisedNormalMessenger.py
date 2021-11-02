@@ -156,8 +156,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
 
         with helpful_support_errors({"name": name, "fn": prior}):
             transform = biject_to(prior.support)
+        # If hierarchical_sites not specified all sites are assumed to be hierarchical
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
-            # If hierarchical_sites not specified all sites are assumed to be hierarchical
             loc, scale, weight = self._get_params(name, prior)
             loc = loc + transform.inv(prior.mean) * weight
             posterior = dist.TransformedDistribution(
@@ -221,7 +221,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         if "single" in self.encoder_mode:
             if self.encoder_instance is not None:
                 # copy provided encoder instance
-                one_encoder = deepcopy(self.encoder_instance)
+                one_encoder = deepcopy(self.encoder_instance).to(prior.mean.device)
                 # convert to pyro module
                 to_pyro_module_(one_encoder)
                 deep_setattr(self, "one_encoder", one_encoder)
@@ -230,13 +230,15 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self,
                     "one_encoder",
-                    self.encoder_class(n_in=self.single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs),
+                    self.encoder_class(n_in=self.single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs).to(
+                        prior.mean.device
+                    ),
                 )
         if "multiple" in self.encoder_mode:
             # create multiple encoders
             if self.encoder_instance is not None:
                 # copy instances
-                encoder_ = deepcopy(self.encoder_instance).to(prior["fn"].mean.device)
+                encoder_ = deepcopy(self.encoder_instance).to(prior.mean.device)
                 # convert to pyro module
                 to_pyro_module_(encoder_)
                 deep_setattr(
@@ -249,10 +251,16 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self,
                     "multiple_encoders." + name,
-                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs),
+                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **self.multi_encoder_kwargs).to(
+                        prior.mean.device
+                    ),
                 )
 
     def _get_params(self, name: str, prior: Distribution):
+        if name not in self.amortised_plate_sites["sites"].keys():
+            # don't use amortisation unless requested (site in the list)
+            return super()._get_params(name, prior)
+
         args, kwargs = self.args_kwargs  # stored as a tuple of (tuple, dict)
         hidden = self.encode(name, prior)
         try:
@@ -297,13 +305,19 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             bias_dim = (1, self.amortised_plate_sites["sites"][name])
             # generate initial value for linear parameters
             init_param = torch.normal(
-                torch.full(size=param_dim, fill_value=0.0),
-                torch.full(size=param_dim, fill_value=(1 * self.init_param_scale) / np.sqrt(self.n_hidden)),
+                torch.full(size=param_dim, fill_value=0.0, device=prior.mean.device),
+                torch.full(
+                    size=param_dim, fill_value=(1 * self.init_param_scale) / np.sqrt(n_hidden), device=prior.mean.device
+                ),
             )
         deep_setattr(self, "hidden2locs." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
         deep_setattr(self, "hidden2scales." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
-        deep_setattr(self, "bias4locs." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
-        deep_setattr(self, "bias4scales." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
+        deep_setattr(
+            self, "bias4locs." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device))
+        )
+        deep_setattr(
+            self, "bias4scales." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device))
+        )
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
             if self.weight_type == "scalar":
                 # weight is a single value parameter
@@ -313,7 +327,11 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self, "hidden2weights." + name, PyroParam(init_param.clone().detach().requires_grad_(True))
                 )
-                deep_setattr(self, "bias4weights." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0)))
+                deep_setattr(
+                    self,
+                    "bias4weights." + name,
+                    PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device)),
+                )
         return self._get_params(name, prior)
 
     def median(self, *args, **kwargs):
