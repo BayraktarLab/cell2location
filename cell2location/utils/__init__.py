@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 
-from ._spatial_knn import spatial_knn
+from ._spatial_knn import spatial_neighbours, sum_neighbours
 from .filtering import filter_genes
 
 
@@ -43,6 +43,7 @@ def list_imported_modules():
 __all__ = [
     "select_slide",
     "filter_genes",
-    "spatial_knn",
+    "spatial_neighbours",
+    "sum_neighbours",
     "list_imported_modules",
 ]
