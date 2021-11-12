@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
@@ -117,7 +116,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             **model_kwargs,
         )
         self._model_summary_string = f'cell2location model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
-        self.init_params_ = self._get_init_params(deepcopy(locals()))
+        self.init_params_ = self._get_init_params(locals())
 
     @staticmethod
     @setup_anndata_dsp.dedent
