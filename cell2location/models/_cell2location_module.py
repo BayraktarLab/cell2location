@@ -228,7 +228,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         else:
             return self._get_fn_args_from_batch_no_cat
 
-    def create_plates(self, x_data, idx, batch_index):
+    def create_plates(self, x_data, idx, batch_index, extra_categoricals):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def list_obs_plate_vars(self):
@@ -273,7 +273,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 dim=1,
             )
 
-        obs_plate = self.create_plates(x_data, idx, batch_index)
+        obs_plate = self.create_plates(x_data, idx, batch_index, extra_categoricals)
 
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
