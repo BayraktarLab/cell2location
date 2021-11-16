@@ -1,5 +1,6 @@
 from datetime import date
 from functools import partial
+from typing import Optional
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -49,7 +50,11 @@ class AutoGuideMixinModule:
         n_cat_list: list = [],
         encoder_instance=None,
         guide_class=AutoNormalMessenger,
+        guide_kwargs: Optional[dict] = None,
     ):
+
+        if guide_kwargs is None:
+            guide_kwargs = dict()
 
         if not amortised:
             if getattr(model, "discrete_variables", None) is not None:
@@ -57,6 +62,7 @@ class AutoGuideMixinModule:
             _guide = guide_class(
                 model,
                 init_loc_fn=init_loc_fn,
+                **guide_kwargs
                 # create_plates=model.create_plates,
             )
         else:
@@ -100,6 +106,7 @@ class AutoGuideMixinModule:
                 encoder_kwargs=encoder_kwargs,
                 encoder_mode=encoder_mode,
                 encoder_instance=encoder_instance,
+                **guide_kwargs,
             )
         return _guide
 
