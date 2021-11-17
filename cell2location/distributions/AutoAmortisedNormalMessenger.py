@@ -253,6 +253,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                         prior.mean.device
                     ),
                 )
+        return self.encode(name, prior)
 
     def _get_params(self, name: str, prior: Distribution):
         if name not in self.amortised_plate_sites["sites"].keys():
