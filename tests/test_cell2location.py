@@ -63,7 +63,7 @@ def test_cell2location():
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
     # test computing any quantile of the posterior distribution
-    if isinstance(st_model.module.guide, poutine.messenger.Messenger):
+    if not isinstance(st_model.module.guide, poutine.messenger.Messenger):
         st_model.posterior_quantile(q=0.5)
     # test computing expected expression per cell type
     st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata)
