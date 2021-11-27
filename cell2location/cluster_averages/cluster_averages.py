@@ -38,7 +38,7 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
             var_names = adata.raw.var_names
 
     if sum(adata.obs.columns == labels) != 1:
-        raise ValueError("cluster_col is absent in adata_ref.obs or not unique")
+        raise ValueError("`labels` is absent in adata_ref.obs or not unique")
 
     all_clusters = np.unique(adata.obs[labels])
     averages_mat = np.zeros((1, x.shape[1]))
@@ -73,7 +73,7 @@ def get_cluster_variances(adata, labels, use_raw=True, layer=None):
             var_names = adata.raw.var_names
 
     if sum(adata.obs.columns == labels) != 1:
-        raise ValueError("cluster_col is absent in adata_ref.obs or not unique")
+        raise ValueError("`labels` is absent in adata_ref.obs or not unique")
 
     all_clusters = np.unique(adata.obs[labels])
     var_mat = np.zeros((1, x.shape[1]))
