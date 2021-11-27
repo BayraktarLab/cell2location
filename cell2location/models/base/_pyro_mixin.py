@@ -68,7 +68,12 @@ class AutoGuideMixinModule:
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
             n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
-            if data_transform == "log1p":
+            if isinstance(data_transform, np.ndarray):
+                # add extra info about gene clusters as input to NN
+                self.register_buffer("gene_clusters", torch.tensor(data_transform.astype("float32")))
+                n_in = model.n_vars + data_transform.shape[1]
+                data_transform = self._data_transform_clusters()
+            elif data_transform == "log1p":
                 # use simple log1p transform
                 data_transform = torch.log1p
                 n_in = self.model.n_vars
@@ -87,7 +92,7 @@ class AutoGuideMixinModule:
                     "var_std",
                     torch.tensor(data_transform["var_std"].astype("float32").reshape((1, n_in))),
                 )
-                data_transform = self.data_transform_scale()
+                data_transform = self._data_transform_scale()
             else:
                 # use custom data transform
                 data_transform = data_transform
@@ -109,6 +114,12 @@ class AutoGuideMixinModule:
                 **guide_kwargs,
             )
         return _guide
+
+    def _data_transform_clusters(self):
+        def _data_transform(x):
+            return torch.log1p(torch.cat([x, x @ self.gene_clusters], dim=1))
+
+        return _data_transform
 
     def _data_transform_scale(self):
         def _data_transform(x):
