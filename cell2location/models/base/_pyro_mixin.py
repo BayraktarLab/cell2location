@@ -1,11 +1,12 @@
 from datetime import date
 from functools import partial
-from typing import Optional
+from typing import Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pyro
 import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormalMessenger, init_to_feasible, init_to_mean
@@ -14,6 +15,8 @@ from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
+from scvi.module.base import PyroBaseModuleClass
+from scvi.train import PyroTrainingPlan
 
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
@@ -494,3 +497,103 @@ class PltExportMixin:
         if issparse(x_data):
             x_data = np.asarray(x_data.toarray())
         self.plot_posterior_mu_vs_data(self.expected_nb_param["mu"], x_data)
+
+
+class PyroAggressiveTrainingPlan(PyroTrainingPlan):
+    """
+    Lightning module task to train Pyro scvi-tools modules.
+    Parameters
+    ----------
+    pyro_module
+        An instance of :class:`~scvi.module.base.PyroBaseModuleClass`. This object
+        should have callable `model` and `guide` attributes or methods.
+    loss_fn
+        A Pyro loss. Should be a subclass of :class:`~pyro.infer.ELBO`.
+        If `None`, defaults to :class:`~pyro.infer.Trace_ELBO`.
+    optim
+        A Pyro optimizer instance, e.g., :class:`~pyro.optim.Adam`. If `None`,
+        defaults to :class:`pyro.optim.Adam` optimizer with a learning rate of `1e-3`.
+    optim_kwargs
+        Keyword arguments for **default** optimiser :class:`pyro.optim.Adam`.
+    n_aggressive_epochs
+        Number of epochs in aggressive optimisation of amortised variables.
+    n_aggressive_steps
+        Number of steps to spend optimising amortised variables before one step optimising global variables.
+    n_steps_kl_warmup
+        Number of training steps (minibatches) to scale weight on KL divergences from 0 to 1.
+        Only activated when `n_epochs_kl_warmup` is set to None.
+    n_epochs_kl_warmup
+        Number of epochs to scale weight on KL divergences from 0 to 1.
+        Overrides `n_steps_kl_warmup` when both are not `None`.
+    """
+
+    def __init__(
+        self,
+        pyro_module: PyroBaseModuleClass,
+        loss_fn: Optional[pyro.infer.ELBO] = None,
+        optim: Optional[pyro.optim.PyroOptim] = None,
+        optim_kwargs: Optional[dict] = None,
+        n_aggressive_epochs: int = 20,
+        n_aggressive_steps: int = 100,
+        n_steps_kl_warmup: Union[int, None] = None,
+        n_epochs_kl_warmup: Union[int, None] = 400,
+    ):
+        super().__init__(
+            pyro_module=pyro_module,
+            loss_fn=loss_fn,
+            optim=optim,
+            optim_kwargs=optim_kwargs,
+            n_steps_kl_warmup=n_steps_kl_warmup,
+            n_epochs_kl_warmup=n_epochs_kl_warmup,
+        )
+
+        self.n_aggressive_epochs = n_aggressive_epochs
+        self.n_aggressive_steps = n_aggressive_steps
+        self.n_aggressive_steps_total = n_aggressive_epochs * n_aggressive_steps
+        self.aggressive_steps_counter = 0
+        self.aggressive_total_counter = 0
+
+        self.svi_nonamortised = pyro.infer.SVI(
+            model=pyro.poutine.block(self.pyro_model, hide=list(self.module.list_obs_plate_vars["sites"].keys())),
+            guide=pyro.poutine.block(self.pyro_guide, hide=list(self.module.list_obs_plate_vars["sites"].keys())),
+            optim=self.optim,
+            loss=self.loss_fn,
+        )
+
+        self.svi_amortised = pyro.infer.SVI(
+            model=pyro.poutine.block(self.pyro_model, expose=list(self.module.list_obs_plate_vars["sites"].keys())),
+            guide=pyro.poutine.block(self.pyro_guide, expose=list(self.module.list_obs_plate_vars["sites"].keys())),
+            optim=self.optim,
+            loss=self.loss_fn,
+        )
+
+        self.svi = pyro.infer.SVI(
+            model=self.pyro_model,
+            guide=self.pyro_guide,
+            optim=self.optim,
+            loss=self.loss_fn,
+        )
+
+    def training_step(self, batch, batch_idx):
+
+        args, kwargs = self.module._get_fn_args_from_batch(batch)
+        # Set KL weight if necessary.
+        # Note: if applied, ELBO loss in progress bar is the effective KL annealed loss, not the true ELBO.
+        if self.use_kl_weight:
+            kwargs.update({"kl_weight": self.kl_weight})
+
+        if self.aggressive_total_counter <= self.n_aggressive_steps_total:
+            self.aggressive_total_counter += 1
+            if self.aggressive_steps_counter <= self.n_aggressive_steps:
+                self.aggressive_steps_counter += 1
+                # Do parameter update exclusively for amortised variables
+                loss = torch.Tensor([self.svi_amortised.step(*args, **kwargs)])
+            else:
+                self.aggressive_steps_counter = 0
+                # Do parameter update exclusively for non-amortised variables
+                loss = torch.Tensor([self.svi_nonamortised.step(*args, **kwargs)])
+        else:
+            # Do parameter update for both types of variables
+            loss = torch.Tensor([self.svi.step(*args, **kwargs)])
+
+        return {"loss": loss}
