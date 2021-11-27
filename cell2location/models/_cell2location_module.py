@@ -97,7 +97,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior={"mean_alpha": 10.0},
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
-        init_alpha=3.0,
+        init_alpha=20.0,
     ):
 
         super().__init__()
@@ -300,26 +300,26 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             w_sf_mu = z_sr_groups_factors @ x_fr_group2fact
 
             k = "w_sf"
+            w_sf = pyro.sample(
+                k,
+                dist.Gamma(
+                    w_sf_mu * self.w_sf_mean_var_ratio_tensor,
+                    self.w_sf_mean_var_ratio_tensor,
+                ),
+            )  # (self.n_obs, self.n_factors)
             if (
                 self.training_wo_observed
                 and not self.training_wo_initial
                 and getattr(self, f"init_val_{k}", None) is not None
             ):
                 # pre-training Variational distribution to initial values
-                w_sf = pyro.sample(
-                    k,
+                pyro.sample(
+                    k + "_initial",
                     dist.Gamma(
                         self.init_alpha_tt,
                         self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
                     ),
-                )  # (self.n_obs, self.n_factors)
-            else:
-                w_sf = pyro.sample(
-                    "w_sf",
-                    dist.Gamma(
-                        w_sf_mu * self.w_sf_mean_var_ratio_tensor,
-                        self.w_sf_mean_var_ratio_tensor,
-                    ),
+                    obs=w_sf,
                 )  # (self.n_obs, self.n_factors)
 
         # =====================Location-specific detection efficiency ======================= #
