@@ -18,6 +18,22 @@ from scvi.nn import FCLayers
 from torch.distributions import biject_to, constraints
 
 
+def log_sum_exp(value, dim=None, keepdim=False):
+    """Numerically stable implementation of the operation
+    value.exp().sum(dim, keepdim).log()
+    """
+    if dim is not None:
+        m, _ = torch.max(value, dim=dim, keepdim=True)
+        value0 = value - m
+        if keepdim is False:
+            m = m.squeeze(dim)
+        return m + torch.log(torch.sum(torch.exp(value0), dim=dim, keepdim=keepdim))
+    else:
+        m = torch.max(value)
+        sum_exp = torch.sum(torch.exp(value - m))
+        return m + torch.log(sum_exp)
+
+
 class FCLayersPyro(FCLayers, PyroModule):
     pass
 
@@ -114,6 +130,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         self.amortised_plate_sites = amortised_plate_sites
         self.encoder_mode = encoder_mode
         self._computing_median = False
+        self._computing_mi = False
 
         self.softplus = SoftplusTransform()
 
@@ -151,6 +168,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
     ) -> Union[Distribution, torch.Tensor]:
         if self._computing_median:
             return self._get_posterior_median(name, prior)
+        if self._computing_mi:
+            return self._get_mutual_information(name, prior)
 
         with helpful_support_errors({"name": name, "fn": prior}):
             transform = biject_to(prior.support)
@@ -348,3 +367,56 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         else:
             loc, scale = self._get_params(name, prior)
         return transform(loc)
+
+    def mutual_information(self, *args, **kwargs):
+        self._computing_mi = True
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_mi = False
+
+    def _get_mutual_information(self, name, prior):
+        """Approximate the mutual information between x and z
+            I(x, z) = E_xE_{q(z|x)}log(q(z|x)) - E_xE_{q(z|x)}log(q(z))
+
+        Returns: Float
+
+        """
+        if name not in self.amortised_plate_sites["sites"].keys():
+            # if amortisation not used return 0
+            return torch.zeros(())
+
+        #### get posterior mean and variance ####
+        transform = biject_to(prior.support)
+        if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
+            loc, scale, weight = self._get_params(name, prior)
+            loc = loc + transform.inv(prior.mean) * weight
+        else:
+            loc, scale = self._get_params(name, prior)
+
+        #### get sample from posterior ####
+        z_samples = self.get_posterior(name, prior)
+
+        #### compute mi ####
+        x_batch, nz = loc.size()
+
+        # E_{q(z|x)}log(q(z|x)) = -0.5*nz*log(2*\pi) - 0.5*(1+scale.loc()).sum(-1)
+        neg_entropy = (-0.5 * nz * torch.log(2 * torch.pi) - 0.5 * (1 + (scale ** 2).log()).sum(-1)).mean()
+
+        # [1, x_batch, nz]
+        loc, scale = loc.unsqueeze(0), scale.unsqueeze(0)
+        var = scale ** 2
+
+        # (z_batch, x_batch, nz)
+        dev = z_samples - loc
+
+        # (z_batch, x_batch)
+        log_density = -0.5 * ((dev ** 2) / var).sum(dim=-1) - 0.5 * (
+            nz * torch.log(2 * torch.pi) + (scale ** 2).log().sum(-1)
+        )
+
+        # log q(z): aggregate posterior
+        # [z_batch]
+        log_qz = log_sum_exp(log_density, dim=1) - torch.log(x_batch)
+
+        return (neg_entropy - log_qz.mean(-1)).item()
