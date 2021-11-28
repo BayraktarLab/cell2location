@@ -1,6 +1,7 @@
 import numpy as np
 from pyro import poutine
 from scvi.data import synthetic_iid
+from scvi.dataloaders import AnnDataLoader
 
 from cell2location import run_colocation
 from cell2location.models import Cell2location, RegressionModel
@@ -65,6 +66,13 @@ def test_cell2location():
     # test computing any quantile of the posterior distribution
     if not isinstance(st_model.module.guide, poutine.messenger.Messenger):
         st_model.posterior_quantile(q=0.5)
+    # test computing median
+    if False:
+        train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
+        for batch in train_dl:
+            args, kwargs = st_model.module._get_fn_args_from_batch(batch)
+            break
+        st_model.module.guide.median(*args, **kwargs)
     # test computing expected expression per cell type
     st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata)
     ### test amortised inference with default cell2location model ###
@@ -79,6 +87,14 @@ def test_cell2location():
     )
     # test minibatch training
     st_model.train(max_epochs=1, batch_size=50)
+    # test computing median
+    if False:
+        train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
+        for batch in train_dl:
+            args, kwargs = st_model.module._get_fn_args_from_batch(batch)
+            break
+        st_model.module.guide.median(*args, **kwargs)
+        # st_model.module.guide.mutual_information(*args, **kwargs)
     # export the estimated cell abundance (summary of the posterior distribution)
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
