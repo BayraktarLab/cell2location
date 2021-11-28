@@ -533,8 +533,8 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         loss_fn: Optional[pyro.infer.ELBO] = None,
         optim: Optional[pyro.optim.PyroOptim] = None,
         optim_kwargs: Optional[dict] = None,
-        n_aggressive_epochs: int = 20,
-        n_aggressive_steps: int = 100,
+        n_aggressive_epochs: int = 1000,
+        n_aggressive_steps: int = 20,
         n_steps_kl_warmup: Union[int, None] = None,
         n_epochs_kl_warmup: Union[int, None] = 400,
     ):
