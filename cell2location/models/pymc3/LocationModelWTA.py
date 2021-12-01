@@ -26,7 +26,10 @@ class LocationModelWTA(Pymc3LocModel):
     which describes variance in expression of individual genes that is not explained by the cell type expression programs:
 
     .. math::
-        D_{s,g} \sim \mathtt{NB}(\mu_{s,g})
+        D_{s,g} \sim \mathtt{NB}(\mu_{s,g}, \alpha_{e,g})
+
+    The containment prior on overdispersion :math:`\alpha_{e,g}` parameter is used
+    (for more details see: https://statmodeling.stat.columbia.edu/2018/04/03/justify-my-love/).
 
     The spatial expression levels of genes :math:`\mu_{s,g}` in the rate space are modelled
     as the sum of five non-negative components:
