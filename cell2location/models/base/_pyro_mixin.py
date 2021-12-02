@@ -553,16 +553,18 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         self.aggressive_steps_counter = 0
         self.aggressive_total_counter = 0
 
+        amortised_vars = list(self.module.list_obs_plate_vars["sites"].keys())
+        amortised_vars = amortised_vars + [f"{i}_initial" for i in amortised_vars]
         self.svi_nonamortised = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, hide=list(self.module.list_obs_plate_vars["sites"].keys())),
-            guide=pyro.poutine.block(self.pyro_guide, hide=list(self.module.list_obs_plate_vars["sites"].keys())),
+            model=pyro.poutine.block(self.pyro_model, hide=amortised_vars),
+            guide=pyro.poutine.block(self.pyro_guide, hide=amortised_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
 
         self.svi_amortised = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, expose=list(self.module.list_obs_plate_vars["sites"].keys())),
-            guide=pyro.poutine.block(self.pyro_guide, expose=list(self.module.list_obs_plate_vars["sites"].keys())),
+            model=pyro.poutine.block(self.pyro_model, expose=amortised_vars),
+            guide=pyro.poutine.block(self.pyro_guide, expose=amortised_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
