@@ -406,6 +406,7 @@ class PltExportMixin:
         site_name: str = "w_sf",
         summary_name: str = "means",
         name_prefix: str = "cell_abundance",
+        factor_names_key: str = "",
     ):
         """Export posterior distribution summary for observation-specific parameters
         (e.g. spatial cell abundance) as Pandas data frame
@@ -428,7 +429,7 @@ class PltExportMixin:
 
         """
         if type(self.factor_names_) is dict:
-            factor_names_ = self.factor_names_[site_name]
+            factor_names_ = self.factor_names_[factor_names_key]
         else:
             factor_names_ = self.factor_names_
 
@@ -444,6 +445,7 @@ class PltExportMixin:
         site_name: str = "gene_factors",
         summary_name: str = "means",
         name_prefix: str = "",
+        factor_names_key: str = "",
     ):
         """Export posterior distribution summary for variable-specific parameters as Pandas data frame
         (means, 5%/95% quantiles or sd of posterior distribution).
@@ -465,7 +467,7 @@ class PltExportMixin:
 
         """
         if type(self.factor_names_) is dict:
-            factor_names_ = self.factor_names_[site_name]
+            factor_names_ = self.factor_names_[factor_names_key]
         else:
             factor_names_ = self.factor_names_
 
