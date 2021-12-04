@@ -395,6 +395,8 @@ class PltExportMixin:
             "post_sample_q05": samples["post_sample_q05"],
             "post_sample_q95": samples["post_sample_q95"],
         }
+        if type(self.factor_names_) is dict:
+            results["factor_names"] = self.factor_names_
 
         return results
 
@@ -425,11 +427,15 @@ class PltExportMixin:
         Pandas data frame corresponding to either means, 5%/95% quantiles or sd of the posterior distribution
 
         """
+        if type(self.factor_names_) is dict:
+            factor_names_ = self.factor_names_[site_name]
+        else:
+            factor_names_ = self.factor_names_
 
         return pd.DataFrame(
             samples[f"post_sample_{summary_name}"].get(site_name, None),
             index=self.adata.obs_names,
-            columns=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in self.factor_names_],
+            columns=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in factor_names_],
         )
 
     def sample2df_vars(
@@ -458,11 +464,15 @@ class PltExportMixin:
         Pandas data frame corresponding to either means, 5%/95% quantiles or sd of the posterior distribution
 
         """
+        if type(self.factor_names_) is dict:
+            factor_names_ = self.factor_names_[site_name]
+        else:
+            factor_names_ = self.factor_names_
 
         return pd.DataFrame(
             samples[f"post_sample_{summary_name}"].get(site_name, None),
             columns=self.adata.var_names,
-            index=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in self.factor_names_],
+            index=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in factor_names_],
         ).T
 
     def plot_QC(self, summary_name: str = "means", use_n_obs: int = 1000):
