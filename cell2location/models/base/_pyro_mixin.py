@@ -561,9 +561,8 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
 
         self.n_aggressive_epochs = n_aggressive_epochs
         self.n_aggressive_steps = n_aggressive_steps
-        self.n_aggressive_steps_total = n_aggressive_epochs * n_aggressive_steps
         self.aggressive_steps_counter = 0
-        self.aggressive_total_counter = 0
+        self.aggressive_epochs_counter = 0
 
         amortised_vars = list(self.module.list_obs_plate_vars["sites"].keys())
         amortised_vars = amortised_vars + [f"{i}_initial" for i in amortised_vars]
@@ -588,6 +587,18 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             loss=self.loss_fn,
         )
 
+    def training_epoch_end(self, outputs):
+
+        self.aggressive_epochs_counter += 1
+
+        elbo = 0
+        n = 0
+        for out in outputs:
+            elbo += out["loss"]
+            n += 1
+        elbo /= n
+        self.log("elbo_train", elbo, prog_bar=True)
+
     def training_step(self, batch, batch_idx):
 
         args, kwargs = self.module._get_fn_args_from_batch(batch)
@@ -596,8 +607,7 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         if self.use_kl_weight:
             kwargs.update({"kl_weight": self.kl_weight})
 
-        if self.aggressive_total_counter <= self.n_aggressive_steps_total:
-            self.aggressive_total_counter += 1
+        if self.aggressive_epochs_counter <= self.n_aggressive_epochs:
             if self.aggressive_steps_counter <= self.n_aggressive_steps:
                 self.aggressive_steps_counter += 1
                 # Do parameter update exclusively for amortised variables

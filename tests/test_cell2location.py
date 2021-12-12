@@ -76,7 +76,6 @@ def test_cell2location():
     # test computing expected expression per cell type
     st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata)
     ### test amortised inference with default cell2location model ###
-    ##  full data  ##
     st_model = Cell2location(
         dataset,
         cell_state_df=inf_aver,
@@ -86,7 +85,10 @@ def test_cell2location():
         encoder_mode="multiple",
     )
     # test minibatch training
-    st_model.train(max_epochs=1, batch_size=50)
+    st_model.train(max_epochs=1, batch_size=20)
+    st_model.train_aggressive(
+        max_epochs=2, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}
+    )
     # test computing median
     if False:
         train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
