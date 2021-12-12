@@ -67,9 +67,11 @@ def test_cell2location():
     if not isinstance(st_model.module.guide, poutine.messenger.Messenger):
         st_model.posterior_quantile(q=0.5)
     # test computing median
-    if False:
+    if True:
         train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
         for batch in train_dl:
+            device = list(st_model.module.guide.state_dict().values())[0].device
+            batch = {k: v.to(device) for k, v in batch.items()}
             args, kwargs = st_model.module._get_fn_args_from_batch(batch)
             break
         st_model.module.guide.median(*args, **kwargs)
@@ -90,9 +92,11 @@ def test_cell2location():
         max_epochs=2, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}
     )
     # test computing median
-    if False:
+    if True:
         train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
         for batch in train_dl:
+            device = list(st_model.module.guide.state_dict().values())[0].device
+            batch = {k: v.to(device) for k, v in batch.items()}
             args, kwargs = st_model.module._get_fn_args_from_batch(batch)
             break
         st_model.module.guide.median(*args, **kwargs)
