@@ -130,6 +130,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         self.amortised_plate_sites = amortised_plate_sites
         self.encoder_mode = encoder_mode
         self._computing_median = False
+        self._computing_quantiles = False
+        self._quantile_values = None
         self._computing_mi = False
 
         self.softplus = SoftplusTransform()
@@ -168,6 +170,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
     ) -> Union[Distribution, torch.Tensor]:
         if self._computing_median:
             return self._get_posterior_median(name, prior)
+        if self._computing_quantiles:
+            return self._get_posterior_quantiles(name, prior)
         if self._computing_mi:
             return self._get_mutual_information(name, prior)
 
@@ -359,6 +363,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         finally:
             self._computing_median = False
 
+    @torch.no_grad()
     def _get_posterior_median(self, name, prior):
         transform = biject_to(prior.support)
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
@@ -368,6 +373,27 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             loc, scale = self._get_params(name, prior)
         return transform(loc)
 
+    def quantiles(self, quantiles, *args, **kwargs):
+        self._computing_quantiles = True
+        self._quantile_values = quantiles
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_quantiles = False
+
+    @torch.no_grad()
+    def _get_posterior_quantiles(self, name, prior):
+        transform = biject_to(prior.support)
+        if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
+            loc, scale, weight = self._get_params(name, prior)
+            loc = loc + transform.inv(prior.mean) * weight
+        else:
+            loc, scale = self._get_params(name, prior)
+
+        site_quantiles = torch.tensor(self._quantile_values, dtype=loc.dtype, device=loc.device)
+        site_quantiles_values = dist.Normal(loc, scale).icdf(site_quantiles)
+        return transform(site_quantiles_values)
+
     def mutual_information(self, *args, **kwargs):
         self._computing_mi = True
         try:
@@ -375,8 +401,10 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         finally:
             self._computing_mi = False
 
+    @torch.no_grad()
     def _get_mutual_information(self, name, prior):
-        """Approximate the mutual information between x and z
+        """Approximate the mutual information between data x and latent variable z
+
             I(x, z) = E_xE_{q(z|x)}log(q(z|x)) - E_xE_{q(z|x)}log(q(z))
 
         Returns: Float
