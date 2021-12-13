@@ -549,6 +549,7 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         n_aggressive_steps: int = 20,
         n_steps_kl_warmup: Union[int, None] = None,
         n_epochs_kl_warmup: Union[int, None] = 400,
+        aggressive_vars: Union[list, None] = None,
     ):
         super().__init__(
             pyro_module=pyro_module,
@@ -564,18 +565,21 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         self.aggressive_steps_counter = 0
         self.aggressive_epochs_counter = 0
 
-        amortised_vars = list(self.module.list_obs_plate_vars["sites"].keys())
-        amortised_vars = amortised_vars + [f"{i}_initial" for i in amortised_vars]
-        self.svi_nonamortised = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, hide=amortised_vars),
-            guide=pyro.poutine.block(self.pyro_guide, hide=amortised_vars),
+        # in list not provided use amortised variables for aggressive training
+        if aggressive_vars is None:
+            aggressive_vars = list(self.module.list_obs_plate_vars["sites"].keys())
+            aggressive_vars = aggressive_vars + [f"{i}_initial" for i in aggressive_vars]
+
+        self.svi_aggressive = pyro.infer.SVI(
+            model=pyro.poutine.block(self.pyro_model, hide=aggressive_vars),
+            guide=pyro.poutine.block(self.pyro_guide, hide=aggressive_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
 
-        self.svi_amortised = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, expose=amortised_vars),
-            guide=pyro.poutine.block(self.pyro_guide, expose=amortised_vars),
+        self.svi_nonaggressive = pyro.infer.SVI(
+            model=pyro.poutine.block(self.pyro_model, expose=aggressive_vars),
+            guide=pyro.poutine.block(self.pyro_guide, expose=aggressive_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
@@ -611,11 +615,11 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             if self.aggressive_steps_counter <= self.n_aggressive_steps:
                 self.aggressive_steps_counter += 1
                 # Do parameter update exclusively for amortised variables
-                loss = torch.Tensor([self.svi_amortised.step(*args, **kwargs)])
+                loss = torch.Tensor([self.svi_aggressive.step(*args, **kwargs)])
             else:
                 self.aggressive_steps_counter = 0
                 # Do parameter update exclusively for non-amortised variables
-                loss = torch.Tensor([self.svi_nonamortised.step(*args, **kwargs)])
+                loss = torch.Tensor([self.svi_nonaggressive.step(*args, **kwargs)])
         else:
             # Do parameter update for both types of variables
             loss = torch.Tensor([self.svi.step(*args, **kwargs)])
