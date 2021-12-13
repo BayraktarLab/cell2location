@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from functools import partial
 from typing import Optional, Union
@@ -7,9 +8,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
+import pytorch_lightning as pl
 import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormalMessenger, init_to_feasible, init_to_mean
+from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
@@ -21,6 +24,8 @@ from scvi.train import PyroTrainingPlan
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def init_to_value(site=None, values={}):
@@ -511,6 +516,47 @@ class PltExportMixin:
         self.plot_posterior_mu_vs_data(self.expected_nb_param["mu"], x_data)
 
 
+class PyroAggressiveConvergence(Callback):
+    """
+    A callback to compute/apply aggressive training convergence criteria for amortised inference.
+    Motivated by this paper: https://arxiv.org/pdf/1901.05534.pdf
+    """
+
+    def __init__(self, dataloader: AnnDataLoader = None, patience: int = 10, tolerance: float = 1e-4) -> None:
+        super().__init__()
+        self.dataloader = dataloader
+        self.patience = patience
+        self.tolerance = tolerance
+
+    def on_train_epoch_end(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", unused: Optional = None
+    ) -> None:
+        """
+        Compute aggressive training convergence criteria for amortised inference.
+        """
+        pyro_guide = pl_module.module.guide
+        if self.dataloader is None:
+            dl = trainer.datamodule.train_dataloader()
+        else:
+            dl = self.dataloader
+        for tensors in dl:
+            tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
+            args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
+            break
+        mi_ = pyro_guide.mutual_information(*args, **kwargs)
+        mi_ = np.array([v for v in mi_.values()]).sum()
+        pl_module.log("MI", mi_, prog_bar=True)
+        if pl_module.mi[-1] >= (mi_ - self.tolerance):
+            pl_module.n_epochs_patience += 1
+        else:
+            pl_module.n_epochs_patience = 0
+        if pl_module.n_epochs_patience > self.patience:
+            # stop aggressive training by setting epoch counter to max epochs
+            pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
+            logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
+        pl_module.mi.append([mi_])
+
+
 class PyroAggressiveTrainingPlan(PyroTrainingPlan):
     """
     Lightning module task to train Pyro scvi-tools modules.
@@ -564,6 +610,8 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         self.n_aggressive_steps = n_aggressive_steps
         self.aggressive_steps_counter = 0
         self.aggressive_epochs_counter = 0
+        self.mi = [0]
+        self.n_epochs_patience = 0
 
         # in list not provided use amortised variables for aggressive training
         if aggressive_vars is None:

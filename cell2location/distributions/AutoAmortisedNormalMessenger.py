@@ -133,6 +133,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         self._computing_quantiles = False
         self._quantile_values = None
         self._computing_mi = False
+        self.mi = dict()
+        self.samples_for_mi = None
 
         self.softplus = SoftplusTransform()
 
@@ -173,7 +175,10 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         if self._computing_quantiles:
             return self._get_posterior_quantiles(name, prior)
         if self._computing_mi:
-            return self._get_mutual_information(name, prior)
+            # the messenger autoguide needs the output to fit certain dimensions
+            # this is hack which saves MI to self.mi but returns cheap to compute medians
+            self.mi[name] = self._get_mutual_information(name, prior)
+            return self._get_posterior_median(name, prior)
 
         with helpful_support_errors({"name": name, "fn": prior}):
             transform = biject_to(prior.support)
@@ -395,9 +400,13 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         return transform(site_quantiles_values)
 
     def mutual_information(self, *args, **kwargs):
+        # compute samples necessary to compute MI
+        self.samples_for_mi = self(*args, **kwargs)
         self._computing_mi = True
         try:
-            return self(*args, **kwargs)
+            # compute mi (saved to self.mi)
+            self(*args, **kwargs)
+            return self.mi
         finally:
             self._computing_mi = False
 
@@ -410,9 +419,6 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         Returns: Float
 
         """
-        if name not in self.amortised_plate_sites["sites"].keys():
-            # if amortisation not used return 0
-            return torch.zeros(())
 
         #### get posterior mean and variance ####
         transform = biject_to(prior.support)
@@ -422,26 +428,38 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         else:
             loc, scale = self._get_params(name, prior)
 
+        if name not in self.amortised_plate_sites["sites"].keys():
+            # if amortisation is not used for a particular site return MI=0
+            return 0
+
+        #### create tensors with useful numbers ####
+        one = torch.ones((), dtype=loc.dtype, device=loc.device)
+        two = torch.tensor(2, dtype=loc.dtype, device=loc.device)
+        pi = torch.tensor(torch.pi, dtype=loc.dtype, device=loc.device)
         #### get sample from posterior ####
-        z_samples = self.get_posterior(name, prior)
+        z_samples = self.samples_for_mi[name]
 
         #### compute mi ####
         x_batch, nz = loc.size()
+        x_batch = torch.tensor(x_batch, dtype=loc.dtype, device=loc.device)
+        nz = torch.tensor(nz, dtype=loc.dtype, device=loc.device)
 
         # E_{q(z|x)}log(q(z|x)) = -0.5*nz*log(2*\pi) - 0.5*(1+scale.loc()).sum(-1)
-        neg_entropy = (-0.5 * nz * torch.log(2 * torch.pi) - 0.5 * (1 + (scale ** 2).log()).sum(-1)).mean()
+        neg_entropy = (
+            -nz * torch.log(pi * two) * (one / two) - ((scale ** two).log() + one).sum(-1) * (one / two)
+        ).mean()
 
         # [1, x_batch, nz]
         loc, scale = loc.unsqueeze(0), scale.unsqueeze(0)
-        var = scale ** 2
+        var = scale ** two
 
         # (z_batch, x_batch, nz)
         dev = z_samples - loc
 
         # (z_batch, x_batch)
-        log_density = -0.5 * ((dev ** 2) / var).sum(dim=-1) - 0.5 * (
-            nz * torch.log(2 * torch.pi) + (scale ** 2).log().sum(-1)
-        )
+        log_density = -((dev ** two) / var).sum(dim=-1) * (one / two) - (
+            nz * torch.log(pi * two) + (scale ** two).log().sum(-1)
+        ) * (one / two)
 
         # log q(z): aggregate posterior
         # [z_batch]

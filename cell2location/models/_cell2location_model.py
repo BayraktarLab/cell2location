@@ -24,6 +24,7 @@ from cell2location.models._cell2location_module import (
 from cell2location.models.base._pyro_base_loc_module import Cell2locationBaseModule
 from cell2location.models.base._pyro_mixin import (
     PltExportMixin,
+    PyroAggressiveConvergence,
     PyroAggressiveTrainingPlan,
     QuantileMixin,
 )
@@ -275,6 +276,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if "callbacks" not in trainer_kwargs.keys():
             trainer_kwargs["callbacks"] = []
         trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+        trainer_kwargs["callbacks"].append(PyroAggressiveConvergence())
 
         runner = TrainRunner(
             self,
