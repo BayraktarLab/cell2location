@@ -546,15 +546,16 @@ class PyroAggressiveConvergence(Callback):
         mi_ = pyro_guide.mutual_information(*args, **kwargs)
         mi_ = np.array([v for v in mi_.values()]).sum()
         pl_module.log("MI", mi_, prog_bar=True)
-        if pl_module.mi[-1] >= (mi_ - self.tolerance):
-            pl_module.n_epochs_patience += 1
+        if len(pl_module.mi) > 1:
+            if pl_module.mi[-1] >= (mi_ - self.tolerance):
+                pl_module.n_epochs_patience += 1
         else:
             pl_module.n_epochs_patience = 0
         if pl_module.n_epochs_patience > self.patience:
             # stop aggressive training by setting epoch counter to max epochs
-            pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
+            # pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
             logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
-        pl_module.mi.append([mi_])
+        pl_module.mi.append(mi_)
 
 
 class PyroAggressiveTrainingPlan(PyroTrainingPlan):
@@ -610,7 +611,7 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         self.n_aggressive_steps = n_aggressive_steps
         self.aggressive_steps_counter = 0
         self.aggressive_epochs_counter = 0
-        self.mi = [0]
+        self.mi = []
         self.n_epochs_patience = 0
 
         # in list not provided use amortised variables for aggressive training
@@ -618,14 +619,14 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             aggressive_vars = list(self.module.list_obs_plate_vars["sites"].keys())
             aggressive_vars = aggressive_vars + [f"{i}_initial" for i in aggressive_vars]
 
-        self.svi_aggressive = pyro.infer.SVI(
+        self.svi_nonaggressive = pyro.infer.SVI(
             model=pyro.poutine.block(self.pyro_model, hide=aggressive_vars),
             guide=pyro.poutine.block(self.pyro_guide, hide=aggressive_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
 
-        self.svi_nonaggressive = pyro.infer.SVI(
+        self.svi_aggressive = pyro.infer.SVI(
             model=pyro.poutine.block(self.pyro_model, expose=aggressive_vars),
             guide=pyro.poutine.block(self.pyro_guide, expose=aggressive_vars),
             optim=self.optim,

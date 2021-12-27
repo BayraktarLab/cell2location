@@ -17,7 +17,10 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 def test_cell2location():
     save_path = "./cell2location_model_test"
 
-    use_gpu = int(torch.cuda.is_available())
+    if torch.cuda.is_available():
+        use_gpu = int(torch.cuda.is_available())
+    else:
+        use_gpu = False
 
     dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")

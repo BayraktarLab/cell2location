@@ -78,6 +78,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         super().__init__(adata)
 
+        self.mi_ = []
+
         if model_class is None:
             model_class = LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
 
@@ -286,7 +288,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             use_gpu=use_gpu,
             **trainer_kwargs,
         )
-        return runner()
+        res = runner()
+        self.mi_ = self.mi_ + training_plan.mi
+        return res
 
     def export_posterior(
         self,
