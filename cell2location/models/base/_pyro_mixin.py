@@ -172,7 +172,9 @@ class QuantileMixin:
         return optim_param
 
     @torch.no_grad()
-    def _posterior_quantile_amortised(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def _posterior_quantile_amortised(
+        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
         and global variables, which is necessary when performing amortised inference.
@@ -188,10 +190,12 @@ class QuantileMixin:
             number of observations per batch
         use_gpu
             Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
-        dictionary {variable_name: posterior median}
+        dictionary {variable_name: posterior quantile}
 
         """
 
@@ -211,8 +215,10 @@ class QuantileMixin:
             self.to_device(device)
 
             if i == 0:
-
-                means = self.module.guide.quantiles([q], *args, **kwargs)
+                if use_median and q == 0.5:
+                    means = self.module.guide.median(*args, **kwargs)
+                else:
+                    means = self.module.guide.quantiles([q], *args, **kwargs)
                 means = {
                     k: means[k].cpu().numpy()
                     for k in means.keys()
@@ -249,7 +255,10 @@ class QuantileMixin:
         kwargs = {k: v.to(device) for k, v in kwargs.items()}
         self.to_device(device)
 
-        global_means = self.module.guide.quantiles([q], *args, **kwargs)
+        if use_median and q == 0.5:
+            global_means = self.module.guide.median(*args, **kwargs)
+        else:
+            global_means = self.module.guide.quantiles([q], *args, **kwargs)
         global_means = {
             k: global_means[k].cpu().numpy()
             for k in global_means.keys()
@@ -264,20 +273,24 @@ class QuantileMixin:
         return means
 
     @torch.no_grad()
-    def _posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def _posterior_quantile(
+        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
 
         Parameters
         ----------
         q
-            quantile to compute
+            Quantile to compute
         use_gpu
             Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
-        dictionary {variable_name: posterior median}
+        dictionary {variable_name: posterior quantile}
 
         """
 
@@ -292,20 +305,28 @@ class QuantileMixin:
         kwargs = {k: v.to(device) for k, v in kwargs.items()}
         self.to_device(device)
 
-        means = self.module.guide.quantiles([q], *args, **kwargs)
+        if use_median and q == 0.5:
+            means = self.module.guide.median(*args, **kwargs)
+        else:
+            means = self.module.guide.quantiles([q], *args, **kwargs)
         means = {k: means[k].cpu().detach().numpy() for k in means.keys()}
 
         return means
 
-    def posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def posterior_quantile(
+        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter.
 
         Parameters
         ----------
         q
-            quantile to compute
+            Quantile to compute
         use_gpu
+            Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
@@ -313,9 +334,11 @@ class QuantileMixin:
         """
 
         if self.module.is_amortised:
-            return self._posterior_quantile_amortised(q=q, batch_size=batch_size, use_gpu=use_gpu)
+            return self._posterior_quantile_amortised(
+                q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median
+            )
         else:
-            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu)
+            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median)
 
 
 class PltExportMixin:
@@ -597,6 +620,7 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         n_steps_kl_warmup: Union[int, None] = None,
         n_epochs_kl_warmup: Union[int, None] = 400,
         aggressive_vars: Union[list, None] = None,
+        invert_aggressive_selection: bool = False,
     ):
         super().__init__(
             pyro_module=pyro_module,
@@ -619,16 +643,26 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             aggressive_vars = list(self.module.list_obs_plate_vars["sites"].keys())
             aggressive_vars = aggressive_vars + [f"{i}_initial" for i in aggressive_vars]
 
+        if invert_aggressive_selection:
+            nonaggressive_kwargs = {"expose": aggressive_vars}
+            aggressive_kwargs = {"hide": aggressive_vars}
+        else:
+            nonaggressive_kwargs = {"hide": aggressive_vars}
+            aggressive_kwargs = {"expose": aggressive_vars}
         self.svi_nonaggressive = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, hide=aggressive_vars),
-            guide=pyro.poutine.block(self.pyro_guide, hide=aggressive_vars),
+            model=pyro.poutine.block(self.pyro_model, **nonaggressive_kwargs),
+            guide=pyro.poutine.block(self.pyro_guide, **nonaggressive_kwargs),
+            # model=pyro.poutine.block(self.pyro_model, hide=aggressive_vars),
+            # guide=pyro.poutine.block(self.pyro_guide, hide=aggressive_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
 
         self.svi_aggressive = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, expose=aggressive_vars),
-            guide=pyro.poutine.block(self.pyro_guide, expose=aggressive_vars),
+            model=pyro.poutine.block(self.pyro_model, **aggressive_kwargs),
+            guide=pyro.poutine.block(self.pyro_guide, **aggressive_kwargs),
+            # model=pyro.poutine.block(self.pyro_model, expose=aggressive_vars),
+            # guide=pyro.poutine.block(self.pyro_guide, expose=aggressive_vars),
             optim=self.optim,
             loss=self.loss_fn,
         )
@@ -660,9 +694,10 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         if self.use_kl_weight:
             kwargs.update({"kl_weight": self.kl_weight})
 
-        if self.aggressive_epochs_counter <= self.n_aggressive_epochs:
-            if self.aggressive_steps_counter <= self.n_aggressive_steps:
+        if self.aggressive_epochs_counter < self.n_aggressive_epochs:
+            if self.aggressive_steps_counter < self.n_aggressive_steps:
                 self.aggressive_steps_counter += 1
+                print(f"steps {self.aggressive_steps_counter}")
                 # Do parameter update exclusively for amortised variables
                 loss = torch.Tensor([self.svi_aggressive.step(*args, **kwargs)])
             else:
