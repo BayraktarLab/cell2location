@@ -642,6 +642,7 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         if aggressive_vars is None:
             aggressive_vars = list(self.module.list_obs_plate_vars["sites"].keys())
             aggressive_vars = aggressive_vars + [f"{i}_initial" for i in aggressive_vars]
+            aggressive_vars = aggressive_vars + [f"{i}_unconstrained" for i in aggressive_vars]
 
         if invert_aggressive_selection:
             nonaggressive_kwargs = {"expose": aggressive_vars}
@@ -697,7 +698,6 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
         if self.aggressive_epochs_counter < self.n_aggressive_epochs:
             if self.aggressive_steps_counter < self.n_aggressive_steps:
                 self.aggressive_steps_counter += 1
-                print(f"steps {self.aggressive_steps_counter}")
                 # Do parameter update exclusively for amortised variables
                 loss = torch.Tensor([self.svi_aggressive.step(*args, **kwargs)])
             else:
