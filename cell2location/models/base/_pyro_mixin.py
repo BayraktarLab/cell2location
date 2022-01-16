@@ -644,29 +644,8 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             aggressive_vars = aggressive_vars + [f"{i}_initial" for i in aggressive_vars]
             aggressive_vars = aggressive_vars + [f"{i}_unconstrained" for i in aggressive_vars]
 
-        if invert_aggressive_selection:
-            nonaggressive_kwargs = {"expose": aggressive_vars}
-            aggressive_kwargs = {"hide": aggressive_vars}
-        else:
-            nonaggressive_kwargs = {"hide": aggressive_vars}
-            aggressive_kwargs = {"expose": aggressive_vars}
-        self.svi_nonaggressive = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, **nonaggressive_kwargs),
-            guide=pyro.poutine.block(self.pyro_guide, **nonaggressive_kwargs),
-            # model=pyro.poutine.block(self.pyro_model, hide=aggressive_vars),
-            # guide=pyro.poutine.block(self.pyro_guide, hide=aggressive_vars),
-            optim=self.optim,
-            loss=self.loss_fn,
-        )
-
-        self.svi_aggressive = pyro.infer.SVI(
-            model=pyro.poutine.block(self.pyro_model, **aggressive_kwargs),
-            guide=pyro.poutine.block(self.pyro_guide, **aggressive_kwargs),
-            # model=pyro.poutine.block(self.pyro_model, expose=aggressive_vars),
-            # guide=pyro.poutine.block(self.pyro_guide, expose=aggressive_vars),
-            optim=self.optim,
-            loss=self.loss_fn,
-        )
+        self.aggressive_vars = aggressive_vars
+        self.invert_aggressive_selection = invert_aggressive_selection
 
         self.svi = pyro.infer.SVI(
             model=self.pyro_model,
@@ -674,6 +653,24 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             optim=self.optim,
             loss=self.loss_fn,
         )
+
+    def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
+
+        for k, v in self.pyro_guide.named_parameters():
+            k_in_vars = np.any([i in k for i in self.aggressive_vars])
+            # hide variables on the list if they are not hidden
+            if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
+                v.requires_grad = False
+            # expose variables on the list if they are hidden
+            if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
+                v.requires_grad = True
+
+            # hide variables not on the list if they are not hidden
+            if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
+                v.requires_grad = False
+            # expose variables not on the list if they are hidden
+            if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
+                v.requires_grad = True
 
     def training_epoch_end(self, outputs):
 
@@ -699,13 +696,37 @@ class PyroAggressiveTrainingPlan(PyroTrainingPlan):
             if self.aggressive_steps_counter < self.n_aggressive_steps:
                 self.aggressive_steps_counter += 1
                 # Do parameter update exclusively for amortised variables
-                loss = torch.Tensor([self.svi_aggressive.step(*args, **kwargs)])
+                if self.invert_aggressive_selection:
+                    self.change_requires_grad(
+                        aggressive_vars_status="hide",
+                        non_aggressive_vars_status="expose",
+                    )
+                else:
+                    self.change_requires_grad(
+                        aggressive_vars_status="expose",
+                        non_aggressive_vars_status="hide",
+                    )
+                loss = torch.Tensor([self.svi.step(*args, **kwargs)])
             else:
                 self.aggressive_steps_counter = 0
                 # Do parameter update exclusively for non-amortised variables
-                loss = torch.Tensor([self.svi_nonaggressive.step(*args, **kwargs)])
+                if self.invert_aggressive_selection:
+                    self.change_requires_grad(
+                        aggressive_vars_status="expose",
+                        non_aggressive_vars_status="hide",
+                    )
+                else:
+                    self.change_requires_grad(
+                        aggressive_vars_status="hide",
+                        non_aggressive_vars_status="expose",
+                    )
+                loss = torch.Tensor([self.svi.step(*args, **kwargs)])
         else:
             # Do parameter update for both types of variables
+            self.change_requires_grad(
+                aggressive_vars_status="expose",
+                non_aggressive_vars_status="expose",
+            )
             loss = torch.Tensor([self.svi.step(*args, **kwargs)])
 
         return {"loss": loss}
