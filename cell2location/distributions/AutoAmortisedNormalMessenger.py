@@ -221,6 +221,12 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             # apply data transform before passing to NN
             in_transforms = self.amortised_plate_sites["input_transform"]
             x_in = [in_transforms[i](x) for i, x in enumerate(x_in)]
+            # apply learnable normalisation before passing to NN:
+            input_normalisation = self.amortised_plate_sites.get("input_normalisation", None)
+            if input_normalisation is not None:
+                for i in range(len(self.amortised_plate_sites["input"])):
+                    if input_normalisation[i]:
+                        x_in[i] = x_in[i] * deep_getattr(self, f"input_normalisation_{i}")
             if "single" in self.encoder_mode:
                 # encode with a single encoder
                 res = deep_getattr(self, "one_encoder")(*x_in)
@@ -236,7 +242,17 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             pass
 
         # Initialize.
-        # create single encoder NN
+        # create normalisation parameters if necessary:
+        input_normalisation = self.amortised_plate_sites.get("input_normalisation", None)
+        if input_normalisation is not None:
+            for i in range(len(self.amortised_plate_sites["input"])):
+                if input_normalisation[i]:
+                    deep_setattr(
+                        self,
+                        f"input_normalisation_{i}",
+                        PyroParam(torch.ones((1, self.single_n_in)).to(prior.mean.device).requires_grad_(True)),
+                    )
+        # create encoder neural networks
         if "single" in self.encoder_mode:
             if self.encoder_instance is not None:
                 # copy provided encoder instance
