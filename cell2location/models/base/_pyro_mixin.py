@@ -8,7 +8,7 @@ import pandas as pd
 import pyro
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, init_to_mean
+from pyro.infer.autoguide import AutoNormal, AutoNormalMessenger, init_to_mean
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
@@ -50,10 +50,10 @@ class AutoGuideMixinModule:
     ):
 
         if not amortised:
-            _guide = AutoNormal(
+            _guide = AutoNormalMessenger(
                 model,
                 init_loc_fn=init_loc_fn,
-                create_plates=model.create_plates,
+                # create_plates=model.create_plates,
             )
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
