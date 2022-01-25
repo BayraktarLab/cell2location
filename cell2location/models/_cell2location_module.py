@@ -220,6 +220,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 torch.log1p,
                 lambda x: x,
             ],  # how to transform input data before passing to NN
+            "input_normalisation": [
+                False,
+                False,
+            ],  # whether to normalise input data before passing to NN
             "sites": {
                 "n_s_cells_per_location": 1,
                 "b_s_groups_per_location": 1,
