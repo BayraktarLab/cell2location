@@ -288,7 +288,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         # cell state signatures (e.g. background, free-floating RNA)
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
+            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta)
+            .expand([1, 1])
+            .to_event(2),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -315,7 +317,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
+            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta)
+            .expand([1, 1])
+            .to_event(2),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
@@ -326,10 +330,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         # expected expression
         mu = ((w_sf @ self.cell_state) + (obs2sample @ s_g_gene_add)) * detection_y_s
         alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
-        # convert mean and overdispersion to total count and logits
-        # total_count, logits = _convert_mean_disp_to_counts_logits(
-        #    mu, alpha, eps=self.eps
-        # )
 
         # =====================DATA likelihood ======================= #
         # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
@@ -337,7 +337,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
             pyro.sample(
                 "data_target",
                 dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                # dist.NegativeBinomial(total_count=total_count, logits=logits),
                 obs=x_data,
             )
 
