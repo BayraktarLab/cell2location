@@ -317,9 +317,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta)
-            .expand([1, 1])
-            .to_event(2),
+            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta).expand([1, 1]).to_event(2),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
