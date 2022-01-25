@@ -1,21 +1,98 @@
 from datetime import date
 from functools import partial
+from typing import Callable, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
+import pyro.distributions as dist
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, AutoNormalMessenger, init_to_mean
+from pyro.distributions.distribution import Distribution
+from pyro.infer.autoguide import AutoNormal
+from pyro.infer.autoguide import AutoNormalMessenger as AutoNormalMessengerPyro
+from pyro.infer.autoguide import init_to_feasible, init_to_mean
+from pyro.infer.autoguide.utils import helpful_support_errors
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
+from torch.distributions import biject_to
 
 from ...distributions.AutoNormalEncoder import AutoGuideList, AutoNormalEncoder
+
+
+class AutoNormalMessenger(AutoNormalMessengerPyro):
+    """
+    :class:`AutoMessenger` with mean-field normal posterior.
+
+    Copied from Pyro with modifications adding quantile methods.
+
+    The mean-field posterior at any site is a transformed normal distribution.
+    This posterior is equivalent to :class:`~pyro.infer.autoguide.AutoNormal`
+    or :class:`~pyro.infer.autoguide.AutoDiagonalNormal`, but allows
+    customization via subclassing.
+
+    :param callable model: A Pyro model.
+    :param callable init_loc_fn: A per-site initialization function.
+        See :ref:`autoguide-initialization` section for available functions.
+    :param float init_scale: Initial scale for the standard deviation of each
+        (unconstrained transformed) latent variable.
+    :param tuple amortized_plates: A tuple of names of plates over which guide
+        parameters should be shared. This is useful for subsampling, where a
+        guide parameter can be shared across all plates.
+    """
+
+    def __init__(
+        self,
+        model: Callable,
+        *,
+        init_loc_fn: Callable = init_to_mean(fallback=init_to_feasible),
+        init_scale: float = 0.1,
+        amortized_plates: Tuple[str, ...] = (),
+    ):
+        if not isinstance(init_scale, float) or not (init_scale > 0):
+            raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
+        super().__init__(model, amortized_plates=amortized_plates)
+        self.init_loc_fn = init_loc_fn
+        self._init_scale = init_scale
+        self._computing_median = False
+        self._computing_quantiles = False
+        self._quantile_values = None
+
+    def get_posterior(self, name: str, prior: Distribution) -> Union[Distribution, torch.Tensor]:
+        if self._computing_median:
+            return self._get_posterior_median(name, prior)
+        if self._computing_quantiles:
+            return self._get_posterior_quantiles(name, prior)
+
+        with helpful_support_errors({"name": name, "fn": prior}):
+            transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        posterior = dist.TransformedDistribution(
+            dist.Normal(loc, scale).to_event(transform.domain.event_dim),
+            transform.with_cache(),
+        )
+        return posterior
+
+    def quantiles(self, quantiles, *args, **kwargs):
+        self._computing_quantiles = True
+        self._quantile_values = quantiles
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_quantiles = False
+
+    @torch.no_grad()
+    def _get_posterior_quantiles(self, name, prior):
+        transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        site_quantiles = torch.tensor(self._quantile_values, dtype=loc.dtype, device=loc.device)
+        site_quantiles_values = dist.Normal(loc, scale).icdf(site_quantiles)
+        return transform(site_quantiles_values)
 
 
 def init_to_value(site=None, values={}):
