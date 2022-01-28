@@ -6,5 +6,5 @@ labels: enhancement
 assignees: ''
 ---
 
-<!-- Please describe your wishes below: -->
+<!-- Please describe your feature you would like to see below: -->
 ...
