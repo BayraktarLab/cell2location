@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Scanpy Community Forum
-    url: https://scanpy.discourse.group/
-    about: If you have questions about “How to do X”, please ask them here.
+  - name: Cell2location Community Discussions
+    url: https://github.com/BayraktarLab/cell2location/discussions
+    about: Ask how to solve your problem using cell2location.
