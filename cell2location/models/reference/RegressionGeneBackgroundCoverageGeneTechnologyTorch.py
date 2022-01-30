@@ -13,7 +13,7 @@ It models unexplained variance (overdispersion :math:`\\alpha_g`) and count natu
 the Negative Binomial distribution:
 
 .. math::
-    J_{cg} \sim \mathtt{NB}(\mu_{cg}, 1 / \\alpha_g^2)
+    J_{cg} \sim \mathtt{NB}(\mu_{cg}, 1 / \alpha_g^2)
 
 .. math::
     \mu_{cg} = (g_{fg} + b_{eg}) \: {h_e} \: p_{tg}

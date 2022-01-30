@@ -15,7 +15,7 @@ Pyro and scvi-tools Module classes
 Pyro Module class (defining the model using pyro)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.reference._reference_module.RegressionBackgroundDetectionTechPyroModel
+.. autoclass:: cell2location.models.reference._reference_module.RegressionBackgroundDetectionTechPyroModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Pyro Module class (defining the model using pyro)
 scvi-tools Module class (initialising the model and the guide, PyroBaseModuleClass)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.reference._reference_module.RegressionModel
+.. autoclass:: cell2location.models.reference._reference_module.RegressionModel
    :members:
    :undoc-members:
    :show-inheritance:

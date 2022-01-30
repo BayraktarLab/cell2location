@@ -120,7 +120,7 @@ class BaseModel:
     @staticmethod
     def align_plot_stability(fac1, fac2, name1, name2, align=True, return_aligned=False):
         r"""Align columns between two np.ndarrays using scipy.optimize.linear_sum_assignment,
-            then plot correlations between columns in fac1 and fac2, ordering fac2 according to alignment
+        then plot correlations between columns in fac1 and fac2, ordering fac2 according to alignment
 
         :param fac1: np.ndarray 1, factors in columns
         :param fac2: np.ndarray 2, factors in columns
@@ -153,7 +153,8 @@ class BaseModel:
 
     def generate_cv_data(self, n: int = 2, discrete: bool = True, non_discrete_mean_var: float = 1):
         r"""Generate X_data for molecular cross-validation by sampling molecule counts
-             with np.random.binomial
+        with np.random.binomial
+
         :param n: number of cross-validation folds of equal size to generate, for now, only n=2 is implemented
         """
 
@@ -171,7 +172,8 @@ class BaseModel:
 
     def bootstrap_data(self, n=10, downsampling_p=0.8, discrete=True, non_discrete_mean_var=1):
         r"""Generate X_data for bootstrap analysis by sampling molecule counts
-             with np.random.binomial
+        with np.random.binomial
+
         :param n: number of bootstrap samples to generate
         :param downsampling_p: sample this proportion of values
         :param non_discrete_mean_var: low means lower variance
@@ -291,13 +293,15 @@ class BaseModel:
 
     def set_fact_filt(self, fact_filt):
         r"""Specify which factors are not relevant/ not expressed.
-            It is currently used to filter results shown by .print_gene_loadings() and .plot_gene_loadings()
+        It is currently used to filter results shown by .print_gene_loadings() and .plot_gene_loadings()
+
         :param fact_filt: logical array specifying which factors are to be retained
         """
         self.fact_filt = fact_filt
 
     def apply_fact_filt(self, df):
         r"""Select DataFrame columns by factor filter which was saved in the model object
+
         :param df: pd.DataFrame
         """
         if self.fact_filt is not None:

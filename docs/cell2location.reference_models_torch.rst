@@ -22,6 +22,7 @@ BaseModel
 
 .. automodule:: cell2location.models.base.base_model
    :members:
+   :noindex:
    :undoc-members:
    :show-inheritance:
 
