@@ -71,9 +71,8 @@ def run_regression(
         if `train_args['tech_name_col']` is specified RegressionNBV4Torch model is used.
 
     Returns
-        -------
         dict
-            dictionary {'mod','sc_data','model_name', 'train_args','posterior_args', 'export_args', 'run_name', 'run_time'}
+            dictionary {'mod', 'sc_data', 'model_name', 'train_args', 'posterior_args', 'export_args', 'run_name', 'run_time'}
     """
 
     if ignore_deprecation_exception is not True:

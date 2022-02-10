@@ -63,12 +63,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
     the mean sensitivity for each batch :math:`y_e`:
 
     .. math::
-        y_s ~ Gamma(200, 200 / y_e)
+        y_s \sim Gamma(200, 200 / y_e)
 
     where y_e is unknown/latent average detection efficiency in each batch/experiment:
 
     .. math::
-        y_e ~ Gamma(1, 1)
+        y_e \sim Gamma(1, 1)
 
     Note
     ----
@@ -124,6 +124,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormGeneAlph
 
         * **mu** average prior
         * **sd** standard deviation in this prior
+
         When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
     spot_fact_mean_var_ratio :
         the parameter that controls the strength of co-located cell combination prior on

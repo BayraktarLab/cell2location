@@ -12,7 +12,7 @@ from scvi.nn import one_hot
 
 
 class RegressionBackgroundDetectionTechPyroModel(PyroModule):
-    """
+    r"""
     Given cell type annotation for each cell, the corresponding reference cell type signatures :math:`g_{f,g}`,
     which represent the average mRNA count of each gene `g` in each cell type `f={1, .., F}`,
     are estimated from sc/snRNA-seq data using Negative Binomial regression,
@@ -33,7 +33,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
 
     Here, :math:`\mu_{f,g}` denotes average mRNA count in each cell type :math:`f` for each gene :math:`g`;
     :math:`y_c` denotes normalisation for each experiment :math:`e` to account for  sequencing depth.
-    :math:`y_{t,g}` denotes per gene :math:`g` detection efficiency normalisation for each technology :math:`t`
+    :math:`y_{t,g}` denotes per gene :math:`g` detection efficiency normalisation for each technology :math:`t`.
 
     """
 

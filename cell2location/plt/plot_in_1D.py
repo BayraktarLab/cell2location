@@ -16,10 +16,12 @@ def plot_absolute_abundances_1D(
     colourCode=None,
     figureSize=(12, 8),
 ):
-    r"""Plot absolute abundance of celltypes in a dotplot across 1 dimension
+    r"""
+    Plot absolute abundance of celltypes in a dotplot across 1 dimension
+
     :param adata_sp: anndata object for spatial data with celltype abundance included in .obs (this is returned by running cell2location first)
     :param celltype_subset: list of a subset of cell type names to be plotted
-    :params slide & radial_position: if wanting to plot only data from one slide + one radial position, include in these parameters
+    :param slide&radial_position: if wanting to plot only data from one slide + one radial position, include in these parameters
     :param cell_types: parameter for only plotting specific cell types where column names in adata_sp.obs are meanSpot[celltype] format
     :param roi_subset: optionally a boolean for only using part of the data in adata_sp (corresponding to a specific ROI)
     :param saving: optionally a string value, which will result in the plot to be saved under this name
