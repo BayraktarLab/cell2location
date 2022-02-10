@@ -4,7 +4,7 @@ Reference signatures (NB regression)
 User-facing reference signature estimation model class (scvi-tools BaseModelClass)
 ----------------------------------------------------------------------------------
 
-.. automodule:: cell2location.models.RegressionModel
+.. autoclass:: cell2location.models.RegressionModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Pyro Module class (defining the model using pyro)
 scvi-tools Module class (initialising the model and the guide, PyroBaseModuleClass)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: cell2location.models.reference._reference_module.RegressionModel
+.. autoclass:: cell2location.models.reference._reference_module.RegressionBackgroundDetectionTechPyroModel
    :members:
    :undoc-members:
    :show-inheritance:

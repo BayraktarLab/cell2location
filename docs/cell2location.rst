@@ -4,7 +4,7 @@ Cell2location: spatial mapping (scvi-tools/pyro)
 User-facing cell2location spatial cell abundance estimation model class (scvi-tools BaseModelClass)
 ---------------------------------------------------------------------------------------------------
 
-.. automodule:: cell2location.models.Cell2location
+.. autoclass:: cell2location.models.Cell2location
    :members:
    :undoc-members:
    :show-inheritance:
@@ -16,14 +16,6 @@ Pyro Module class (defining the model using pyro, math description)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: cell2location.models._cell2location_module.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-scvi-tools Module class (initialising the model and the guide, PyroBaseModuleClass)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. autoclass:: cell2location.models._cell2location_model.Cell2locationBaseModule
    :members:
    :undoc-members:
    :show-inheritance:

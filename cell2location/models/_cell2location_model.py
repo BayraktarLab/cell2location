@@ -129,6 +129,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     ) -> Optional[AnnData]:
         """
         %(summary)s.
+
         Parameters
         ----------
         %(param_adata)s
@@ -138,6 +139,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         %(param_cat_cov_keys)s
         %(param_cont_cov_keys)s
         %(param_copy)s
+
         Returns
         -------
         %(returns)s
