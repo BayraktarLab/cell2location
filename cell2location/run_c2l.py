@@ -67,9 +67,10 @@ def run_cell2location(
     into a set of predefined reference signatures of cell types :math:`g_{f,g}`.
 
     The cell2location software comes with two implementations for this estimation step:
+
     1) a statistical method based on Negative Binomial regression (see `cell2location.run_regression`);
     2) hard-coded computation of per-cluster average mRNA counts for individual genes
-      (provided anndata object to this function, see below).
+       (provided anndata object to this function, see below).
 
     Approximate Variational Inference is used to estimate all model parameters,
     implemented in the pymc3 framework, which supports GPU acceleration.

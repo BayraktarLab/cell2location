@@ -50,7 +50,7 @@ class ArchetypalAnalysis(BaseModel):
 
       .. math::
           \sum_{r} i_{sr} = 1
-    .
+
 
     In practice :math:`q_{rf} = k_{rf} \: m_{f}` is obtained by performing archetypal analysis
     and normalised by the sum across combinations `r` to obtain :math:`k_{rf}`:

@@ -15,7 +15,7 @@ scvi-tools Module classes (initialising the model and the guide, PyroBaseModuleC
 Cell2location spatial cell abundance estimation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.base._pyro_base_loc_model.Cell2locationBaseModule
+.. autoclass:: cell2location.models.base._pyro_base_loc_module.Cell2locationBaseModule
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Cell2location spatial cell abundance estimation
 Reference signature estimation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: cell2location.models.reference._reference_model.RegressionModel
+.. autoclass:: cell2location.models.reference._reference_model.RegressionModel
    :members:
    :undoc-members:
    :show-inheritance:

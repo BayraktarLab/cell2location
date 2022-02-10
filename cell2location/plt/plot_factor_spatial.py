@@ -22,7 +22,8 @@ def plot_factor_spatial(
     text_size=9,
 ):
     r"""Plot expression of factors / cell types in space.
-        Convenient but not as powerful as scanpy plotting.
+    Convenient but not as powerful as scanpy plotting.
+
     :param adata: anndata object with spatial data
     :param fact: pd.DataFrame with spatial expression of factors (W), e.g. mod.spot_factors_df
     :param cluster_names: names of those factors to show on a plot

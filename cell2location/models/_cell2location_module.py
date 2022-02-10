@@ -45,7 +45,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
     Approximate Variational Inference is used to estimate the posterior distribution of all model parameters.
 
-    Estimation of absolute cell abundance `w_{s,f}` is guided using informed prior on the number of cells
+    Estimation of absolute cell abundance :math:`w_{s,f}` is guided using informed prior on the number of cells
     (argument called `N_cells_per_location`). It is a tissue-level global estimate, which can be derived from histology
     images (H&E or DAPI), ideally paired to the spatial expression data or at least representing the same tissue type.
     This parameter can be estimated by manually counting nuclei in a 10-20 locations in the histology image
@@ -60,12 +60,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     the mean sensitivity for each batch :math:`y_e`:
 
     .. math::
-        y_s \sim Gamma(detection_alpha, detection_alpha / y_e)
+        y_s \sim Gamma(detection\_alpha, detection\_alpha / y_e)
 
     where y_e is unknown/latent average detection efficiency in each batch/experiment:
 
     .. math::
-        y_e \sim Gamma(10, 10 / detection_mean)
+        y_e \sim Gamma(10, 10 / detection\_mean)
 
     """
 
@@ -203,14 +203,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def list_obs_plate_vars(self):
-        """Create a dictionary with:
+        """
+        Create a dictionary with:
+
         1. "name" - the name of observation/minibatch plate;
         2. "input" - indexes of model args to provide to encoder network when using amortised inference;
         3. "sites" - dictionary with
-            keys - names of variables that belong to the observation plate (used to recognise
-             and merge posterior samples for minibatch variables)
-            values - the dimensions in non-plate axis of each variable (used to construct output
-             layer of encoder network when using amortised inference)
+
+          * keys - names of variables that belong to the observation plate (used to recognise
+            and merge posterior samples for minibatch variables)
+          * values - the dimensions in non-plate axis of each variable (used to construct output
+            layer of encoder network when using amortised inference)
         """
 
         return {
@@ -444,10 +447,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         Returns
         -------
-        dictionary with:
-        1) list with expected expression counts (sparse, shape=(N locations, N genes)
-        for each cell type in the same order as mod.factor_names_;
-        2) np.array with location indices
+        dict
+          dictionary with:
+
+            1. list with expected expression counts (sparse, shape=(N locations, N genes)
+               for each cell type in the same order as mod\.factor_names_;
+            2. np.array with location indices
         """
         if ind_x is None:
             ind_x = np.arange(adata.n_obs).astype(int)

@@ -88,6 +88,7 @@ class LocationModelLinearDependentWMultiExperimentNoMg(Pymc3LocModel):
 
         * **mu** average prior
         * **sd** standard deviation in this prior
+
         When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
     spot_fact_mean_var_ratio :
         the parameter that controls the strength of co-located cell combination prior on

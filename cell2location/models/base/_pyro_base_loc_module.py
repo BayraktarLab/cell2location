@@ -5,6 +5,22 @@ from ._pyro_mixin import AutoGuideMixinModule, init_to_value
 
 
 class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
+    r"""
+    Module class which defines AutoGuide given model. Supports multiple model architectures.
+
+    Parameters
+    ----------
+    amortised
+        boolean, use a Neural Network to approximate posterior distribution of location-specific (local) parameters?
+    encoder_mode
+        Use single encoder for all variables ("single"), one encoder per variable ("multiple")
+        or a single encoder in the first step and multiple encoders in the second step ("single-multiple").
+    encoder_kwargs
+        arguments for Neural Network construction (scvi.nn.FCLayers)
+    kwargs
+        arguments for specific model class - e.g. number of genes, values of the prior distribution
+    """
+
     def __init__(
         self,
         model,
@@ -14,21 +30,6 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         data_transform="log1p",
         **kwargs,
     ):
-        """
-        Module class which defines AutoGuide given model. Supports multiple model architectures.
-
-        Parameters
-        ----------
-        amortised
-            boolean, use a Neural Network to approximate posterior distribution of location-specific (local) parameters?
-        encoder_mode
-            Use single encoder for all variables ("single"), one encoder per variable ("multiple")
-            or a single encoder in the first step and multiple encoders in the second step ("single-multiple").
-        encoder_kwargs
-            arguments for Neural Network construction (scvi.nn.FCLayers)
-        kwargs
-            arguments for specific model class - e.g. number of genes, values of the prior distribution
-        """
         super().__init__()
         self.hist = []
 
@@ -57,6 +58,19 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
 
     @property
     def list_obs_plate_vars(self):
+        """
+        Create a dictionary with:
+
+        1. "name" - the name of observation/minibatch plate;
+        2. "input" - indexes of model args to provide to encoder network when using amortised inference;
+        3. "sites" - dictionary with
+
+          * keys - names of variables that belong to the observation plate
+            (used to recognise and merge posterior samples for minibatch variables)
+          * values - the dimensions in non-plate axis of each variable (used to
+            construct output layer of encoder network when using amortised inference)
+        """
+
         return self.model.list_obs_plate_vars()
 
     @property

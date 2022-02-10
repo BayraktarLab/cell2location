@@ -4,15 +4,10 @@ Plotting
 Plot cell abundance for multiple cell types using colour interpolation
 ----------------------------------------------------------------------
 
-.. automodule:: cell2location.plt.plot_spatial
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autofunction:: cell2location.plt.plot_spatial
 
-.. automodule:: cell2location.plt.plot_spatial.plot_spatial_general
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autofunction:: cell2location.plt.plot_spatial.plot_spatial_general
+
 
 Plot heatmap and dotplot (hierarchically clustered but without showing the tree)
 --------------------------------------------------------------------------------
@@ -63,5 +58,6 @@ Module contents
 
 .. automodule:: cell2location.plt
    :members:
+   :exclude-members: plot_spatial, plot_expected_vs_obs, plot_factor_spatial
    :undoc-members:
    :show-inheritance:
