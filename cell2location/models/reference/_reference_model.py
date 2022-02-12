@@ -3,11 +3,18 @@ from typing import List, Optional
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import scvi
+from scvi import REGISTRY_KEYS
 from anndata import AnnData
 from pyro import clear_param_store
-from scvi.data._anndata import _setup_anndata
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
+from scvi.data.anndata import AnnDataManager
+from scvi.data.anndata.fields import (
+    CategoricalJointObsField,
+    CategoricalObsField,
+    LayerField,
+    NumericalJointObsField,
+    NumericalObsField,
+)
 from scvi.utils import setup_anndata_dsp
 
 from ...cluster_averages import compute_cluster_averages
@@ -47,15 +54,6 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
         # in case any other model was created before that shares the same parameter names.
         clear_param_store()
 
-        # add index for each cell (provided to pyro plate for correct minibatching)
-        adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
-        scvi.data.register_tensor_from_anndata(
-            adata,
-            registry_key="ind_x",
-            adata_attr_name="obs",
-            adata_key_name="_indices",
-        )
-
         super().__init__(adata)
 
         if model_class is None:
@@ -63,17 +61,17 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
 
         # annotations for cell types
         self.n_factors_ = self.summary_stats["n_labels"]
-        self.factor_names_ = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_labels"]["mapping"]
+        self.factor_names_ = self.adata_manager.get_state_registry(REGISTRY_KEYS.LABELS_KEY).categorical_mapping
         # annotations for extra categorical covariates
-        if "extra_categoricals" in self.adata.uns["_scvi"].keys():
-            self.extra_categoricals_ = self.adata.uns["_scvi"]["extra_categoricals"]
-            self.n_extra_categoricals_ = self.adata.uns["_scvi"]["extra_categoricals"]["n_cats_per_key"]
+        if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry:
+            self.extra_categoricals_ = self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY)
+            self.n_extra_categoricals_ = self.extra_categoricals_.n_cats_per_key
             model_kwargs["n_extra_categoricals"] = self.n_extra_categoricals_
 
         # use per class average as initial value
         if use_average_as_initial:
             # compute cluster average expression
-            aver = self._compute_cluster_averages(key="_scvi_labels")
+            aver = self._compute_cluster_averages(key=REGISTRY_KEYS.LABELS_KEY)
             model_kwargs["init_vals"] = {"per_cluster_mu_fg": aver.values.T.astype("float32") + 0.0001}
 
         self.module = RegressionBaseModule(
@@ -87,41 +85,42 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
         self._model_summary_string = f'RegressionBackgroundDetectionTech model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
         self.init_params_ = self._get_init_params(locals())
 
-    @staticmethod
+    @classmethod
     @setup_anndata_dsp.dedent
     def setup_anndata(
+        cls,
         adata: AnnData,
+        layer: Optional[str] = None,
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
-        layer: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
-        copy: bool = False,
-    ) -> Optional[AnnData]:
+        **kwargs,
+    ):
         """
         %(summary)s.
+
         Parameters
         ----------
-        %(param_adata)s
+        %(param_layer)s
         %(param_batch_key)s
         %(param_labels_key)s
-        %(param_layer)s
         %(param_cat_cov_keys)s
         %(param_cont_cov_keys)s
-        %(param_copy)s
-        Returns
-        -------
-        %(returns)s
         """
-        return _setup_anndata(
-            adata,
-            batch_key=batch_key,
-            labels_key=labels_key,
-            layer=layer,
-            categorical_covariate_keys=categorical_covariate_keys,
-            continuous_covariate_keys=continuous_covariate_keys,
-            copy=copy,
-        )
+        setup_method_args = cls._get_setup_method_args(**locals())
+        adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
+        anndata_fields = [
+            LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
+            CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
+            CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
+            CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
+            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
+            NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
+        ]
+        adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
+        adata_manager.register_fields(adata, **kwargs)
+        cls.register_manager(adata_manager)
 
     def train(
         self,
@@ -157,19 +156,19 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
 
         super().train(**kwargs)
 
-    def _compute_cluster_averages(self, key="_scvi_labels"):
+    def _compute_cluster_averages(self, key=REGISTRY_KEYS.LABELS_KEY):
         """
-        Compute average per cluster (key='_scvi_labels') or per batch (key='_scvi_batch').
+        Compute average per cluster (key=REGISTRY_KEYS.LABELS_KEY) or per batch (key=REGISTRY_KEYS.BATCH_KEY).
 
         Returns
         -------
         pd.DataFrame with variables in rows and labels in columns
         """
         # find cell label column
-        label_col = self.adata.uns["_scvi"]["categorical_mappings"][key]["original_key"]
+        label_col = self.adata_manager.get_state_registry(key).original_key
 
         # find data slot
-        x_dict = self.adata.uns["_scvi"]["data_registry"]["X"]
+        x_dict = self.adata_manager.data_registry["X"]
         if x_dict["attr_name"] == "X":
             use_raw = False
         else:
@@ -284,7 +283,7 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
         inf_aver = self.samples[f"post_sample_{summary_name}"]["per_cluster_mu_fg"].T
         if scale_average_detection and ("detection_y_c" in list(self.samples[f"post_sample_{summary_name}"].keys())):
             inf_aver = inf_aver * self.samples[f"post_sample_{summary_name}"]["detection_y_c"].mean()
-        aver = self._compute_cluster_averages(key="_scvi_labels")
+        aver = self._compute_cluster_averages(key=REGISTRY_KEYS.LABELS_KEY)
         aver = aver[self.factor_names_]
 
         plt.hist2d(
