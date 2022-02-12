@@ -39,20 +39,10 @@ Additionally we provide 2 models for downstream analysis of cell abundance estim
 
 .. toctree::
    :maxdepth: 2
-   :caption: Using docker and singularity environments, common errors:
+   :caption: Common errors, using containers:
 
-   dockersingularity
    commonerrors
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Pymc3 Tutorials (advanced use, Nanostring WTA):
-
-   installing_pymc3
-   notebooks/cell2location_for_NanostringWTA
-   notebooks/cell2location_estimating_signatures
-   notebooks/cell2location_short_demo
-   notebooks/cell2location_short_demo_downstream
+   dockersingularity
 
 .. toctree::
    :maxdepth: 4
@@ -66,9 +56,14 @@ Additionally we provide 2 models for downstream analysis of cell abundance estim
    cell2location.plt
    cell2location.utils
    cell2location.pyro_infrastructure
-   cell2location.pymc3
-   cell2location.reference_models_torch
    cell2location.distributions
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Nanostring WTA Tutorial (pymc3):
+
+   installing_pymc3
+   notebooks/cell2location_for_NanostringWTA
 
 Indices and tables
 ==================

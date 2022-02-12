@@ -87,6 +87,7 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
           on how well each experiment worked. A good choice for SmartSeq 2 reference is around ~ 1/10.
         * **sd** a good choice of this prior is **mean** / 2.
           Avoid setting **sd** >= **mean** because it puts a lot of weight on 0.
+
     gene_level_var_prior :
         Certainty in the gene_level_prior (mean_var_ratio)
         - by default the variance in our prior of mean and sd is equal to the mean and sd
@@ -101,6 +102,7 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
         * **combs_per_spot** - what is the average number of factor combinations per location?
           a number halfway in-between `factors_per_spot` and 1 is a sensible default
           Low numbers mean more factors are co-located with other factors.
+
     cell_number_var_prior :
         Certainty in the cell_number_prior (cells_mean_var_ratio, factors_mean_var_ratio,
         combs_mean_var_ratio)
@@ -112,6 +114,7 @@ class LocationModelLinearDependentWMultiExperiment(Pymc3LocModel):
 
         * **mu** average prior
         * **sd** standard deviation in this prior
+
         When using the Visium data model is not sensitive to the choice of this prior so it is better to use the default.
     spot_fact_mean_var_ratio :
         the parameter that controls the strength of co-located cell combination prior on

@@ -22,7 +22,7 @@ from cell2location.utils import select_slide
 
 
 class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExportMixin, BaseModelClass):
-    """
+    r"""
     Cell2location model. User-end model class. See Module class for description of the model (incl. math).
 
     Parameters
@@ -133,6 +133,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     ) -> Optional[AnnData]:
         """
         %(summary)s.
+
         Parameters
         ----------
         %(param_adata)s
@@ -142,6 +143,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         %(param_cat_cov_keys)s
         %(param_cont_cov_keys)s
         %(param_copy)s
+
         Returns
         -------
         %(returns)s
@@ -195,6 +197,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     ):
         """
         Summarise posterior distribution and export results (cell abundance) to anndata object:
+
         1. adata.obsm: Estimated cell abundance as pd.DataFrames for each posterior distribution summary `add_to_obsm`,
             posterior mean, sd, 5% and 95% quantiles (['means', 'stds', 'q05', 'q95']).
             If export to adata.obsm fails with error, results are saved to adata.obs instead.

@@ -46,8 +46,8 @@ class AutoGuideList(PyroAutoGuideList):
 class AutoNormalEncoder(AutoGuide):
     """
     AutoNormal posterior approximation for amortised inference,
-      where mean and sd of the posterior distributions are approximated using a neural network:
-      mean, sd = encoderNN(input data).
+    where mean and sd of the posterior distributions are approximated using a neural network:
+    mean, sd = encoderNN(input data).
 
     The class supports single encoder for all parameters as well as one encoder per parameter.
     The output of encoder network is treated as a hidden layer, mean and sd are a linear function of hidden layer nodes,
@@ -284,13 +284,14 @@ class AutoNormalEncoder(AutoGuide):
     def encode(self, *args, **kwargs):
         """
         Apply encoder network to input data to obtain hidden layer encoding.
+
         Parameters
         ----------
         args
             Pyro model args
         kwargs
             Pyro model kwargs
-        -------
+
 
         """
         in_names = self.amortised_plate_sites["input"]
