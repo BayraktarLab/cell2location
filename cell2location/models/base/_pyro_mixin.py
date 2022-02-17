@@ -237,7 +237,11 @@ class QuantileMixin:
 
             else:
 
-                means_ = self.module.guide.quantiles([q], *args, **kwargs)
+                if use_median and q == 0.5:
+                    means_ = self.module.guide.median(*args, **kwargs)
+                else:
+                    means_ = self.module.guide.quantiles([q], *args, **kwargs)
+
                 means_ = {
                     k: means_[k].cpu().numpy()
                     for k in means_.keys()

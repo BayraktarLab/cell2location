@@ -452,7 +452,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         #### create tensors with useful numbers ####
         one = torch.ones((), dtype=loc.dtype, device=loc.device)
         two = torch.tensor(2, dtype=loc.dtype, device=loc.device)
-        pi = torch.tensor(torch.pi, dtype=loc.dtype, device=loc.device)
+        pi = torch.tensor(3.14159265359, dtype=loc.dtype, device=loc.device)
         #### get sample from posterior ####
         z_samples = self.samples_for_mi[name]
 
