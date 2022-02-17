@@ -172,7 +172,7 @@ class QuantileMixin:
         return optim_param
 
     @torch.no_grad()
-    def _posterior_quantile_amortised(
+    def _posterior_quantile_minibatch(
         self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
     ):
         """
@@ -274,7 +274,7 @@ class QuantileMixin:
 
     @torch.no_grad()
     def _posterior_quantile(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+        self, q: float = 0.5, batch_size: int = None, use_gpu: bool = None, use_median: bool = False
     ):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
@@ -296,7 +296,8 @@ class QuantileMixin:
 
         self.module.eval()
         gpus, device = parse_use_gpu_arg(use_gpu)
-
+        if batch_size is None:
+            batch_size = self.adata.n_obs
         train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
@@ -333,8 +334,8 @@ class QuantileMixin:
 
         """
 
-        if self.module.is_amortised:
-            return self._posterior_quantile_amortised(
+        if batch_size is not None:
+            return self._posterior_quantile_minibatch(
                 q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median
             )
         else:
