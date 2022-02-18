@@ -146,11 +146,11 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
 
     @staticmethod
     def _get_fn_args_from_batch_cat(tensor_dict):
-        x_data = tensor_dict[_CONSTANTS.X_KEY]
+        x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
-        batch_index = tensor_dict[_CONSTANTS.BATCH_KEY]
-        label_index = tensor_dict[_CONSTANTS.LABELS_KEY]
-        extra_categoricals = tensor_dict[_CONSTANTS.CAT_COVS_KEY]
+        batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
+        label_index = tensor_dict[REGISTRY_KEYS.LABELS_KEY]
+        extra_categoricals = tensor_dict[REGISTRY_KEYS.CAT_COVS_KEY]
         return (x_data, ind_x, batch_index, label_index, extra_categoricals), {}
 
     @property
@@ -292,7 +292,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
             )
 
     # =====================Other functions======================= #
-    def compute_expected(self, samples, adata, ind_x=None):
+    def compute_expected(self, samples, ind_x=None):
         r"""Compute expected expression of each gene in each cell. Useful for evaluating how well
         the model learned expression pattern of all genes in the data.
 
@@ -309,15 +309,15 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
             ind_x = np.arange(adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
-        obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
-        obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
-        obs2label = get_from_registry(adata, _CONSTANTS.LABELS_KEY)
-        obs2label = pd.get_dummies(obs2label.flatten()).values[ind_x, :]
+        obs2sample = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
+        obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :].astype('float32')
+        obs2label = self.adata_manager.get_from_registry(REGISTRY_KEYS.LABELS_KEY)
+        obs2label = pd.get_dummies(obs2label.flatten()).values[ind_x, :].astype('float32')
         if self.n_extra_categoricals is not None:
-            extra_categoricals = get_from_registry(adata, _CONSTANTS.CAT_COVS_KEY)
+            extra_categoricals = self.adata_manager.get_from_registry(REGISTRY_KEYS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
                 [
-                    pd.get_dummies(extra_categoricals.iloc[ind_x, i])
+                    pd.get_dummies(extra_categoricals.iloc[ind_x, i]).astype('float32')
                     for i, n_cat in enumerate(self.n_extra_categoricals)
                 ],
                 axis=1,
@@ -333,7 +333,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
 
         return {"mu": mu, "alpha": alpha}
 
-    def compute_expected_subset(self, samples, adata, fact_ind, cell_ind):
+    def compute_expected_subset(self, samples, fact_ind, cell_ind):
         r"""Compute expected expression of each gene in each cell that comes from
         a subset of factors (cell types) or cells.
 
@@ -350,12 +350,12 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         cell_ind
             indices of cells to use
         """
-        obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
+        obs2sample = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten())
-        obs2label = get_from_registry(adata, _CONSTANTS.LABELS_KEY)
+        obs2label = self.adata_manager.get_from_registry(REGISTRY_KEYS.LABELS_KEY)
         obs2label = pd.get_dummies(obs2label.flatten())
         if self.n_extra_categoricals is not None:
-            extra_categoricals = get_from_registry(adata, _CONSTANTS.CAT_COVS_KEY)
+            extra_categoricals = self.adata_manager.get_from_registry(REGISTRY_KEYS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
                 [pd.get_dummies(extra_categoricals.iloc[:, i]) for i, n_cat in enumerate(self.n_extra_categoricals)],
                 axis=1,
@@ -385,16 +385,16 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
             registered anndata
 
         """
-        obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
+        obs2sample = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten())
         if self.n_extra_categoricals is not None:
-            extra_categoricals = get_from_registry(adata, _CONSTANTS.CAT_COVS_KEY)
+            extra_categoricals = self.adata_manager.get_from_registry(REGISTRY_KEYS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
                 [pd.get_dummies(extra_categoricals.iloc[:, i]) for i, n_cat in enumerate(self.n_extra_categoricals)],
                 axis=1,
             )
         # get counts matrix
-        corrected = get_from_registry(adata, _CONSTANTS.X_KEY)
+        corrected = self.adata_manager.get_field(REGISTRY_KEYS.X_KEY)
         # normalise per-sample scaling
         corrected = corrected / np.dot(obs2sample, samples["detection_mean_y_e"])
         # normalise per gene effects
