@@ -4,12 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy
-import scvi
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
 from scvi import REGISTRY_KEYS
-from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.data.anndata import AnnDataManager
 from scvi.data.anndata.fields import (
     CategoricalJointObsField,
@@ -18,6 +16,7 @@ from scvi.data.anndata.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
+from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.utils import setup_anndata_dsp
 
 from cell2location.models._cell2location_module import (
