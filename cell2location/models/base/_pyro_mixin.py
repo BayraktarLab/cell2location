@@ -10,7 +10,7 @@ import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_mean
 from scipy.sparse import issparse
-from scvi import _CONSTANTS
+from scvi import REGISTRY_KEYS
 from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
@@ -494,7 +494,7 @@ class PltExportMixin:
         self.expected_nb_param = self.module.model.compute_expected(
             self.samples[f"post_sample_{summary_name}"], self.adata, ind_x=ind_x
         )
-        x_data = get_from_registry(self.adata, _CONSTANTS.X_KEY)[ind_x, :]
+        x_data = get_from_registry(self.adata, REGISTRY_KEYS.X_KEY)[ind_x, :]
         if issparse(x_data):
             x_data = np.asarray(x_data.toarray())
         self.plot_posterior_mu_vs_data(self.expected_nb_param["mu"], x_data)

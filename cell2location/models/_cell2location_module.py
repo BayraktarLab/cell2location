@@ -457,7 +457,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             ind_x = ind_x.astype(int)
 
         # fetch data
-        x_data = self.adata_manager.get_field(REGISTRY_KEYS.X_KEY)[ind_x, :]
+        x_data = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY)[ind_x, :]
         x_data = csr_matrix(x_data)
 
         # compute total expected expression

@@ -310,14 +310,14 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         else:
             ind_x = ind_x.astype(int)
         obs2sample = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
-        obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :].astype('float32')
+        obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :].astype("float32")
         obs2label = self.adata_manager.get_from_registry(REGISTRY_KEYS.LABELS_KEY)
-        obs2label = pd.get_dummies(obs2label.flatten()).values[ind_x, :].astype('float32')
+        obs2label = pd.get_dummies(obs2label.flatten()).values[ind_x, :].astype("float32")
         if self.n_extra_categoricals is not None:
             extra_categoricals = self.adata_manager.get_from_registry(REGISTRY_KEYS.CAT_COVS_KEY)
             obs2extra_categoricals = np.concatenate(
                 [
-                    pd.get_dummies(extra_categoricals.iloc[ind_x, i]).astype('float32')
+                    pd.get_dummies(extra_categoricals.iloc[ind_x, i]).astype("float32")
                     for i, n_cat in enumerate(self.n_extra_categoricals)
                 ],
                 axis=1,
@@ -394,7 +394,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
                 axis=1,
             )
         # get counts matrix
-        corrected = self.adata_manager.get_field(REGISTRY_KEYS.X_KEY)
+        corrected = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY)
         # normalise per-sample scaling
         corrected = corrected / np.dot(obs2sample, samples["detection_mean_y_e"])
         # normalise per gene effects

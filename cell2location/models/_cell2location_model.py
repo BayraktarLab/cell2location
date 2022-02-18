@@ -75,14 +75,14 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if not detection_mean_per_sample:
             # compute expected change in sensitivity (m_g in V1 or y_s in V2)
             sc_total = cell_state_df.sum(0).mean()
-            sp_total = self.adata_manager.get_field(REGISTRY_KEYS.X_KEY).sum(1).mean()
+            sp_total = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY).sum(1).mean()
             self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction
             model_kwargs["detection_mean"] = self.detection_mean_
         else:
             # compute expected change in sensitivity (m_g in V1 and y_s in V2)
             sc_total = cell_state_df.sum(0).mean()
-            sp_total = self.adata_manager.get_field(REGISTRY_KEYS.X_KEY).sum(1)
+            sp_total = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY).sum(1)
             batch = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY).flatten()
             sp_total = np.array([sp_total[batch == b].mean() for b in range(self.summary_stats["n_batch"])])
             self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total

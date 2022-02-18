@@ -4,7 +4,7 @@ import pyro
 import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
-from scvi import _CONSTANTS
+from scvi import REGISTRY_KEYS
 from scvi.data._anndata import get_from_registry
 from scvi.nn import one_hot
 
@@ -181,9 +181,9 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
 
     @staticmethod
     def _get_fn_args_from_batch(tensor_dict):
-        x_data = tensor_dict[_CONSTANTS.X_KEY]
+        x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
-        batch_index = tensor_dict[_CONSTANTS.BATCH_KEY]
+        batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
         return (x_data, ind_x, batch_index), {}
 
     def create_plates(self, x_data, idx, batch_index):
@@ -369,7 +369,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
             ind_x = np.arange(adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
-        obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
+        obs2sample = get_from_registry(adata, REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
         mu = (
             np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"]
