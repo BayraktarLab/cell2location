@@ -6,7 +6,6 @@ import numpy as np
 from scvi import REGISTRY_KEYS
 from anndata import AnnData
 from pyro import clear_param_store
-from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.data.anndata import AnnDataManager
 from scvi.data.anndata.fields import (
     CategoricalJointObsField,
@@ -15,6 +14,7 @@ from scvi.data.anndata.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
+from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.utils import setup_anndata_dsp
 
 from ...cluster_averages import compute_cluster_averages
