@@ -8,8 +8,8 @@ from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
 from scvi import REGISTRY_KEYS
-from scvi.data.anndata import AnnDataManager
-from scvi.data.anndata.fields import (
+from scvi.data import AnnDataManager
+from scvi.data.fields import (
     CategoricalJointObsField,
     CategoricalObsField,
     LayerField,
