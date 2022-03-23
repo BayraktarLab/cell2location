@@ -215,41 +215,27 @@ class QuantileMixin:
             self.to_device(device)
 
             if i == 0:
+                # find plate sites
+                obs_plate_sites = self._get_obs_plate_sites(args, kwargs, return_observed=True)
+                if len(obs_plate_sites) == 0:
+                    # if no local variables - don't sample
+                    break
+                # find plate dimension
+                obs_plate_dim = list(obs_plate_sites.values())[0]
                 if use_median and q == 0.5:
                     means = self.module.guide.median(*args, **kwargs)
                 else:
                     means = self.module.guide.quantiles([q], *args, **kwargs)
-                means = {
-                    k: means[k].cpu().numpy()
-                    for k in means.keys()
-                    if k in self.module.model.list_obs_plate_vars()["sites"]
-                }
-
-                # find plate dimension
-                trace = poutine.trace(self.module.model).get_trace(*args, **kwargs)
-                # print(trace.nodes[self.module.model.list_obs_plate_vars()['name']])
-                obs_plate = {
-                    name: site["cond_indep_stack"][0].dim
-                    for name, site in trace.nodes.items()
-                    if site["type"] == "sample"
-                    if any(f.name == self.module.model.list_obs_plate_vars()["name"] for f in site["cond_indep_stack"])
-                }
+                means = {k: means[k].cpu().numpy() for k in means.keys() if k in obs_plate_sites}
 
             else:
-
                 if use_median and q == 0.5:
                     means_ = self.module.guide.median(*args, **kwargs)
                 else:
                     means_ = self.module.guide.quantiles([q], *args, **kwargs)
 
-                means_ = {
-                    k: means_[k].cpu().numpy()
-                    for k in means_.keys()
-                    if k in list(self.module.model.list_obs_plate_vars()["sites"].keys())
-                }
-                means = {
-                    k: np.concatenate([means[k], means_[k]], axis=list(obs_plate.values())[0]) for k in means.keys()
-                }
+                means_ = {k: means_[k].cpu().numpy() for k in means_.keys() if k in obs_plate_sites}
+                means = {k: np.concatenate([means[k], means_[k]], axis=obs_plate_dim) for k in means.keys()}
             i += 1
 
         # sample global parameters
@@ -263,11 +249,7 @@ class QuantileMixin:
             global_means = self.module.guide.median(*args, **kwargs)
         else:
             global_means = self.module.guide.quantiles([q], *args, **kwargs)
-        global_means = {
-            k: global_means[k].cpu().numpy()
-            for k in global_means.keys()
-            if k not in list(self.module.model.list_obs_plate_vars()["sites"].keys())
-        }
+        global_means = {k: global_means[k].cpu().numpy() for k in global_means.keys() if k not in obs_plate_sites}
 
         for k in global_means.keys():
             means[k] = global_means[k]
