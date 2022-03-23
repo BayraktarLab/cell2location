@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import pyro
 import torch
-from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_mean
 from scipy.sparse import issparse
 from scvi import _CONSTANTS
