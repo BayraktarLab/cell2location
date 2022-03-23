@@ -167,7 +167,9 @@ class QuantileMixin:
         return optim_param
 
     @torch.no_grad()
-    def _posterior_quantile_amortised(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def _posterior_quantile_minibatch(
+        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
         and global variables, which is necessary when performing amortised inference.
@@ -183,10 +185,12 @@ class QuantileMixin:
             number of observations per batch
         use_gpu
             Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
-        dictionary {variable_name: posterior median}
+        dictionary {variable_name: posterior quantile}
 
         """
 
@@ -206,35 +210,27 @@ class QuantileMixin:
             self.to_device(device)
 
             if i == 0:
-
-                means = self.module.guide.quantiles([q], *args, **kwargs)
-                means = {
-                    k: means[k].cpu().numpy()
-                    for k in means.keys()
-                    if k in self.module.model.list_obs_plate_vars()["sites"]
-                }
-
+                # find plate sites
+                obs_plate_sites = self._get_obs_plate_sites(args, kwargs, return_observed=True)
+                if len(obs_plate_sites) == 0:
+                    # if no local variables - don't sample
+                    break
                 # find plate dimension
-                trace = poutine.trace(self.module.model).get_trace(*args, **kwargs)
-                # print(trace.nodes[self.module.model.list_obs_plate_vars()['name']])
-                obs_plate = {
-                    name: site["cond_indep_stack"][0].dim
-                    for name, site in trace.nodes.items()
-                    if site["type"] == "sample"
-                    if any(f.name == self.module.model.list_obs_plate_vars()["name"] for f in site["cond_indep_stack"])
-                }
+                obs_plate_dim = list(obs_plate_sites.values())[0]
+                if use_median and q == 0.5:
+                    means = self.module.guide.median(*args, **kwargs)
+                else:
+                    means = self.module.guide.quantiles([q], *args, **kwargs)
+                means = {k: means[k].cpu().numpy() for k in means.keys() if k in obs_plate_sites}
 
             else:
+                if use_median and q == 0.5:
+                    means_ = self.module.guide.median(*args, **kwargs)
+                else:
+                    means_ = self.module.guide.quantiles([q], *args, **kwargs)
 
-                means_ = self.module.guide.quantiles([q], *args, **kwargs)
-                means_ = {
-                    k: means_[k].cpu().numpy()
-                    for k in means_.keys()
-                    if k in list(self.module.model.list_obs_plate_vars()["sites"].keys())
-                }
-                means = {
-                    k: np.concatenate([means[k], means_[k]], axis=list(obs_plate.values())[0]) for k in means.keys()
-                }
+                means_ = {k: means_[k].cpu().numpy() for k in means_.keys() if k in obs_plate_sites}
+                means = {k: np.concatenate([means[k], means_[k]], axis=obs_plate_dim) for k in means.keys()}
             i += 1
 
         # sample global parameters
@@ -244,12 +240,11 @@ class QuantileMixin:
         kwargs = {k: v.to(device) for k, v in kwargs.items()}
         self.to_device(device)
 
-        global_means = self.module.guide.quantiles([q], *args, **kwargs)
-        global_means = {
-            k: global_means[k].cpu().numpy()
-            for k in global_means.keys()
-            if k not in list(self.module.model.list_obs_plate_vars()["sites"].keys())
-        }
+        if use_median and q == 0.5:
+            global_means = self.module.guide.median(*args, **kwargs)
+        else:
+            global_means = self.module.guide.quantiles([q], *args, **kwargs)
+        global_means = {k: global_means[k].cpu().numpy() for k in global_means.keys() if k not in obs_plate_sites}
 
         for k in global_means.keys():
             means[k] = global_means[k]
@@ -259,26 +254,31 @@ class QuantileMixin:
         return means
 
     @torch.no_grad()
-    def _posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def _posterior_quantile(
+        self, q: float = 0.5, batch_size: int = None, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
 
         Parameters
         ----------
         q
-            quantile to compute
+            Quantile to compute
         use_gpu
             Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
-        dictionary {variable_name: posterior median}
+        dictionary {variable_name: posterior quantile}
 
         """
 
         self.module.eval()
         gpus, device = parse_use_gpu_arg(use_gpu)
-
+        if batch_size is None:
+            batch_size = self.adata.n_obs
         train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
@@ -287,30 +287,40 @@ class QuantileMixin:
         kwargs = {k: v.to(device) for k, v in kwargs.items()}
         self.to_device(device)
 
-        means = self.module.guide.quantiles([q], *args, **kwargs)
+        if use_median and q == 0.5:
+            means = self.module.guide.median(*args, **kwargs)
+        else:
+            means = self.module.guide.quantiles([q], *args, **kwargs)
         means = {k: means[k].cpu().detach().numpy() for k in means.keys()}
 
         return means
 
-    def posterior_quantile(self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None):
+    def posterior_quantile(
+        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+    ):
         """
         Compute median of the posterior distribution of each parameter.
 
         Parameters
         ----------
         q
-            quantile to compute
+            Quantile to compute
         use_gpu
+            Bool, use gpu?
+        use_median
+            Bool, when q=0.5 use median rather than quantile method of the guide
 
         Returns
         -------
 
         """
 
-        if self.module.is_amortised:
-            return self._posterior_quantile_amortised(q=q, batch_size=batch_size, use_gpu=use_gpu)
+        if batch_size is not None:
+            return self._posterior_quantile_minibatch(
+                q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median
+            )
         else:
-            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu)
+            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median)
 
 
 class PltExportMixin:
