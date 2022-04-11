@@ -13,7 +13,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 def test_cell2location():
     save_path = "./cell2location_model_test"
-    dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
+    dataset = synthetic_iid(n_labels=5)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
     # train regression model to get signatures of cell types
@@ -64,7 +64,7 @@ def test_cell2location():
     # test computing any quantile of the posterior distribution
     st_model.posterior_quantile(q=0.5)
     # test computing expected expression per cell type
-    st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata)
+    st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata_manager)
     ### test amortised inference with default cell2location model ###
     ##  full data  ##
     st_model = Cell2location(
