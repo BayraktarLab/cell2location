@@ -15,8 +15,8 @@ class Gamma(dist.Gamma):
         if alpha is not None and beta is not None:
             pass
         elif mu is not None and sigma is not None:
-            alpha = mu ** 2 / sigma ** 2
-            beta = mu / sigma ** 2
+            alpha = mu**2 / sigma**2
+            beta = mu / sigma**2
         else:
             raise ValueError("Define (mu and var) or (alpha and beta).")
 

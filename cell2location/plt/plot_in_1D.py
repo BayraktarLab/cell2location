@@ -172,12 +172,12 @@ def plot_density_1D(
         celltypesForPlot = np.repeat(celltypes, sum(subset))
         vcForPlot = np.array([adata_sp.obs[dimName].loc[subset] for j in range(len(celltypes))]).flatten()
         countsForPlot = np.array(
-            [abundances.iloc[:, j].loc[subset] / roi_area[subset] * 10 ** 6 for j in range(len(celltypes))]
+            [abundances.iloc[:, j].loc[subset] / roi_area[subset] * 10**6 for j in range(len(celltypes))]
         )
     else:
         celltypesForPlot = np.repeat(celltypes, np.shape(adata_sp)[0])
         vcForPlot = np.array([adata_sp.obs[dimName] for j in range(len(celltypes))]).flatten()
-        countsForPlot = np.array([abundances.iloc[:, j] / roi_area * 10 ** 6 for j in range(len(celltypes))])
+        countsForPlot = np.array([abundances.iloc[:, j] / roi_area * 10**6 for j in range(len(celltypes))])
 
     if type(colourCode) is dict:
         colourCode = pd.DataFrame(data=colourCode.values(), index=colourCode.keys(), columns=["Colours"])
