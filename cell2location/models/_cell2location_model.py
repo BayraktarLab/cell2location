@@ -4,12 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy
-import scvi
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.nn import PyroModule
-from scvi import _CONSTANTS
-from scvi.data._anndata import _setup_anndata, get_from_registry
+from scvi import REGISTRY_KEYS
+from scvi.data import AnnDataManager
+from scvi.data.fields import (
+    CategoricalJointObsField,
+    CategoricalObsField,
+    LayerField,
+    NumericalJointObsField,
+    NumericalObsField,
+)
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.utils import setup_anndata_dsp
 
@@ -57,15 +63,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if not np.all(adata.var_names == cell_state_df.index):
             raise ValueError("adata.var_names should match cell_state_df.index, find interecting variables/genes first")
 
-        # add index for each cell (provided to pyro plate for correct minibatching)
-        adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
-        scvi.data.register_tensor_from_anndata(
-            adata,
-            registry_key="ind_x",
-            adata_attr_name="obs",
-            adata_key_name="_indices",
-        )
-
         super().__init__(adata)
 
         if model_class is None:
@@ -78,8 +75,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if not detection_mean_per_sample:
             # compute expected change in sensitivity (m_g in V1 and y_s in V2)
             sc_total = cell_state_df.sum(0).mean()
-            sp_total = get_from_registry(self.adata, _CONSTANTS.X_KEY).sum(1)
-            batch = get_from_registry(self.adata, _CONSTANTS.BATCH_KEY).flatten()
+            sp_total = self.adata_manager.get_from_registry(_CONSTANTS.X_KEY).sum(1)
+            batch = self.adata_manager.get_from_registry(_CONSTANTS.BATCH_KEY).flatten()
             sp_total = np.array([sp_total[batch == b].mean() for b in range(self.summary_stats["n_batch"])])
             self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total
             if (self.detection_mean_.max() > 1.0) and (model_kwargs.get("use_detection_probability", False) is True):
@@ -90,8 +87,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         else:
             # compute expected change in sensitivity (m_g in V1 and y_s in V2)
             sc_total = cell_state_df.sum(0).mean()
-            sp_total = get_from_registry(self.adata, _CONSTANTS.X_KEY).sum(1)
-            batch = get_from_registry(self.adata, _CONSTANTS.BATCH_KEY).flatten()
+            sp_total = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY).sum(1)
+            batch = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY).flatten()
             sp_total = np.array([sp_total[batch == b].mean() for b in range(self.summary_stats["n_batch"])])
             self.detection_mean_ = (sp_total / model_kwargs.get("N_cells_per_location", 1)) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction
@@ -102,7 +99,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         detection_alpha = model_kwargs.get("detection_alpha", None)
         if detection_alpha is not None:
             if type(detection_alpha) is dict:
-                batch_mapping = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_batch"]["mapping"]
+                batch_mapping = self.adata_manager.get_state_registry(REGISTRY_KEYS.BATCH_KEY).categorical_mapping
                 self.detection_alpha_ = pd.Series(detection_alpha)[batch_mapping]
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
@@ -120,43 +117,42 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         self._model_summary_string = f'cell2location model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
         self.init_params_ = self._get_init_params(locals())
 
-    @staticmethod
+    @classmethod
     @setup_anndata_dsp.dedent
     def setup_anndata(
+        cls,
         adata: AnnData,
+        layer: Optional[str] = None,
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
-        layer: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
-        copy: bool = False,
-    ) -> Optional[AnnData]:
+        **kwargs,
+    ):
         """
         %(summary)s.
 
         Parameters
         ----------
-        %(param_adata)s
+        %(param_layer)s
         %(param_batch_key)s
         %(param_labels_key)s
-        %(param_layer)s
         %(param_cat_cov_keys)s
         %(param_cont_cov_keys)s
-        %(param_copy)s
-
-        Returns
-        -------
-        %(returns)s
         """
-        return _setup_anndata(
-            adata,
-            batch_key=batch_key,
-            labels_key=labels_key,
-            layer=layer,
-            categorical_covariate_keys=categorical_covariate_keys,
-            continuous_covariate_keys=continuous_covariate_keys,
-            copy=copy,
-        )
+        setup_method_args = cls._get_setup_method_args(**locals())
+        adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
+        anndata_fields = [
+            LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
+            CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
+            CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
+            CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
+            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
+            NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
+        ]
+        adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
+        adata_manager.register_fields(adata, **kwargs)
+        cls.register_manager(adata_manager)
 
     def train(
         self, max_epochs: int = 30000, batch_size: int = None, train_size: float = 1, lr: float = 0.002, **kwargs
@@ -258,7 +254,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         adata = self.adata
 
         # get batch key and the list of samples
-        batch_key = self.adata.uns["_scvi"]["categorical_mappings"]["_scvi_batch"]["original_key"]
+        batch_key = self.adata_manager.get_state_registry(REGISTRY_KEYS.BATCH_KEY).original_key
         samples = adata.obs[batch_key].unique()
 
         # figure out plot shape
@@ -270,7 +266,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         # compute total counts
         # find data slot
-        x_dict = self.adata.uns["_scvi"]["data_registry"]["X"]
+        x_dict = self.adata_manager.data_registry[REGISTRY_KEYS.X_KEY]
         if x_dict["attr_name"] == "X":
             use_raw = False
         else:
