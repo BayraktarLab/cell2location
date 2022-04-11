@@ -452,7 +452,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             2. np.array with location indices
         """
         if ind_x is None:
-            ind_x = np.arange(adata.n_obs).astype(int)
+            ind_x = np.arange(self.adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
 
