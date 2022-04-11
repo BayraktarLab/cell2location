@@ -5,7 +5,6 @@ import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
 from scvi import REGISTRY_KEYS
-from scvi.data._anndata import get_from_registry
 from scvi.nn import one_hot
 
 # class NegativeBinomial(TorchDistributionMixin, ScVINegativeBinomial):
@@ -360,16 +359,16 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
             mRNA = w_sf * (self.cell_state * m_g).sum(-1)
             pyro.deterministic("u_sf_mRNA_factors", mRNA)
 
-    def compute_expected(self, samples, adata, ind_x=None):
+    def compute_expected(self, samples, adata_manager, ind_x=None):
         r"""
         Compute expected expression of each gene in each location. Useful for evaluating how well
         the model learned expression pattern of all genes in the data.
         """
         if ind_x is None:
-            ind_x = np.arange(adata.n_obs).astype(int)
+            ind_x = np.arange(adata_manager.adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
-        obs2sample = get_from_registry(adata, REGISTRY_KEYS.BATCH_KEY)
+        obs2sample = adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
         mu = (
             np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"]
