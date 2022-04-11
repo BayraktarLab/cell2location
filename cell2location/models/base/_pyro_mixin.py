@@ -494,7 +494,7 @@ class PltExportMixin:
         self.expected_nb_param = self.module.model.compute_expected(
             self.samples[f"post_sample_{summary_name}"], self.adata, ind_x=ind_x
         )
-        x_data = get_from_registry(self.adata, REGISTRY_KEYS.X_KEY)[ind_x, :]
+        x_data = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY)[ind_x, :]
         if issparse(x_data):
             x_data = np.asarray(x_data.toarray())
         self.plot_posterior_mu_vs_data(self.expected_nb_param["mu"], x_data)
