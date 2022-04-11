@@ -39,6 +39,7 @@ def test_cell2location():
     inf_aver.columns = dataset.uns["mod"]["factor_names"]
 
     ### test default cell2location model ###
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     ##  full data  ##
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test full data training
