@@ -165,20 +165,17 @@ class Pymc3LocModel(Pymc3Model):
 
                 if column_ind is None:
                     column_ind = np.arange(step.shape[1])
-                p = (
-                    plot_factor_spatial(
-                        adata=adata,
-                        fact=step,
-                        cluster_names=step.columns,
-                        fact_ind=column_ind,
-                        n_columns=n_columns,
-                        sample_name=sample,
-                        figure_size=figure_size,
-                        point_size=point_size,
-                        text_size=text_size,
-                    )
-                    + ggtitle(step_name_r)
-                )
+                p = plot_factor_spatial(
+                    adata=adata,
+                    fact=step,
+                    cluster_names=step.columns,
+                    fact_ind=column_ind,
+                    n_columns=n_columns,
+                    sample_name=sample,
+                    figure_size=figure_size,
+                    point_size=point_size,
+                    text_size=text_size,
+                ) + ggtitle(step_name_r)
 
                 # create a directory for each initialisation
                 plot_init_dir = plot_dir + "/" + n_init + "/"

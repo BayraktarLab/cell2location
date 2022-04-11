@@ -13,7 +13,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 def test_cell2location():
     save_path = "./cell2location_model_test"
-    dataset = synthetic_iid(n_labels=5, run_setup_anndata=False)
+    dataset = synthetic_iid(n_labels=5)
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
     # train regression model to get signatures of cell types
@@ -39,6 +39,7 @@ def test_cell2location():
     inf_aver.columns = dataset.uns["mod"]["factor_names"]
 
     ### test default cell2location model ###
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     ##  full data  ##
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test full data training
@@ -47,6 +48,7 @@ def test_cell2location():
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
     ##  minibatches of locations  ##
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test minibatch training
     st_model.train(max_epochs=1, batch_size=50)
@@ -66,9 +68,10 @@ def test_cell2location():
     quant = st_model.posterior_quantile(q=0.5, batch_size=50, use_median=True)
     assert quant['w_sf'].shape == dataset.n_obs
     # test computing expected expression per cell type
-    st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata)
+    st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata_manager)
     ### test amortised inference with default cell2location model ###
     ##  full data  ##
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(
         dataset,
         cell_state_df=inf_aver,
@@ -97,6 +100,7 @@ def test_cell2location():
 
     ### test simplified cell2location models ###
     ##  no m_g  ##
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(
         dataset,
         cell_state_df=inf_aver,
@@ -110,6 +114,7 @@ def test_cell2location():
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
     ##  no w_sf factorisation  ##
+    Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(
         dataset,
         cell_state_df=inf_aver,
