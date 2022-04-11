@@ -491,7 +491,7 @@ class PltExportMixin:
             ind_x = None
 
         self.expected_nb_param = self.module.model.compute_expected(
-            self.samples[f"post_sample_{summary_name}"], self.adata, ind_x=ind_x
+            self.samples[f"post_sample_{summary_name}"], self.adata_manager, ind_x=ind_x
         )
         x_data = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY)[ind_x, :]
         if issparse(x_data):
