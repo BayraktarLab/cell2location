@@ -193,7 +193,7 @@ class QuantileMixin:
 
         self.module.eval()
 
-        train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
 
         # sample local parameters
         i = 0
@@ -278,7 +278,7 @@ class QuantileMixin:
         self.module.eval()
         gpus, device = parse_use_gpu_arg(use_gpu)
 
-        train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
         args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
