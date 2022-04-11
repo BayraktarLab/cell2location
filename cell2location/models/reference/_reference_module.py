@@ -7,7 +7,6 @@ import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
 from scvi import REGISTRY_KEYS
-from scvi.data._anndata import get_from_registry
 from scvi.nn import one_hot
 
 
@@ -306,7 +305,7 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
             indices of cells to use (to reduce data size)
         """
         if ind_x is None:
-            ind_x = np.arange(adata.n_obs).astype(int)
+            ind_x = np.arange(self.adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
         obs2sample = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
