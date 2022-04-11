@@ -16,7 +16,7 @@ def interpolate_coord(start=10, end=5, steps=100, accel_power=3, accelerate=True
     """
 
     seq = np.linspace(np.zeros_like(start), np.ones_like(end), steps)
-    seq = seq ** accel_power
+    seq = seq**accel_power
 
     if jitter is not None:
         seq = np.random.normal(loc=seq, scale=jitter * np.abs(seq))

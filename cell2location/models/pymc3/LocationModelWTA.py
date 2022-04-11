@@ -299,7 +299,7 @@ class LocationModelWTA(Pymc3LocModel):
                 "data_target",
                 mu=self.mu_biol,
                 alpha=tt.concatenate(
-                    [np.repeat(10 ** 10, self.n_npro).reshape(1, self.n_npro), 1 / (self.gene_E.T * self.gene_E.T)],
+                    [np.repeat(10**10, self.n_npro).reshape(1, self.n_npro), 1 / (self.gene_E.T * self.gene_E.T)],
                     axis=1,
                 ),
                 observed=tt.concatenate([self.y_data, self.x_data], axis=1),

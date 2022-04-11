@@ -10,8 +10,7 @@ import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_mean
 from scipy.sparse import issparse
-from scvi import _CONSTANTS
-from scvi.data._anndata import get_from_registry
+from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 
@@ -194,7 +193,7 @@ class QuantileMixin:
 
         self.module.eval()
 
-        train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
 
         # sample local parameters
         i = 0
@@ -279,7 +278,7 @@ class QuantileMixin:
         self.module.eval()
         gpus, device = parse_use_gpu_arg(use_gpu)
 
-        train_dl = AnnDataLoader(self.adata, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
         args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
@@ -492,9 +491,9 @@ class PltExportMixin:
             ind_x = None
 
         self.expected_nb_param = self.module.model.compute_expected(
-            self.samples[f"post_sample_{summary_name}"], self.adata, ind_x=ind_x
+            self.samples[f"post_sample_{summary_name}"], self.adata_manager, ind_x=ind_x
         )
-        x_data = get_from_registry(self.adata, _CONSTANTS.X_KEY)[ind_x, :]
+        x_data = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY)[ind_x, :]
         if issparse(x_data):
             x_data = np.asarray(x_data.toarray())
         self.plot_posterior_mu_vs_data(self.expected_nb_param["mu"], x_data)
