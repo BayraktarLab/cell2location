@@ -356,7 +356,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
             ind_x = np.arange(adata_manager.adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
-        obs2sample = adata_manager.get_from_registry(adata, REGISTRY_KEYS.BATCH_KEY)
+        obs2sample = adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
         mu = (
             np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) + np.dot(obs2sample, samples["s_g_gene_add"])

@@ -3,9 +3,9 @@ from typing import List, Optional
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from scvi import REGISTRY_KEYS
 from anndata import AnnData
 from pyro import clear_param_store
+from scvi import REGISTRY_KEYS
 from scvi.data import AnnDataManager
 from scvi.data.fields import (
     CategoricalJointObsField,
