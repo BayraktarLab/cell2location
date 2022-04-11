@@ -11,7 +11,6 @@ from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_mean
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
-from scvi.data._anndata import get_from_registry
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 
