@@ -31,7 +31,7 @@ dependencies:
   - cython >= 0.29.17
   - pip:
       - pyro-ppl>=1.7.0
-      - scvi-tools==0.15.0b0
+      - scvi-tools>=0.15.3
       - torch>=1.9.0
       - pymc3>=3.8,<3.10
       - arviz==0.10.0
