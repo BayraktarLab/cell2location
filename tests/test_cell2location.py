@@ -25,7 +25,7 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     dataset = sc_model.export_posterior(dataset, sample_kwargs={"num_samples": 10})
     # test exclusion of observed variables from posterior sampling
-    assert 'data_target' not in dataset.uns['mod']['post_sample_means'].keys()
+    assert "data_target" not in dataset.uns["mod"]["post_sample_means"].keys()
     # test plot_QC
     sc_model.plot_QC()
     # test save/load
@@ -50,7 +50,7 @@ def test_cell2location():
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
     # test exclusion of observed variables from posterior sampling
-    assert 'data_target' not in dataset.uns['mod']['post_sample_means'].keys()
+    assert "data_target" not in dataset.uns["mod"]["post_sample_means"].keys()
     ##  minibatches of locations  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
