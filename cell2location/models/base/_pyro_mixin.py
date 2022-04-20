@@ -513,7 +513,9 @@ class PltExportMixin:
         if getattr(self, "samples", False) is False:
             raise RuntimeError("self.samples is missing, please run self.export_posterior() first")
         if use_n_obs is not None:
-            ind_x = np.random.choice(self.adata.n_obs, np.min((use_n_obs, self.adata.n_obs)), replace=False)
+            ind_x = np.random.choice(
+                self.adata_manager.adata.n_obs, np.min((use_n_obs, self.adata.n_obs)), replace=False
+            )
         else:
             ind_x = None
 

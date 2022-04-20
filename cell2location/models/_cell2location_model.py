@@ -195,7 +195,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         kwargs["train_size"] = train_size
         kwargs["lr"] = lr
 
-        kwargs["plan_kwargs"] = kwargs["plan_kwargs"] if isinstance(kwargs["plan_kwargs"], dict) else dict()
+        if "plan_kwargs" not in kwargs.keys():
+            kwargs["plan_kwargs"] = dict()
         if getattr(self.module.model, "discrete_variables", None) and (len(self.module.model.discrete_variables) > 0):
             kwargs["plan_kwargs"]["loss_fn"] = TraceEnum_ELBO(num_particles=num_particles)
         else:
@@ -250,7 +251,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             Other keyword args for :class:`~scvi.train.Trainer`.
         """
         if max_epochs is None:
-            n_obs = self.adata.n_obs
+            n_obs = self.adata_manager.adata.n_obs
             max_epochs = np.min([round((20000 / n_obs) * 1000), 1000])
 
         plan_kwargs = plan_kwargs if isinstance(plan_kwargs, dict) else dict()
@@ -260,7 +261,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if batch_size is None:
             # use data splitter which moves data to GPU once
             data_splitter = DeviceBackedDataSplitter(
-                self.adata,
+                self.adata_manager,
                 train_size=train_size,
                 validation_size=validation_size,
                 batch_size=batch_size,
@@ -268,7 +269,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             )
         else:
             data_splitter = DataSplitter(
-                self.adata,
+                self.adata_manager,
                 train_size=train_size,
                 validation_size=validation_size,
                 batch_size=batch_size,
