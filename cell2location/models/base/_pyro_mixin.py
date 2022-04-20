@@ -637,8 +637,8 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
         self.invert_aggressive_selection = invert_aggressive_selection
 
         self.svi = pyro.infer.SVI(
-            model=self.pyro_model,
-            guide=self.pyro_guide,
+            model=pyro_module.model,
+            guide=pyro_module.guide,
             optim=self.optim,
             loss=self.loss_fn,
         )
