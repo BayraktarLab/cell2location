@@ -1,12 +1,12 @@
 ---
 name: Usage Question
-about: Ask how to solve your problem using cell2location.
+about: Template for posting a question to scverse Discourse.
 title: ''
 labels: question
 assignees: ''
 ---
 
-## Please use the outline below to post a question to https://discourse.scverse.org/c/ecosytem/cell2location/. 
+## Please use the template below to post a question to https://discourse.scverse.org/c/ecosytem/cell2location/. 
 
 ### Problem
 
