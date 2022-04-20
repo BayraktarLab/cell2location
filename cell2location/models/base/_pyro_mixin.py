@@ -719,53 +719,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
         return {"loss": loss}
 
 
-class PyroScaledTrainingPlan(PyroTrainingPlan):
-    """
-    Lightning module task to train Pyro scvi-tools modules.
-    Parameters
-    ----------
-    pyro_module
-        An instance of :class:`~scvi.module.base.PyroBaseModuleClass`. This object
-        should have callable `model` and `guide` attributes or methods.
-    loss_fn
-        A Pyro loss. Should be a subclass of :class:`~pyro.infer.ELBO`.
-        If `None`, defaults to :class:`~pyro.infer.Trace_ELBO`.
-    optim
-        A Pyro optimizer instance, e.g., :class:`~pyro.optim.Adam`. If `None`,
-        defaults to :class:`pyro.optim.Adam` optimizer with a learning rate of `1e-3`.
-    optim_kwargs
-        Keyword arguments for **default** optimiser :class:`pyro.optim.Adam`.
-    n_steps_kl_warmup
-        Number of training steps (minibatches) to scale weight on KL divergences from 0 to 1.
-        Only activated when `n_epochs_kl_warmup` is set to None.
-    n_epochs_kl_warmup
-        Number of epochs to scale weight on KL divergences from 0 to 1.
-        Overrides `n_steps_kl_warmup` when both are not `None`.
-    """
-
-    def __init__(
-        self,
-        scale_elbo: Union[float, None] = 1.0,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-
-        if scale_elbo != 1.0:
-            self.svi = pyro.infer.SVI(
-                model=poutine.scale(self.module.model, scale_elbo),
-                guide=poutine.scale(self.module.guide, scale_elbo),
-                optim=self.optim,
-                loss=self.loss_fn,
-            )
-        else:
-            self.svi = pyro.infer.SVI(
-                model=self.module.model,
-                guide=self.module.guide,
-                optim=self.optim,
-                loss=self.loss_fn,
-            )
-
-
 class PyroAggressiveTrainingPlan(PyroAggressiveTrainingPlan1):
     """
     Lightning module task to train Pyro scvi-tools modules.
