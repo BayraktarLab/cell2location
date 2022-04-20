@@ -98,6 +98,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
         init_alpha=20.0,
+        dropout_p=0.0,
     ):
 
         super().__init__()
@@ -117,6 +118,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior["mean"] = detection_mean
         detection_hyp_prior["alpha"] = detection_alpha
         self.detection_hyp_prior = detection_hyp_prior
+
+        self.dropout_p = dropout_p
+        if self.dropout_p is not None:
+            self.dropout = torch.nn.Dropout(p=self.dropout_p)
 
         if (init_vals is not None) & (type(init_vals) is dict):
             self.np_init_vals = init_vals
@@ -465,6 +470,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
             # =====================DATA likelihood ======================= #
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
+            if self.dropout_p != 0:
+                x_data = self.dropout(x_data)
             with obs_plate:
                 pyro.sample(
                     "data_target",
