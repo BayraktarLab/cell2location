@@ -645,7 +645,7 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
 
     def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
 
-        for k, v in self.pyro_guide.named_parameters():
+        for k, v in self.module.guide.named_parameters():
             k_in_vars = np.any([i in k for i in self.aggressive_vars])
             # hide variables on the list if they are not hidden
             if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
