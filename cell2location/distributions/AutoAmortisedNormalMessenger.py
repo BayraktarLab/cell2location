@@ -463,19 +463,19 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
 
         # E_{q(z|x)}log(q(z|x)) = -0.5*nz*log(2*\pi) - 0.5*(1+scale.loc()).sum(-1)
         neg_entropy = (
-            -nz * torch.log(pi * two) * (one / two) - ((scale ** two).log() + one).sum(-1) * (one / two)
+            -nz * torch.log(pi * two) * (one / two) - ((scale**two).log() + one).sum(-1) * (one / two)
         ).mean()
 
         # [1, x_batch, nz]
         loc, scale = loc.unsqueeze(0), scale.unsqueeze(0)
-        var = scale ** two
+        var = scale**two
 
         # (z_batch, x_batch, nz)
         dev = z_samples - loc
 
         # (z_batch, x_batch)
-        log_density = -((dev ** two) / var).sum(dim=-1) * (one / two) - (
-            nz * torch.log(pi * two) + (scale ** two).log().sum(-1)
+        log_density = -((dev**two) / var).sum(dim=-1) * (one / two) - (
+            nz * torch.log(pi * two) + (scale**two).log().sum(-1)
         ) * (one / two)
 
         # log q(z): aggregate posterior
