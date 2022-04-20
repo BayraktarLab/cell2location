@@ -88,3 +88,19 @@ See https://github.com/BayraktarLab/cell2location/discussions
 ## Future development and experimental features
 
 We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. Numpyro+JAX are being introduces into scvi-tools so follow updates on that.
+
+## Tips
+
+### Conda environment for A100 GPUs
+
+```bash
+export PYTHONNOUSERSITE="literallyanyletters"
+conda create -y -n test_scvi16_cuda113 python=3.9
+conda activate test_scvi16_cuda113
+conda install -y -c anaconda hdf5 pytables git
+pip install scvi-tools
+pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials]
+pip3 install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 -f https://download.pytorch.org/whl/torch_stable.html
+conda activate test_scvi16_cuda113
+python -m ipykernel install --user --name=test_scvi16_cuda113 --display-name='Environment (test_scvi16_cuda113)'
+```
