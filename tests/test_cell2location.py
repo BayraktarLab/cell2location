@@ -79,7 +79,7 @@ def test_cell2location():
             device = f"cuda:{use_gpu}"
         else:
             device = "cpu"
-        train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
+        train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
         for batch in train_dl:
             batch = {k: v.to(device) for k, v in batch.items()}
             args, kwargs = st_model.module._get_fn_args_from_batch(batch)
@@ -109,7 +109,7 @@ def test_cell2location():
             device = f"cuda:{use_gpu}"
         else:
             device = "cpu"
-        train_dl = AnnDataLoader(st_model.adata, shuffle=False, batch_size=50)
+        train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
         for batch in train_dl:
             batch = {k: v.to(device) for k, v in batch.items()}
             args, kwargs = st_model.module._get_fn_args_from_batch(batch)
