@@ -125,3 +125,19 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+
+    ### test new cell2location models ###
+    ##  detection probability rather than detection efficiency  ##
+    st_model = Cell2location(
+        dataset,
+        cell_state_df=inf_aver,
+        N_cells_per_location=30,
+        detection_alpha=200,
+        use_detection_probability=True,
+        detection_hyp_prior={"mean_alpha": 100.0},
+    )
+    # test full data training
+    st_model.train(max_epochs=1)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    # full data
+    dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})

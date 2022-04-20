@@ -82,6 +82,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         n_groups: int = 50,
         detection_mean=1 / 2,
         detection_alpha=200.0,
+        use_detection_probability: bool = False,
         m_g_gene_level_prior={"mean": 1, "mean_var_ratio": 1.0, "alpha_mean": 3.0},
         N_cells_per_location=8.0,
         A_factors_per_location=7.0,
@@ -116,6 +117,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior["mean"] = detection_mean
         detection_hyp_prior["alpha"] = detection_alpha
         self.detection_hyp_prior = detection_hyp_prior
+        self.use_detection_probability = use_detection_probability
 
         if (init_vals is not None) & (type(init_vals) is dict):
             self.np_init_vals = init_vals
@@ -325,27 +327,47 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 )  # (self.n_obs, self.n_factors)
 
         # =====================Location-specific detection efficiency ======================= #
-        # y_s with hierarchical mean prior
-        detection_mean_y_e = pyro.sample(
-            "detection_mean_y_e",
-            dist.Gamma(
-                self.ones * self.detection_mean_hyp_prior_alpha,
-                self.ones * self.detection_mean_hyp_prior_beta,
+        if not self.use_detection_probability:
+            # y_s with hierarchical mean prior
+            detection_mean_y_e = pyro.sample(
+                "detection_mean_y_e",
+                dist.Gamma(
+                    self.ones * self.detection_mean_hyp_prior_alpha,
+                    self.ones * self.detection_mean_hyp_prior_beta,
+                )
+                .expand([self.n_batch, 1])
+                .to_event(2),
             )
-            .expand([self.n_batch, 1])
-            .to_event(2),
-        )
-        detection_hyp_prior_alpha = pyro.deterministic(
-            "detection_hyp_prior_alpha",
-            self.ones_n_batch_1 * self.detection_hyp_prior_alpha,
-        )
+            detection_hyp_prior_alpha = pyro.deterministic(
+                "detection_hyp_prior_alpha",
+                self.ones_n_batch_1 * self.detection_hyp_prior_alpha,
+            )
 
-        beta = (obs2sample @ detection_hyp_prior_alpha) / (obs2sample @ detection_mean_y_e)
-        with obs_plate:
-            detection_y_s = pyro.sample(
-                "detection_y_s",
-                dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
-            )  # (self.n_obs, 1)
+            beta = (obs2sample @ detection_hyp_prior_alpha) / (obs2sample @ detection_mean_y_e)
+            with obs_plate:
+                detection_y_s = pyro.sample(
+                    "detection_y_s",
+                    dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
+                )  # (self.n_obs, 1)
+        else:
+            # y_s with hierarchical mean prior
+            detection_mean_y_e = pyro.sample(
+                "detection_mean_y_e",
+                dist.Beta(
+                    self.ones * self.detection_mean_hyp_prior_alpha,
+                    self.ones * self.detection_mean_hyp_prior_beta,
+                )
+                .expand([self.n_batch, 1])
+                .to_event(2),
+            )
+
+            alpha = (obs2sample @ detection_mean_y_e) * self.ones * self.detection_hyp_prior_alpha
+            beta = (obs2sample @ (self.ones - detection_mean_y_e)) * self.ones * self.detection_hyp_prior_alpha
+            with obs_plate:
+                detection_y_s = pyro.sample(
+                    "detection_y_s",
+                    dist.Beta(alpha, beta),
+                )  # (self.n_obs, 1)
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
