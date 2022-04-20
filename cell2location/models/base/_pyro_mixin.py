@@ -11,7 +11,7 @@ import pyro
 import pytorch_lightning as pl
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormalMessenger, init_to_feasible, init_to_mean
+from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
 from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
@@ -56,7 +56,7 @@ class AutoGuideMixinModule:
         init_loc_fn=init_to_mean(fallback=init_to_feasible),
         n_cat_list: list = [],
         encoder_instance=None,
-        guide_class=AutoNormalMessenger,
+        guide_class=AutoNormal,
         guide_kwargs: Optional[dict] = None,
     ):
 
@@ -66,12 +66,20 @@ class AutoGuideMixinModule:
         if not amortised:
             if getattr(model, "discrete_variables", None) is not None:
                 model = poutine.block(model, hide=model.discrete_variables)
-            _guide = guide_class(
-                model,
-                init_loc_fn=init_loc_fn,
-                **guide_kwargs
-                # create_plates=model.create_plates,
-            )
+            if issubclass(guide_class, poutine.messenger.Messenger):
+                # messenger guides don't need create_plates function
+                _guide = guide_class(
+                    model,
+                    init_loc_fn=init_loc_fn,
+                    **guide_kwargs,
+                )
+            else:
+                _guide = guide_class(
+                    model,
+                    init_loc_fn=init_loc_fn,
+                    **guide_kwargs,
+                    create_plates=model.create_plates,
+                )
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
             n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
