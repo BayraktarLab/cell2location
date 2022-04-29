@@ -14,9 +14,9 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
     labels
         Name of adata.obs column containing cluster labels
     use_raw
-        Use raw slow in adata?
+        Use raw slow in adata.
     layer
-        use layer in adata? provide layer name
+        Use layer in adata, provide layer name.
 
     Returns
     -------
@@ -55,9 +55,21 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
 
 def get_cluster_variances(adata, labels, use_raw=True, layer=None):
     """
-    :param adata_ref: AnnData object of reference single-cell dataset
-    :param cluster_col: Name of adata_ref.obs column containing cluster labels
-    :returns: pd.DataFrame of within cluster variance of each gene
+    Compute variance of each gene in each cluster
+    
+    Parameters
+    ----------
+    
+    labels
+        Name of adata.obs column containing cluster labels
+    use_raw
+        Use raw slow in adata.
+    layer
+        Use layer in adata, provide layer name.
+        
+    Returns
+    -------
+    pd.DataFrame of within cluster variance of each gene
     """
     if layer is not None:
         x = adata.layers[layer]
