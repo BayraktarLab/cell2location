@@ -78,7 +78,7 @@ class AutoGuideMixinModule:
                     model,
                     init_loc_fn=init_loc_fn,
                     **guide_kwargs,
-                    create_plates=model.create_plates,
+                    create_plates=self.model.create_plates,
                 )
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
