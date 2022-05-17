@@ -26,11 +26,9 @@ Overview of the spatial mapping approach and the workflow enabled by cell2locati
 
 ## Usage and Tutorials
 
-The tutorial covering the estimation of expresson signatures of reference cell types, spatial mapping with cell2location and the downstream analysis can be found here: https://cell2location.readthedocs.io/en/latest/
+The tutorial covering the estimation of expresson signatures of reference cell types, spatial mapping with cell2location and the downstream analysis can be found here and tried on [Google Colab](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb): https://cell2location.readthedocs.io/en/latest/
 
-You can also try cell2location on [Google Colab](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb) on a smaller data subset containing somatosensory cortex.
-
-Please report bugs via https://github.com/BayraktarLab/cell2location/issues and ask any usage questions in https://github.com/BayraktarLab/cell2location/discussions.
+Please report bugs via https://github.com/BayraktarLab/cell2location/issues and ask any usage questions about [cell2location](https://discourse.scverse.org/c/ecosytem/cell2location/42), [scvi-tools](https://discourse.scverse.org/c/help/scvi-tools/7) or [Visium data](https://discourse.scverse.org/c/general/visium/32) in scverse community discourse.
 
 Cell2location package is implemented in a general way (using https://pyro.ai/ and https://scvi-tools.org/) to support multiple related models - both for spatial mapping, estimating reference cell type signatures and downstream analysis.
 
@@ -63,10 +61,10 @@ bash Miniconda3-latest-Linux-x86_64.sh
 # use prefix /path/to/software/miniconda3
 ```
 
-Before installing cell2location and it's dependencies, it could be necessary to make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages, ideally by adding this line to your `~/.bashrc` file , but this would also work during a terminal session:
+Before installing cell2location and it's dependencies, it could be necessary to make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages by running this line before creating conda environment and every time before activatin conda environment in a new terminal session:
 
 ```bash
-export PYTHONNOUSERSITE="someletters"
+export PYTHONNOUSERSITE="literallyanyletters"
 ```
 
 
@@ -88,8 +86,7 @@ We also thank Krzysztof Polanski, Luz Garcia Alonso, Carlos Talavera-Lopez, Ni H
 See https://github.com/BayraktarLab/cell2location/discussions
 
 ## Future development and experimental features
-
-We also provide an experimental numpyro translation of the model which has improved memory efficiency (allowing analysis of multiple Visium samples on Google Colab) and minor improvements in speed - https://github.com/vitkl/cell2location_numpyro. You can try it on Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vitkl/cell2location_numpyro/blob/main/docs/notebooks/cell2location_short_demo_colab.ipynb) - however note that both numpyro itself and cell2location_numpyro are in very active development. Numpyro+JAX are being introduces into scvi-tools so follow updates on that.
+Future developments of cell2location are focused on 1) scalability to 100k-mln+ locations using amortised inference of cell abundance (same ideas as used in VAE), 2) extending cell2location to related spatial analysis tasks that require modification of the model (such as using cell type hierarchy information), and 3) incorporating features presented by more recently proposed methods (such as CAR spatial proximity modelling). We are also experimenting with Numpyro and JAX (https://github.com/vitkl/cell2location_numpyro).
 
 ## Tips
 
@@ -105,4 +102,12 @@ pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2locat
 pip3 install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 -f https://download.pytorch.org/whl/torch_stable.html
 conda activate test_scvi16_cuda113
 python -m ipykernel install --user --name=test_scvi16_cuda113 --display-name='Environment (test_scvi16_cuda113)'
+```
+
+### Issues with package version mismatches often originate from python user site rather than conda environment being used to install a subset of packages
+
+Before installing cell2location and it's dependencies, it could be necessary to make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages by running this line before creating conda environment and every time before activatin conda environment in a new terminal session:
+
+```bash
+export PYTHONNOUSERSITE="literallyanyletters"
 ```
