@@ -81,7 +81,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         cell_state_mat,
         n_groups: int = 50,
         detection_mean=1 / 2,
-        detection_alpha=200.0,
+        detection_alpha=20.0,
         m_g_gene_level_prior={"mean": 1, "mean_var_ratio": 1.0, "alpha_mean": 3.0},
         N_cells_per_location=8.0,
         A_factors_per_location=7.0,
