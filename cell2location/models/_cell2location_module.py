@@ -222,14 +222,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         return {
             "name": "obs_plate",
-            "input": [0, 2],  # expression data + (optional) batch index
+            "input": [
+                0,
+                # 2,
+            ],  # expression data + (optional) batch index
             "input_transform": [
                 torch.log1p,
-                lambda x: x,
+                # lambda x: x,
             ],  # how to transform input data before passing to NN
             "input_normalisation": [
                 False,
-                False,
+                # False,
             ],  # whether to normalise input data before passing to NN
             "sites": {
                 "n_s_cells_per_location": 1,
