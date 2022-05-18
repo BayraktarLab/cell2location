@@ -315,7 +315,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         hidden = self.encode(name, prior)
         try:
             bias_loc = deep_getattr(self.bias4locs, name)
-            if isinstance(self.multi_encoder_kwargs["n_out"], str):
+            if ("n_out" in self.multi_encoder_kwargs) and isinstance(self.multi_encoder_kwargs["n_out"], str):
                 loc = hidden[:, :, 0]
             else:
                 linear_loc = deep_getattr(self.hidden2locs, name)
@@ -323,7 +323,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             loc = loc + bias_loc
 
             bias_scale = deep_getattr(self.bias4scales, name)
-            if isinstance(self.multi_encoder_kwargs["n_out"], str):
+            if ("n_out" in self.multi_encoder_kwargs) and isinstance(self.multi_encoder_kwargs["n_out"], str):
                 scale = hidden[:, :, 1]
             else:
                 linear_scale = deep_getattr(self.hidden2scales, name)
@@ -334,7 +334,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 if self.weight_type == "element-wise":
                     # weight is element-wise
                     bias_weight = deep_getattr(self.bias4weights, name)
-                    if isinstance(self.multi_encoder_kwargs["n_out"], str):
+                    if ("n_out" in self.multi_encoder_kwargs) and isinstance(self.multi_encoder_kwargs["n_out"], str):
                         weight = hidden[:, :, 2]
                     else:
                         linear_weight = deep_getattr(self.hidden2weights, name)
@@ -363,7 +363,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             init_weight = torch.full((), self._init_weight)
             self._init_weight_unconstrained = self.softplus.inv(init_weight)
 
-        if not isinstance(self.multi_encoder_kwargs["n_out"], str):
+        if not (("n_out" in self.multi_encoder_kwargs) and isinstance(self.multi_encoder_kwargs["n_out"], str)):
             with torch.no_grad():
                 # determine the number of hidden layers
                 if "multiple" in self.encoder_mode:
@@ -391,7 +391,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 # weight is a single value parameter
                 deep_setattr(self, "weights." + name, PyroParam(init_weight, constraint=constraints.positive))
             if self.weight_type == "element-wise":
-                if not isinstance(self.multi_encoder_kwargs["n_out"], str):
+                if not (("n_out" in self.multi_encoder_kwargs) and isinstance(self.multi_encoder_kwargs["n_out"], str)):
                     # weight is element-wise
                     deep_setattr(
                         self, "hidden2weights." + name, PyroParam(init_param.clone().detach().requires_grad_(True))
