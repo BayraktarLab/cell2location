@@ -195,6 +195,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
 
         self.register_buffer("ones", torch.ones((1, 1)))
+        self.register_buffer("zeros", torch.zeros((1, 1)))
         self.register_buffer("five", torch.tensor(5.0))
         self.register_buffer("ten", torch.tensor(10.0))
         self.register_buffer("ones_1_n_groups", torch.ones((1, self.n_groups)))
@@ -470,24 +471,27 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
             else:
                 # sampling location-specific cell state signatures ====
-                cell_state_alpha = pyro.sample(
-                    "cell_state_alpha",
-                    dist.Exponential(self.five).expand([1, 1]).to_event(2),
-                )  # (1, 1)
-                cell_state_alpha = self.ones / cell_state_alpha.pow(2)
-                cell_state = dist.Gamma(cell_state_alpha, cell_state_alpha / self.cell_state).sample([w_sf.shape[0]])
+                cell_state_sigma = pyro.sample(
+                    "cell_state_sigma",
+                    dist.Exponential(self.ten * self.ten).expand([1, 1, 1]).to_event(2),
+                )  # (1, 1).squeeze()
+                cell_state = torch.exp(
+                    torch.log(self.cell_state.unsqueeze(-3))
+                    + dist.Normal(self.zeros, self.ones).sample([w_sf.shape[0], self.n_factors, self.n_vars]).squeeze()
+                    * cell_state_sigma
+                )
                 biol_mu = torch.einsum("sf,sfg->sg", w_sf, cell_state)
 
                 # sampling location-specific background counts ====
-                s_g_gene_add_alpha = pyro.sample(
-                    "s_g_gene_add_alpha",
-                    dist.Exponential(self.five).expand([self.n_batch, 1]).to_event(2),
+                s_g_gene_add_sigma = pyro.sample(
+                    "s_g_gene_add_sigma",
+                    dist.Exponential(self.ten * self.ten).expand([self.n_batch, 1]).to_event(2),
                 )  # (1, 1)
-                s_g_gene_add_alpha = (obs2sample @ (self.ones / s_g_gene_add_alpha.pow(2))).unsqueeze(-1)
-                s_g_gene_add = (
-                    dist.Gamma(s_g_gene_add_alpha, s_g_gene_add_alpha / s_g_gene_add.unsqueeze(-3))
-                    .sample([1])
-                    .squeeze(-4)
+                s_g_gene_add_sigma = (obs2sample @ s_g_gene_add_sigma).unsqueeze(-1)
+                s_g_gene_add = torch.exp(
+                    torch.log(s_g_gene_add.unsqueeze(-3))
+                    + dist.Normal(self.zeros, self.ones).sample([w_sf.shape[0], self.n_batch, self.n_vars]).squeeze()
+                    * s_g_gene_add_sigma
                 )
                 background_mu = torch.einsum("se,seg->sg", obs2sample, s_g_gene_add)
 
