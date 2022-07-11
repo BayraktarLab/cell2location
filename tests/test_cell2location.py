@@ -51,6 +51,10 @@ def test_cell2location():
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test full data training
     st_model.train(max_epochs=1, use_gpu=use_gpu)
+    # test full data training with residual factors
+    st_model.module.model.use_residual_factors = True
+    st_model.train(max_epochs=1, use_gpu=use_gpu)
+    st_model.module.model.use_residual_factors = False
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
