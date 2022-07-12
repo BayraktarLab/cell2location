@@ -90,6 +90,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         B_groups_per_location=7.0,
         N_cells_mean_var_ratio=1.0,
         A_residual_factors_per_location=3.0,
+        N_residual_cells_per_location=1.0,
         alpha_g_phi_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_alpha_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_mean_hyp_prior={
@@ -98,7 +99,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         },
         detection_hyp_prior={"mean_alpha": 10.0},
         factor_prior={
-            "rate": 1.0,
+            "rate": 0.10,
             "alpha": 1.0,
             "states_per_gene": 10.0,
         },
@@ -170,6 +171,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
         self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
         self.register_buffer("A_residual_factors_per_location", torch.tensor(A_residual_factors_per_location))
+        self.register_buffer("N_residual_cells_per_location", torch.tensor(N_residual_cells_per_location))
         self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
 
         self.register_buffer(
@@ -493,9 +495,16 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     k,
                     dist.Gamma(self.A_residual_factors_per_location, self.ones),
                 )
+                k = "n_s_residual_cells_per_location"
+                n_s_residual_cells_per_location = pyro.sample(
+                    k,
+                    dist.Gamma(self.N_residual_cells_per_location, self.ones),
+                )
             # location loadings
             shape = self.ones_1_n_residual_factors * b_s_residual_factors_per_location / self.n_residual_factors_tensor
-            rate = self.ones_1_n_residual_factors / (n_s_cells_per_location / b_s_residual_factors_per_location)
+            rate = self.ones_1_n_residual_factors / (
+                n_s_residual_cells_per_location / b_s_residual_factors_per_location
+            )
             with obs_plate as ind:
                 k = "w_sf_residual_factors"
                 w_sf_residual_factors = pyro.sample(
@@ -522,10 +531,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
             # expected expression
-            mu_biol = w_sf @ self.cell_state
+            mu_biol = (w_sf @ self.cell_state) * m_g
             if self.use_residual_factors:
                 mu_biol = mu_biol + w_sf_residual_factors @ g_fg_residual_factors
-            mu = (mu_biol * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
+            mu = (mu_biol + (obs2sample @ s_g_gene_add)) * detection_y_s
             alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
             # convert mean and overdispersion to total count and logits
             # total_count, logits = _convert_mean_disp_to_counts_logits(
