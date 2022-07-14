@@ -98,6 +98,7 @@ def run_colocation(
         "export_q05": False,
         "plot_histology": False,
         "top_n": 10,
+        "plot_cell_type_loadings_kwargs": dict(),
     }
 
     d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}}
@@ -346,7 +347,9 @@ def run_colocation(
         if not os.path.exists(fig_path):
             mkdir(fig_path)
         # plot co-occuring cell type combinations
-        mod.plot_cell_type_loadings()
+        mod.plot_cell_type_loadings(
+            **export_args["plot_cell_type_loadings_kwargs"],
+        )
 
         save_plot(fig_path, filename=f"n_fact{mod.n_fact}", extension=export_args["plot_extension"])
         if verbose:
