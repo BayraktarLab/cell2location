@@ -476,14 +476,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )  # (self.n_batch, n_vars)
 
         # =====================Gene-specific overdispersion ======================= #
-        alpha_g_phi_hyp = pyro.sample(
-            "alpha_g_phi_hyp",
-            dist.Gamma(self.ones * self.alpha_g_phi_hyp_prior_alpha, self.ones * self.alpha_g_phi_hyp_prior_beta),
-        )
-        alpha_g_inverse = pyro.sample(
-            "alpha_g_inverse",
-            dist.Exponential(alpha_g_phi_hyp).expand([self.n_batch, self.n_vars]).to_event(2),
-        )  # (self.n_batch, self.n_vars)
+        if not self.use_residual_factors:
+            alpha_g_phi_hyp = pyro.sample(
+                "alpha_g_phi_hyp",
+                dist.Gamma(self.ones * self.alpha_g_phi_hyp_prior_alpha, self.ones * self.alpha_g_phi_hyp_prior_beta),
+            )
+            alpha_g_inverse = pyro.sample(
+                "alpha_g_inverse",
+                dist.Exponential(alpha_g_phi_hyp).expand([self.n_batch, self.n_vars]).to_event(2),
+            )  # (self.n_batch, self.n_vars)
 
         # =======Residual cell abundances w_sf and loadings g_fg ======= #
         if self.use_residual_factors:
@@ -518,6 +519,16 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 .to_event(2),
                 obs=getattr(self, "fixed_val_g_fg_residual_factors", None),
             )
+
+            # Gene-specific overdispersion
+            alpha_g_phi_hyp = pyro.sample(
+                "alpha_residual_g_phi_hyp",
+                dist.Gamma(self.ones * self.alpha_g_phi_hyp_prior_alpha, self.ones * self.alpha_g_phi_hyp_prior_beta),
+            )
+            alpha_g_inverse = pyro.sample(
+                "alpha_residual_g_inverse",
+                dist.Exponential(alpha_g_phi_hyp).expand([self.n_batch, self.n_vars]).to_event(2),
+            )  # (self.n_batch, self.n_vars)
 
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
