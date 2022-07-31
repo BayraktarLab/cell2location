@@ -83,7 +83,9 @@ class AutoGuideMixinModule:
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
             n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
-            if isinstance(data_transform, np.ndarray):
+            if data_transform is None:
+                pass
+            elif isinstance(data_transform, np.ndarray):
                 # add extra info about gene clusters as input to NN
                 self.register_buffer("gene_clusters", torch.tensor(data_transform.astype("float32")))
                 n_in = model.n_vars + data_transform.shape[1]
@@ -115,7 +117,10 @@ class AutoGuideMixinModule:
             amortised_vars = model.list_obs_plate_vars()
             if len(amortised_vars["input"]) >= 2:
                 encoder_kwargs["n_cat_list"] = n_cat_list
-            amortised_vars["input_transform"][0] = data_transform
+            if data_transform is not None:
+                amortised_vars["input_transform"][0] = data_transform
+            if "n_in" in amortised_vars.keys():
+                n_in = amortised_vars["n_in"]
             if getattr(model, "discrete_variables", None) is not None:
                 model = poutine.block(model, hide=model.discrete_variables)
             _guide = AutoAmortisedHierarchicalNormalMessenger(
@@ -180,7 +185,13 @@ class QuantileMixin:
 
     @torch.no_grad()
     def _posterior_quantile_minibatch(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+        self,
+        q: float = 0.5,
+        batch_size: int = 2048,
+        use_gpu: bool = None,
+        use_median: bool = False,
+        exclude_vars: list = None,
+        data_loader_indices=None,
     ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
@@ -210,7 +221,7 @@ class QuantileMixin:
 
         self.module.eval()
 
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
 
         # sample local parameters
         i = 0
@@ -233,7 +244,11 @@ class QuantileMixin:
                     means = self.module.guide.median(*args, **kwargs)
                 else:
                     means = self.module.guide.quantiles([q], *args, **kwargs)
-                means = {k: means[k].cpu().numpy() for k in means.keys() if k in obs_plate_sites}
+                means = {
+                    k: means[k].cpu().numpy()
+                    for k in means.keys()
+                    if (k in obs_plate_sites) and (k not in exclude_vars)
+                }
 
             else:
                 if use_median and q == 0.5:
@@ -241,7 +256,11 @@ class QuantileMixin:
                 else:
                     means_ = self.module.guide.quantiles([q], *args, **kwargs)
 
-                means_ = {k: means_[k].cpu().numpy() for k in means_.keys() if k in obs_plate_sites}
+                means_ = {
+                    k: means_[k].cpu().numpy()
+                    for k in means_.keys()
+                    if (k in obs_plate_sites) and (k not in exclude_vars)
+                }
                 means = {k: np.concatenate([means[k], means_[k]], axis=obs_plate_dim) for k in means.keys()}
             i += 1
 
@@ -256,7 +275,11 @@ class QuantileMixin:
             global_means = self.module.guide.median(*args, **kwargs)
         else:
             global_means = self.module.guide.quantiles([q], *args, **kwargs)
-        global_means = {k: global_means[k].cpu().numpy() for k in global_means.keys() if k not in obs_plate_sites}
+        global_means = {
+            k: global_means[k].cpu().numpy()
+            for k in global_means.keys()
+            if (k not in obs_plate_sites) and (k not in exclude_vars)
+        }
 
         for k in global_means.keys():
             means[k] = global_means[k]
@@ -267,7 +290,13 @@ class QuantileMixin:
 
     @torch.no_grad()
     def _posterior_quantile(
-        self, q: float = 0.5, batch_size: int = None, use_gpu: bool = None, use_median: bool = False
+        self,
+        q: float = 0.5,
+        batch_size: int = None,
+        use_gpu: bool = None,
+        use_median: bool = False,
+        exclude_vars: list = None,
+        data_loader_indices=None,
     ):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
@@ -291,7 +320,7 @@ class QuantileMixin:
         gpus, device = parse_use_gpu_arg(use_gpu)
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
         args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
@@ -303,12 +332,18 @@ class QuantileMixin:
             means = self.module.guide.median(*args, **kwargs)
         else:
             means = self.module.guide.quantiles([q], *args, **kwargs)
-        means = {k: means[k].cpu().detach().numpy() for k in means.keys()}
+        means = {k: means[k].cpu().detach().numpy() for k in means.keys() if k not in exclude_vars}
 
         return means
 
     def posterior_quantile(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+        self,
+        q: float = 0.5,
+        batch_size: int = 2048,
+        use_gpu: bool = None,
+        use_median: bool = False,
+        exclude_vars: list = None,
+        data_loader_indices=None,
     ):
         """
         Compute median of the posterior distribution of each parameter.
@@ -326,13 +361,27 @@ class QuantileMixin:
         -------
 
         """
+        if exclude_vars is None:
+            exclude_vars = []
 
         if batch_size is not None:
             return self._posterior_quantile_minibatch(
-                q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median
+                q=q,
+                batch_size=batch_size,
+                use_gpu=use_gpu,
+                use_median=use_median,
+                exclude_vars=exclude_vars,
+                data_loader_indices=data_loader_indices,
             )
         else:
-            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median)
+            return self._posterior_quantile(
+                q=q,
+                batch_size=batch_size,
+                use_gpu=use_gpu,
+                use_median=use_median,
+                exclude_vars=exclude_vars,
+                data_loader_indices=data_loader_indices,
+            )
 
 
 class PltExportMixin:
