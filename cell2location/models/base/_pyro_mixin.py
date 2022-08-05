@@ -692,6 +692,10 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
 
         self.aggressive_vars = aggressive_vars
         self.invert_aggressive_selection = invert_aggressive_selection
+        # keep frozen variables as frozen
+        self.requires_grad_false_vars = [k for k, v in self.module.guide.named_parameters() if not v.requires_grad] + [
+            k for k, v in self.module.model.named_parameters() if not v.requires_grad
+        ]
 
         self.svi = pyro.infer.SVI(
             model=pyro_module.model,
@@ -703,24 +707,47 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
     def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
 
         for k, v in self.module.guide.named_parameters():
-            k_in_vars = np.any([i in k for i in self.aggressive_vars])
-            # hide variables on the list if they are not hidden
-            if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
-                v.requires_grad = False
-            # expose variables on the list if they are hidden
-            if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
-                v.requires_grad = True
+            if not np.any([i in k for i in self.requires_grad_false_vars]):
+                k_in_vars = np.any([i in k for i in self.aggressive_vars])
+                # hide variables on the list if they are not hidden
+                if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables on the list if they are hidden
+                if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
+                    v.requires_grad = True
 
-            # hide variables not on the list if they are not hidden
-            if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
-                v.requires_grad = False
-            # expose variables not on the list if they are hidden
-            if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
-                v.requires_grad = True
+                # hide variables not on the list if they are not hidden
+                if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables not on the list if they are hidden
+                if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
+                    v.requires_grad = True
+
+        for k, v in self.module.model.named_parameters():
+            if not np.any([i in k for i in self.requires_grad_false_vars]):
+                k_in_vars = np.any([i in k for i in self.aggressive_vars])
+                # hide variables on the list if they are not hidden
+                if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables on the list if they are hidden
+                if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
+                    v.requires_grad = True
+
+                # hide variables not on the list if they are not hidden
+                if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables not on the list if they are hidden
+                if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
+                    v.requires_grad = True
 
     def training_epoch_end(self, outputs):
 
         self.aggressive_epochs_counter += 1
+
+        self.change_requires_grad(
+            aggressive_vars_status="expose",
+            non_aggressive_vars_status="expose",
+        )
 
         elbo = 0
         n = 0
