@@ -67,9 +67,8 @@ def plot_absolute_abundances_1D(
         adata_sp = subset_anndata(adata_sp, celltype_subset, dimName)
 
     celltypes = [
-        x.split("mean_spot_factors")[-1] for x in adata_sp.obs.columns if len(x.split("mean_spot_factors")) == 2
-    ]
-    abundances = adata_sp.obs.loc[:, [len(x.split("mean_spot_factors")) == 2 for x in adata_sp.obs.columns]]
+        x.split("meanscell_abundance_w_sf_")[-1] for x in adata_sp.obsm['means_cell_abundance_w_sf'].columns]
+    abundances = adata_sp.obsm['means_cell_abundance_w_sf']
 
     if roi_subset:
         celltypesForPlot = np.repeat(celltypes, sum(roi_subset))
@@ -84,7 +83,7 @@ def plot_absolute_abundances_1D(
         colourCode = pd.DataFrame(data=colourCode.values(), index=colourCode.keys(), columns=["Colours"])
     else:
         colourCode = pd.DataFrame(data="black", index=celltypes, columns=["Colours"])
-
+    
     coloursForPlot = np.array(colourCode.loc[np.array(celltypesForPlot), "Colours"])
 
     plt.figure(figsize=(figureSize))
@@ -120,7 +119,6 @@ def plot_absolute_abundances_1D(
 
     if saving:
         plt.savefig(saving)
-
 
 def plot_density_1D(
     adata_sp,
