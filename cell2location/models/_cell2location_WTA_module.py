@@ -191,9 +191,9 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
 
         self.register_buffer("n_factors_tensor", torch.tensor(self.n_factors))
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
-        
-        self.register_buffer("neg_probe_alpha", 10**6*torch.ones((self.n_obs, self.n_neg_probes)))
-        self.register_buffer("one", torch.tensor(1.))
+
+        self.register_buffer("neg_probe_alpha", 10**6 * torch.ones((self.n_obs, self.n_neg_probes)))
+        self.register_buffer("one", torch.tensor(1.0))
         self.register_buffer("ones", torch.ones((1, 1)))
         self.register_buffer("ones_1_n_groups", torch.ones((1, self.n_groups)))
         self.register_buffer("ones_n_batch_1", torch.ones((self.n_batch, 1)))
@@ -204,8 +204,8 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
         batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
-        neg_data = tensor_dict['neg_probes']
-        n_nuclei = tensor_dict['nuclei']
+        neg_data = tensor_dict["neg_probes"]
+        n_nuclei = tensor_dict["nuclei"]
         return (x_data, neg_data, n_nuclei, ind_x, batch_index), {}
 
     def create_plates(self, x_data, neg_data, n_nuclei, idx, batch_index):
@@ -250,18 +250,21 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         obs2sample = one_hot(batch_index, self.n_batch)
 
         obs_plate = self.create_plates(x_data, neg_data, n_nuclei, idx, batch_index)
-        
+
         # ============================ Negative Probe Binding ===================== #
         # Negative probe counts scale linearly with the total number of counts in a region of interest.
         # The linear slope is drawn from a gamma distribution. Mean and variance are inferred from the data
         # and are the same for the non-specific binding term for gene probes further below.
-        total_counts_r = torch.sum(x_data, axis = 1).unsqueeze(-1)
-        b_n_hyper_1 = pyro.sample('b_n_hyper_1', dist.Gamma(self.one/0.33, self.one))
-        b_n_hyper_2 = pyro.sample('b_n_hyper_2', dist.Gamma(self.one, self.one))
-        b_n = pyro.sample('b_n', dist.Gamma((b_n_hyper_1/b_n_hyper_2)**2,
-                                             b_n_hyper_1/b_n_hyper_2**2 
-                                           ).expand([self.n_batch, self.n_neg_probes]).to_event(2))
-        y_rn = torch.einsum('ij, jk -> ik', obs2sample, b_n) * total_counts_r
+        total_counts_r = torch.sum(x_data, axis=1).unsqueeze(-1)
+        b_n_hyper_1 = pyro.sample("b_n_hyper_1", dist.Gamma(self.one / 0.33, self.one))
+        b_n_hyper_2 = pyro.sample("b_n_hyper_2", dist.Gamma(self.one, self.one))
+        b_n = pyro.sample(
+            "b_n",
+            dist.Gamma((b_n_hyper_1 / b_n_hyper_2) ** 2, b_n_hyper_1 / b_n_hyper_2**2)
+            .expand([self.n_batch, self.n_neg_probes])
+            .to_event(2),
+        )
+        y_rn = torch.einsum("ij, jk -> ik", obs2sample, b_n) * total_counts_r
 
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
@@ -280,7 +283,7 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
             dist.Exponential(self.m_g_alpha_hyp_mean).expand([1, 1]).to_event(2),
         )  # (1, 1)
         m_g_alpha_e = self.ones / m_g_alpha_e_inv.pow(2)
-        
+
         # global effect on each gene:
         m_g = pyro.sample(
             "m_g",
@@ -288,9 +291,11 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         )  # (1, n_vars)
 
         # independent experiment-specific effect on each gene (narrow prior around 1)
-        m_ge = pyro.sample('m_ge', dist.Gamma(self.one*100, self.one*100).expand([self.n_batch, self.n_vars]).to_event(2))
+        m_ge = pyro.sample(
+            "m_ge", dist.Gamma(self.one * 100, self.one * 100).expand([self.n_batch, self.n_vars]).to_event(2)
+        )
         # experiment specific capture efficiency (wide prior around 1)
-        m_e = pyro.sample('m_e', dist.Gamma(self.slide_alpha, self.slide_alpha).expand([self.n_batch, 1]).to_event(2))
+        m_e = pyro.sample("m_e", dist.Gamma(self.slide_alpha, self.slide_alpha).expand([self.n_batch, 1]).to_event(2))
 
         # =====================Cell abundances w_sf======================= #
         # factorisation prior on w_sf models similarity in locations
@@ -444,9 +449,12 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
         # cell state signatures (e.g. background, free-floating RNA)
-        s_g_gene_add = pyro.sample('s_g_gene_add', dist.Gamma((b_n_hyper_1/b_n_hyper_2)**2,
-                                     b_n_hyper_1/b_n_hyper_2**2 
-                                   ).expand([self.n_batch, self.n_vars]).to_event(2))
+        s_g_gene_add = pyro.sample(
+            "s_g_gene_add",
+            dist.Gamma((b_n_hyper_1 / b_n_hyper_2) ** 2, b_n_hyper_1 / b_n_hyper_2**2)
+            .expand([self.n_batch, self.n_vars])
+            .to_event(2),
+        )
 
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
@@ -461,12 +469,13 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
             # expected expression
-            mu_biol = ((w_sf @ self.cell_state) * m_g \
-                       * (obs2sample @ m_e) * (obs2sample @ m_ge) \
-                       + (obs2sample @ s_g_gene_add)*total_counts_r) * detection_y_s
-            mu = torch.concat([y_rn, mu_biol], axis = 1)
+            mu_biol = (
+                (w_sf @ self.cell_state) * m_g * (obs2sample @ m_e) * (obs2sample @ m_ge)
+                + (obs2sample @ s_g_gene_add) * total_counts_r
+            ) * detection_y_s
+            mu = torch.concat([y_rn, mu_biol], axis=1)
             alpha_biol = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
-            alpha = torch.concat([self.neg_probe_alpha, alpha_biol], axis = 1)
+            alpha = torch.concat([self.neg_probe_alpha, alpha_biol], axis=1)
 
             # =====================DATA likelihood ======================= #
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
@@ -476,8 +485,9 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
                 pyro.sample(
                     "data_target",
                     dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                    obs=torch.concat([neg_data, x_data], axis = 1))
-        
+                    obs=torch.concat([neg_data, x_data], axis=1),
+                )
+
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
             mRNA = w_sf * (self.cell_state * m_g).sum(-1)
