@@ -9,6 +9,7 @@ from .reference import RegressionModel
 __all__ = [
     "Cell2location",
     "RegressionModel",
+    "Cell2location_WTA",
     "LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel",
     "CoLocatedGroupsSklearnNMF",
 ]
