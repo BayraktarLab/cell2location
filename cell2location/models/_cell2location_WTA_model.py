@@ -16,7 +16,7 @@ from scvi.data.fields import (
     LayerField,
     NumericalJointObsField,
     NumericalObsField,
-    ObsmField
+    ObsmField,
 )
 from scvi.dataloaders import DataSplitter, DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
@@ -117,7 +117,7 @@ class Cell2location_WTA(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltEx
             n_obs=self.summary_stats["n_cells"],
             n_vars=self.summary_stats["n_vars"],
             n_factors=self.n_factors_,
-            n_neg_probes = self.summary_stats["n_neg_probes"],
+            n_neg_probes=self.summary_stats["n_neg_probes"],
             n_batch=self.summary_stats["n_batch"],
             cell_state_mat=self.cell_state_df_.values.astype("float32"),
             **model_kwargs,
@@ -160,11 +160,11 @@ class Cell2location_WTA(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltEx
             NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
             NumericalObsField("nuclei", nuclei_key),
-            ObsmField("neg_probes", neg_probes_key)
+            ObsmField("neg_probes", neg_probes_key),
         ]
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
-        adata_manager.summary_stats['n_neg_probes'] = adata.obsm[neg_probes_key].shape[0]
+        adata_manager.summary_stats["n_neg_probes"] = adata.obsm[neg_probes_key].shape[0]
         cls.register_manager(adata_manager)
 
     def train(
