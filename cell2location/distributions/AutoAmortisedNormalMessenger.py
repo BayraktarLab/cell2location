@@ -219,7 +219,20 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             in_names = self.amortised_plate_sites["input"]
             x_in = [kwargs[i] if i in kwargs.keys() else args[i] for i in in_names]
             # apply data transform before passing to NN
-            in_transforms = self.amortised_plate_sites["input_transform"]
+            site_transform = self.amortised_plate_sites.get("site_transform", None)
+            if site_transform is not None and name in site_transform.keys():
+                # when input data transform and input dimensions differ between variables
+                in_transforms = site_transform[name]["input_transform"]
+                single_n_in = site_transform[name]["n_in"]
+                multiple_n_in = site_transform[name]["n_in"]
+                if ("single" in self.encoder_mode) and ("multiple" in self.encoder_mode):
+                    # if single network precedes multiple networks
+                    multiple_n_in = self.multiple_n_in
+            else:
+                in_transforms = self.amortised_plate_sites["input_transform"]
+                single_n_in = self.single_n_in
+                multiple_n_in = self.multiple_n_in
+
             x_in = [in_transforms[i](x) for i, x in enumerate(x_in)]
             # apply learnable normalisation before passing to NN:
             input_normalisation = self.amortised_plate_sites.get("input_normalisation", None)
@@ -250,7 +263,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                     deep_setattr(
                         self,
                         f"input_normalisation_{i}",
-                        PyroParam(torch.ones((1, self.single_n_in)).to(prior.mean.device).requires_grad_(True)),
+                        PyroParam(torch.ones((1, single_n_in)).to(prior.mean.device).requires_grad_(True)),
                     )
         # create encoder neural networks
         if "single" in self.encoder_mode:
@@ -265,7 +278,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self,
                     "one_encoder",
-                    self.encoder_class(n_in=self.single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs).to(
+                    self.encoder_class(n_in=single_n_in, n_out=self.n_hidden["single"], **self.encoder_kwargs).to(
                         prior.mean.device
                     ),
                 )
@@ -294,7 +307,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 deep_setattr(
                     self,
                     "multiple_encoders." + name,
-                    self.encoder_class(n_in=self.multiple_n_in, n_out=n_hidden, **multi_encoder_kwargs).to(
+                    self.encoder_class(n_in=multiple_n_in, n_out=n_hidden, **multi_encoder_kwargs).to(
                         prior.mean.device
                     ),
                 )
