@@ -162,8 +162,10 @@ def read_and_qc(sample_name, file, path=sp_data_folder):
                           + '_' + adata.obs_names
     adata.obs.index.name = 'spot_id'
     
+    file = list(adata.uns['spatial'].keys())[0]
     adata.uns['spatial'][sample_name] = adata.uns['spatial'][file].copy()
     del adata.uns['spatial'][file]
+    print(adata.uns['spatial'].keys())
     
     return adata
 
