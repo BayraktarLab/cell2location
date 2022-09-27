@@ -111,3 +111,115 @@ Before installing cell2location and it's dependencies, it could be necessary to 
 ```bash
 export PYTHONNOUSERSITE="literallyanyletters"
 ```
+
+### Useful code for reading and combining multiple Visium sections
+
+Keeping info on distinct sections in a csv file (Google Sheet).
+
+```python
+sample_annot = pd.read_csv('./sample_annot.csv')
+
+from glob import glob
+sample_annot['path'] = pd.Series(
+    glob(f'{sp_data_folder}*'),
+    index=[sub('^.+WTSI_', '', sub('_GRCh38-2020-A$', '', i)) for i in glob(f'{sp_data_folder}*')]
+)[sample_annot['Sample_ID']].values
+import os
+sample_annot['file'] = [os.path.basename(i) for i in sample_annot['path']]
+
+sample_annot['Sample_ID'].unique()
+```
+
+Reading and concatenating samples.
+
+```python
+def read_and_qc(sample_name, file, path=sp_data_folder):
+    """
+    Read one Visium file and add minimum metadata and QC metrics to adata.obs
+    NOTE: var_names is ENSEMBL ID as it should be, you can always plot with sc.pl.scatter(gene_symbols='SYMBOL')
+    """
+    
+    adata = sc.read_visium(path + str(file) +'/',
+                           count_file='filtered_feature_bc_matrix.h5',
+                           load_images=True)
+    adata.obs['sample'] = sample_name
+    adata.var['SYMBOL'] = adata.var_names
+    adata.var.rename(columns={'gene_ids': 'ENSEMBL'}, inplace=True)
+    adata.var_names = adata.var['ENSEMBL']
+    adata.var.drop(columns='ENSEMBL', inplace=True)
+    
+    # just in case there are non-unique ENSEMBL IDs
+    adata.var_names_make_unique()
+
+    # Calculate QC metrics
+    sc.pp.calculate_qc_metrics(adata, inplace=True)
+    adata.var['mt'] = [gene.startswith('mt-') for gene in adata.var['SYMBOL']]
+    adata.obs['mt_frac'] = adata[:, adata.var['mt'].tolist()].X.sum(1).A.squeeze()/adata.obs['total_counts']
+    
+    # add sample name to obs names
+    adata.obs["sample"] = [str(i) for i in adata.obs['sample']]
+    adata.obs_names = 's' + adata.obs["sample"] \
+                          + '_' + adata.obs_names
+    adata.obs.index.name = 'spot_id'
+    
+    file = list(adata.uns['spatial'].keys())[0]
+    adata.uns['spatial'][sample_name] = adata.uns['spatial'][file].copy()
+    del adata.uns['spatial'][file]
+    print(adata.uns['spatial'].keys())
+    
+    return adata
+
+def read_all_and_qc(
+    sample_annot, Sample_ID_col, file_col, sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+):
+    """
+    Read and concatenate all Visium files.
+    """
+    # read first sample
+    adata = read_and_qc(
+        sample_annot[Sample_ID_col][0], sample_annot[file_col][0], 
+        path=sp_data_folder
+    ) 
+
+    # read the remaining samples
+    slides = {}
+    for i, s in enumerate(sample_annot[Sample_ID_col][1:]):
+        adata_1 = read_and_qc(s, sample_annot[file_col][i], path=sp_data_folder) 
+        slides[str(s)] = adata_1
+
+    adata_0 = adata.copy()
+
+    # combine individual samples
+    #adata = adata.concatenate(list(slides.values()), index_unique=None)
+    adata = adata.concatenate(
+        list(slides.values()),
+        batch_key="sample",
+        uns_merge="unique",
+        batch_categories=sample_annot[Sample_ID_col], 
+        index_unique=None
+    )
+
+    sample_annot.index = sample_annot[Sample_ID_col]
+    for c in sample_annot.columns:
+        sample_annot.loc[:, c] = sample_annot[c].astype(str)
+    adata.obs[sample_annot.columns] = sample_annot.reindex(index=adata.obs['sample']).values
+    
+    return adata
+    
+adata = read_all_and_qc(
+    sample_annot=sample_annot, 
+    Sample_ID_col='Sample_ID', 
+    file_col='file', 
+    sp_data_folder=sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+)
+
+adata_incl_nontissue = read_all_and_qc(
+    sample_annot=sample_annot, 
+    Sample_ID_col='Sample_ID', 
+    file_col='file', 
+    sp_data_folder=sp_data_folder, 
+    count_file='raw_feature_bc_matrix.h5',
+)
+```
