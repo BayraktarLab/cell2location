@@ -206,7 +206,7 @@ class QuantileMixin:
 
         """
 
-        gpus, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_use_gpu_arg(use_gpu)
 
         self.module.eval()
 
@@ -288,7 +288,7 @@ class QuantileMixin:
         """
 
         self.module.eval()
-        gpus, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_use_gpu_arg(use_gpu)
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
         train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
