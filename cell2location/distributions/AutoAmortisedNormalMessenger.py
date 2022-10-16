@@ -1,7 +1,6 @@
 from copy import deepcopy
 from typing import Callable, Optional, Union
 
-import numpy as np
 import pyro.distributions as dist
 import torch
 from pyro.distributions.distribution import Distribution
@@ -121,6 +120,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         encoder_instance: torch.nn.Module = None,
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         hierarchical_sites: Optional[list] = None,
+        bias=True,
     ):
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
@@ -130,6 +130,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         self._hierarchical_sites = hierarchical_sites
         self.amortised_plate_sites = amortised_plate_sites
         self.encoder_mode = encoder_mode
+        self.bias = bias
         self._computing_median = False
         self._computing_quantiles = False
         self._quantile_values = None
@@ -322,17 +323,14 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         hidden = self.encode(name, prior)
         try:
             linear_loc = deep_getattr(self.hidden2locs, name)
-            bias_loc = deep_getattr(self.bias4locs, name)
-            loc = hidden @ linear_loc + bias_loc
+            loc = linear_loc(hidden)
             linear_scale = deep_getattr(self.hidden2scales, name)
-            bias_scale = deep_getattr(self.bias4scales, name)
-            scale = self.softplus((hidden @ linear_scale) + bias_scale - self._init_scale_unconstrained)
+            scale = self.softplus(linear_scale(hidden) + self._init_scale_unconstrained)
             if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
                 if self.weight_type == "element-wise":
                     # weight is element-wise
                     linear_weight = deep_getattr(self.hidden2weights, name)
-                    bias_weight = deep_getattr(self.bias4weights, name)
-                    weight = self.softplus((hidden @ linear_weight) + bias_weight - self._init_weight_unconstrained)
+                    weight = self.softplus(linear_weight(hidden) + self._init_weight_unconstrained)
                 if self.weight_type == "scalar":
                     # weight is a single value parameter
                     weight = deep_getattr(self.weights, name)
@@ -358,23 +356,19 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             elif "single" in self.encoder_mode:
                 n_hidden = self.n_hidden["single"]
             # determine parameter dimensions
-            param_dim = (n_hidden, self.amortised_plate_sites["sites"][name])
-            bias_dim = (1, self.amortised_plate_sites["sites"][name])
-            # generate initial value for linear parameters
-            init_param = torch.normal(
-                torch.full(size=param_dim, fill_value=0.0, device=prior.mean.device),
-                torch.full(
-                    size=param_dim, fill_value=(1 * self.init_param_scale) / np.sqrt(n_hidden), device=prior.mean.device
-                ),
-            )
-        deep_setattr(self, "hidden2locs." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
-        deep_setattr(self, "hidden2scales." + name, PyroParam(init_param.clone().detach().requires_grad_(True)))
+            out_dim = self.amortised_plate_sites["sites"][name]
+
         deep_setattr(
-            self, "bias4locs." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device))
+            self,
+            "hidden2locs." + name,
+            PyroModule[torch.nn.Linear](n_hidden, out_dim, bias=self.bias, device=prior.mean.device),
         )
         deep_setattr(
-            self, "bias4scales." + name, PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device))
+            self,
+            "hidden2scales." + name,
+            PyroModule[torch.nn.Linear](n_hidden, out_dim, bias=self.bias, device=prior.mean.device),
         )
+
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
             if self.weight_type == "scalar":
                 # weight is a single value parameter
@@ -382,12 +376,9 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
             if self.weight_type == "element-wise":
                 # weight is element-wise
                 deep_setattr(
-                    self, "hidden2weights." + name, PyroParam(init_param.clone().detach().requires_grad_(True))
-                )
-                deep_setattr(
                     self,
-                    "bias4weights." + name,
-                    PyroParam(torch.full(size=bias_dim, fill_value=0.0, device=prior.mean.device)),
+                    "hidden2weights." + name,
+                    PyroModule[torch.nn.Linear](n_hidden, out_dim, bias=self.bias, device=prior.mean.device),
                 )
         return self._get_params(name, prior)
 
