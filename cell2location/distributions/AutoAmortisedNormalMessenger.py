@@ -121,6 +121,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         hierarchical_sites: Optional[list] = None,
         bias=True,
+        use_posterior_lsw_encoders=True,
     ):
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
@@ -131,6 +132,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         self.amortised_plate_sites = amortised_plate_sites
         self.encoder_mode = encoder_mode
         self.bias = bias
+        self.use_posterior_lsw_encoders = use_posterior_lsw_encoders
         self._computing_median = False
         self._computing_quantiles = False
         self._quantile_values = None
@@ -323,14 +325,39 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         hidden = self.encode(name, prior)
         try:
             linear_loc = deep_getattr(self.hidden2locs, name)
-            loc = linear_loc(hidden)
             linear_scale = deep_getattr(self.hidden2scales, name)
-            scale = self.softplus(linear_scale(hidden) + self._init_scale_unconstrained)
+            if not self.use_posterior_lsw_encoders:
+                loc = linear_loc(hidden)
+                scale = self.softplus(linear_scale(hidden) + self._init_scale_unconstrained)
+            else:
+                args, kwargs = self.args_kwargs  # stored as a tuple of (tuple, dict)
+                # get the data for NN from
+                in_names = self.amortised_plate_sites["input"]
+                x_in = [kwargs[i] if i in kwargs.keys() else args[i] for i in in_names]
+                x_in[0] = hidden
+                # apply data transform before passing to NN
+                site_transform = self.amortised_plate_sites.get("site_transform", None)
+                if site_transform is not None and name in site_transform.keys():
+                    # when input data transform and input dimensions differ between variables
+                    in_transforms = site_transform[name]["input_transform"]
+                else:
+                    in_transforms = self.amortised_plate_sites["input_transform"]
+                x_in = [in_transforms[i](x) if i != 0 else x for i, x in enumerate(x_in)]
+                linear_loc_encoder = deep_getattr(self.hidden2locs, f"{name}.encoder")
+                linear_scale_encoder = deep_getattr(self.hidden2scales, f"{name}.encoder")
+                loc = linear_loc(linear_loc_encoder(*x_in))
+                scale = self.softplus(linear_scale(linear_scale_encoder(*x_in)) + self._init_scale_unconstrained)
             if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
                 if self.weight_type == "element-wise":
                     # weight is element-wise
                     linear_weight = deep_getattr(self.hidden2weights, name)
-                    weight = self.softplus(linear_weight(hidden) + self._init_weight_unconstrained)
+                    if not self.use_posterior_lsw_encoders:
+                        linear_weight_encoder = deep_getattr(self.hidden2weights, f"{name}.encoder")
+                        weight = self.softplus(
+                            linear_weight(linear_weight_encoder(hidden)) + self._init_weight_unconstrained
+                        )
+                    else:
+                        weight = self.softplus(linear_weight(hidden) + self._init_weight_unconstrained)
                 if self.weight_type == "scalar":
                     # weight is a single value parameter
                     weight = deep_getattr(self.weights, name)
@@ -380,6 +407,57 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                     "hidden2weights." + name,
                     PyroModule[torch.nn.Linear](n_hidden, out_dim, bias=self.bias, device=prior.mean.device),
                 )
+
+        if self.use_posterior_lsw_encoders:
+            # determine the number of hidden layers
+            if name in self.n_hidden.keys():
+                n_hidden = self.n_hidden[name]
+            else:
+                n_hidden = self.n_hidden["multiple"]
+            multi_encoder_kwargs = deepcopy(self.multi_encoder_kwargs)
+            multi_encoder_kwargs["n_hidden"] = n_hidden
+
+            # create multiple encoders
+            if self.encoder_instance is not None:
+                # copy instances
+                encoder_ = deepcopy(self.encoder_instance).to(prior.mean.device)
+                # convert to pyro module
+                to_pyro_module_(encoder_)
+                deep_setattr(
+                    self,
+                    f"hidden2locs.{name}.encoder",
+                    encoder_,
+                )
+                deep_setattr(
+                    self,
+                    f"hidden2scales.{name}.encoder",
+                    encoder_,
+                )
+                if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
+                    deep_setattr(
+                        self,
+                        f"hidden2weights.{name}.encoder",
+                        encoder_,
+                    )
+            else:
+                # create instances
+                deep_setattr(
+                    self,
+                    f"hidden2locs.{name}.encoder",
+                    self.encoder_class(n_in=n_hidden, n_out=n_hidden, **multi_encoder_kwargs).to(prior.mean.device),
+                )
+                deep_setattr(
+                    self,
+                    f"hidden2scales.{name}.encoder",
+                    self.encoder_class(n_in=n_hidden, n_out=n_hidden, **multi_encoder_kwargs).to(prior.mean.device),
+                )
+                if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
+                    deep_setattr(
+                        self,
+                        f"hidden2weights.{name}.encoder",
+                        self.encoder_class(n_in=n_hidden, n_out=n_hidden, **multi_encoder_kwargs).to(prior.mean.device),
+                    )
+
         return self._get_params(name, prior)
 
     def median(self, *args, **kwargs):
