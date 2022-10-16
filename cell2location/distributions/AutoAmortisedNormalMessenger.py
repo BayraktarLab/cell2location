@@ -121,7 +121,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         hierarchical_sites: Optional[list] = None,
         bias=True,
-        use_posterior_lsw_encoders=True,
+        use_posterior_lsw_encoders=False,
     ):
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
@@ -352,12 +352,12 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                     # weight is element-wise
                     linear_weight = deep_getattr(self.hidden2weights, name)
                     if not self.use_posterior_lsw_encoders:
+                        weight = self.softplus(linear_weight(hidden) + self._init_weight_unconstrained)
+                    else:
                         linear_weight_encoder = deep_getattr(self.hidden2weights, f"{name}.encoder")
                         weight = self.softplus(
                             linear_weight(linear_weight_encoder(hidden)) + self._init_weight_unconstrained
                         )
-                    else:
-                        weight = self.softplus(linear_weight(hidden) + self._init_weight_unconstrained)
                 if self.weight_type == "scalar":
                     # weight is a single value parameter
                     weight = deep_getattr(self.weights, name)
