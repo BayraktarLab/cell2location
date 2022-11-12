@@ -6,6 +6,7 @@ import torch
 from pyro.distributions.distribution import Distribution
 from pyro.distributions.transforms import SoftplusTransform
 from pyro.infer.autoguide import AutoHierarchicalNormalMessenger
+from pyro.infer.autoguide.initialization import init_to_feasible, init_to_mean
 from pyro.infer.autoguide.utils import (
     deep_getattr,
     deep_setattr,
@@ -114,6 +115,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         init_param_scale: float = 1 / 50,
         init_scale: float = 0.1,
         init_weight: float = 1.0,
+        init_loc_fn: Callable = init_to_mean(fallback=init_to_feasible),
         encoder_class=FCLayersPyro,
         encoder_kwargs=None,
         multi_encoder_kwargs=None,
@@ -125,7 +127,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
     ):
         if not isinstance(init_scale, float) or not (init_scale > 0):
             raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
-        super().__init__(model)
+        super().__init__(model, init_loc_fn=init_loc_fn)
         self._init_scale = init_scale
         self._init_weight = init_weight
         self._hierarchical_sites = hierarchical_sites
@@ -189,7 +191,7 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         # If hierarchical_sites not specified all sites are assumed to be hierarchical
         if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
             loc, scale, weight = self._get_params(name, prior)
-            loc = loc + transform.inv(prior.mean) * weight
+            loc = loc + transform.inv(prior.mean) * weight  # - torch.tensor(3.0, device=prior.mean.device)
             posterior = dist.TransformedDistribution(
                 dist.Normal(loc, scale).to_event(transform.domain.event_dim),
                 transform.with_cache(),
