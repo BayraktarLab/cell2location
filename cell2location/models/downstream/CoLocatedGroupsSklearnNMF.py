@@ -226,17 +226,21 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
                 align=align,
             )
 
-    def plot_cell_type_loadings(self):
+    def plot_cell_type_loadings(self, selected_cell_types=None, **kwargs):
+
+        if selected_cell_types is None:
+            selected_cell_types = self.var_names_read
 
         self.plot_gene_loadings(
-            self.var_names_read,
-            self.var_names_read,
+            sel_var_names=selected_cell_types,
+            var_names=self.var_names_read,
             fact_filt=self.fact_filt,
             loadings_attr="cell_type_fractions",
             gene_fact_name="cell_type_fractions",
             fun_type="dotplot",
             cmap="RdPu",
             figsize=[5 + 0.12 * self.n_fact, 5 + 0.1 * self.n_var],
+            **kwargs
         )
 
     def sample_posterior(

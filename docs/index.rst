@@ -8,7 +8,7 @@ Welcome to cell2location's documentation!
 
 For installation instructions see: https://github.com/BayraktarLab/cell2location#Installation
 
-For FAQ and to ask any questions please use GitHub Discussions: https://github.com/BayraktarLab/cell2location/discussions
+For FAQ and to ask any questions please use scverse discourse: on cell2location https://discourse.scverse.org/c/ecosytem/cell2location/42, on scvi-tools https://discourse.scverse.org/c/help/scvi-tools/7 or in Visium data https://discourse.scverse.org/c/general/visium/32.
 
 For reporting bugs or other issues with cell2location please use GitHub Issues: https://github.com/BayraktarLab/cell2location/issues
 

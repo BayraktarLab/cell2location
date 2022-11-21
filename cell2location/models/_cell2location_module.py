@@ -81,7 +81,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         cell_state_mat,
         n_groups: int = 50,
         detection_mean=1 / 2,
-        detection_alpha=200.0,
+        detection_alpha=20.0,
         m_g_gene_level_prior={"mean": 1, "mean_var_ratio": 1.0, "alpha_mean": 3.0},
         N_cells_per_location=8.0,
         A_factors_per_location=7.0,
@@ -96,7 +96,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior={"mean_alpha": 10.0},
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
-        init_alpha=3.0,
+        init_alpha=20.0,
+        dropout_p=0.0,
     ):
 
         super().__init__()
@@ -116,6 +117,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior["mean"] = detection_mean
         detection_hyp_prior["alpha"] = detection_alpha
         self.detection_hyp_prior = detection_hyp_prior
+
+        self.dropout_p = dropout_p
+        if self.dropout_p is not None:
+            self.dropout = torch.nn.Dropout(p=self.dropout_p)
 
         if (init_vals is not None) & (type(init_vals) is dict):
             self.np_init_vals = init_vals
@@ -222,6 +227,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 torch.log1p,
                 lambda x: x,
             ],  # how to transform input data before passing to NN
+            "input_normalisation": [
+                False,
+                False,
+            ],  # whether to normalise input data before passing to NN
             "sites": {
                 "n_s_cells_per_location": 1,
                 "b_s_groups_per_location": 1,
@@ -263,28 +272,74 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Cell abundances w_sf======================= #
         # factorisation prior on w_sf models similarity in locations
         # across cell types f and reflects the absolute scale of w_sf
-        with obs_plate:
+        with obs_plate as ind:
+            k = "n_s_cells_per_location"
             n_s_cells_per_location = pyro.sample(
-                "n_s_cells_per_location",
+                k,
                 dist.Gamma(
                     self.N_cells_per_location * self.N_cells_mean_var_ratio,
                     self.N_cells_mean_var_ratio,
                 ),
             )
+            if (
+                self.training_wo_observed
+                and not self.training_wo_initial
+                and getattr(self, f"init_val_{k}", None) is not None
+            ):
+                # pre-training Variational distribution to initial values
+                pyro.sample(
+                    k + "_initial",
+                    dist.Gamma(
+                        self.init_alpha_tt,
+                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                    ),
+                    obs=n_s_cells_per_location,
+                )  # (self.n_obs, self.n_groups)
 
+            k = "b_s_groups_per_location"
             b_s_groups_per_location = pyro.sample(
-                "b_s_groups_per_location",
+                k,
                 dist.Gamma(self.B_groups_per_location, self.ones),
             )
+            if (
+                self.training_wo_observed
+                and not self.training_wo_initial
+                and getattr(self, f"init_val_{k}", None) is not None
+            ):
+                # pre-training Variational distribution to initial values
+                pyro.sample(
+                    k + "_initial",
+                    dist.Gamma(
+                        self.init_alpha_tt,
+                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                    ),
+                    obs=b_s_groups_per_location,
+                )  # (self.n_obs, self.n_groups)
 
         # cell group loadings
         shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
         rate = self.ones_1_n_groups / (n_s_cells_per_location / b_s_groups_per_location)
-        with obs_plate:
+        with obs_plate as ind:
+            k = "z_sr_groups_factors"
             z_sr_groups_factors = pyro.sample(
-                "z_sr_groups_factors",
+                k,
                 dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
             )  # (n_obs, n_groups)
+
+            if (
+                self.training_wo_observed
+                and not self.training_wo_initial
+                and getattr(self, f"init_val_{k}", None) is not None
+            ):
+                # pre-training Variational distribution to initial values
+                pyro.sample(
+                    k + "_initial",
+                    dist.Gamma(
+                        self.init_alpha_tt,
+                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                    ),
+                    obs=z_sr_groups_factors,
+                )  # (self.n_obs, self.n_groups)
 
         k_r_factors_per_groups = pyro.sample(
             "k_r_factors_per_groups",
@@ -302,26 +357,26 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             w_sf_mu = z_sr_groups_factors @ x_fr_group2fact
 
             k = "w_sf"
+            w_sf = pyro.sample(
+                k,
+                dist.Gamma(
+                    w_sf_mu * self.w_sf_mean_var_ratio_tensor,
+                    self.w_sf_mean_var_ratio_tensor,
+                ),
+            )  # (self.n_obs, self.n_factors)
             if (
                 self.training_wo_observed
                 and not self.training_wo_initial
                 and getattr(self, f"init_val_{k}", None) is not None
             ):
                 # pre-training Variational distribution to initial values
-                w_sf = pyro.sample(
-                    k,
+                pyro.sample(
+                    k + "_initial",
                     dist.Gamma(
                         self.init_alpha_tt,
                         self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
                     ),
-                )  # (self.n_obs, self.n_factors)
-            else:
-                w_sf = pyro.sample(
-                    "w_sf",
-                    dist.Gamma(
-                        w_sf_mu * self.w_sf_mean_var_ratio_tensor,
-                        self.w_sf_mean_var_ratio_tensor,
-                    ),
+                    obs=w_sf,
                 )  # (self.n_obs, self.n_factors)
 
         # =====================Location-specific detection efficiency ======================= #
@@ -342,17 +397,33 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         beta = (obs2sample @ detection_hyp_prior_alpha) / (obs2sample @ detection_mean_y_e)
         with obs_plate:
+            k = "detection_y_s"
             detection_y_s = pyro.sample(
-                "detection_y_s",
+                k,
                 dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
             )  # (self.n_obs, 1)
+
+            if (
+                self.training_wo_observed
+                and not self.training_wo_initial
+                and getattr(self, f"init_val_{k}", None) is not None
+            ):
+                # pre-training Variational distribution to initial values
+                pyro.sample(
+                    k + "_initial",
+                    dist.Gamma(
+                        self.init_alpha_tt,
+                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                    ),
+                    obs=detection_y_s,
+                )  # (self.n_obs, 1)
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
         # cell state signatures (e.g. background, free-floating RNA)
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
+            dist.Gamma(self.ones * self.gene_add_alpha_hyp_prior_alpha, self.ones * self.gene_add_alpha_hyp_prior_beta),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -379,7 +450,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
+            dist.Gamma(self.ones * self.alpha_g_phi_hyp_prior_alpha, self.ones * self.alpha_g_phi_hyp_prior_beta),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
@@ -398,6 +469,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
             # =====================DATA likelihood ======================= #
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
+            if self.dropout_p != 0:
+                x_data = self.dropout(x_data)
             with obs_plate:
                 pyro.sample(
                     "data_target",

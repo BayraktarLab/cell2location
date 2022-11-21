@@ -1,10 +1,12 @@
 ---
 name: Usage Question
-about: Ask how to solve your problem using cell2location.
+about: Template for posting a question to scverse Discourse.
 title: ''
 labels: question
 assignees: ''
 ---
+
+## Please use the template below to post a question to https://discourse.scverse.org/c/ecosytem/cell2location/. 
 
 ### Problem
 
@@ -14,7 +16,7 @@ assignees: ''
 - [ ] I follow the instructions from the [cell2location tutorial (using on scvi-tools)](https://cell2location.readthedocs.io/en/latest/notebooks/cell2location_tutorial.html).
 - [ ] I have adjusted required hyperparameters to my dataset and tissue `N_cells_per_location` and `detection_alpha`.
 - [ ] I have provided 10X reaction/inlet as `batch_key` for reference NB regression.
-- [ ] I have checked [Cell2location Community Forum](https://github.com/BayraktarLab/cell2location/discussions), [scvi-tools forum](https://discourse.scvi-tools.org/) and did not find a solution
+- [ ] I have checked [scverse Discourse](https://discourse.scverse.org/c/ecosytem/cell2location/) and [old Cell2location Community Forum](https://github.com/BayraktarLab/cell2location/discussions), and did not find a solution.
 
 
 ### Description of the data input and hyperparameters
