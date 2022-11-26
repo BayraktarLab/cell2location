@@ -246,9 +246,9 @@ class LocationModelWTAMultiExperimentHierarchicalGeneLevel(PyroModule):
         }
 
     def forward(self, x_data, neg_data, n_nuclei, idx, batch_index):
-        
+
         self.n_neg_probes = neg_data.shape[1]
-        
+
         obs2sample = one_hot(batch_index, self.n_batch)
 
         obs_plate = self.create_plates(x_data, neg_data, n_nuclei, idx, batch_index)
