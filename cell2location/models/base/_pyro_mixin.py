@@ -1,7 +1,9 @@
+import functools
+import gc
 import logging
 from datetime import date
 from functools import partial
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -11,14 +13,21 @@ import pyro
 import pytorch_lightning as pl
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
+from pyro.infer.autoguide import (
+    AutoNormal,
+    init_to_feasible,
+    init_to_mean,
+    init_to_median,
+)
+from pyro.infer.autoguide.initialization import _is_multivariate
+from pyro.util import torch_isnan
 from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 from scvi.module.base import PyroBaseModuleClass
-from scvi.train import PyroTrainingPlan
+from scvi.train import PyroTrainingPlan as PyroTrainingPlan_scvi
 
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
@@ -27,13 +36,56 @@ from ...distributions.AutoAmortisedNormalMessenger import (
 logger = logging.getLogger(__name__)
 
 
+def init_to_median_scaled(
+    site=None,
+    num_samples=15,
+    scaling_factor=1.0,
+    *,
+    fallback: Optional[Callable] = init_to_feasible,
+):
+    """
+    Initialize to the prior median; fallback to ``fallback`` (defaults to
+    :func:`init_to_feasible`) if mean is undefined.
+
+    :param callable fallback: Fallback init strategy, for sites not specified
+        in ``values``.
+    :raises ValueError: If ``fallback=None`` and no value for a site is given
+        in ``values``.
+    """
+    if site is None:
+        return functools.partial(init_to_median, num_samples=num_samples, fallback=fallback)
+
+    # The median undefined for multivariate distributions.
+    if _is_multivariate(site["fn"]):
+        return init_to_feasible(site)
+
+    try:
+        # Try to compute empirical mean.
+        samples = site["fn"].sample(sample_shape=(num_samples,))
+        value = samples.median(dim=0)[0]
+        if torch_isnan(value):
+            raise ValueError
+        if hasattr(site["fn"], "_validate_sample"):
+            site["fn"]._validate_sample(value)
+        value._pyro_custom_init = False
+        if scaling_factor is None:
+            scaling_factor = np.sqrt(np.prod(value.shape))
+        scaling_factor = torch.tensor(scaling_factor, device=value.device)
+        return value / scaling_factor
+    except (RuntimeError, ValueError):
+        pass
+    if fallback is not None:
+        return fallback(site)
+    raise ValueError(f"No init strategy specified for site {repr(site['name'])}")
+
+
 def init_to_value(site=None, values={}):
     if site is None:
         return partial(init_to_value, values=values)
     if site["name"] in values:
         return values[site["name"]]
     else:
-        return init_to_mean(site, fallback=init_to_feasible)
+        return init_to_median(site, num_samples=501, fallback=init_to_mean)
 
 
 class AutoGuideMixinModule:
@@ -131,6 +183,7 @@ class AutoGuideMixinModule:
                 encoder_kwargs=encoder_kwargs,
                 encoder_mode=encoder_mode,
                 encoder_instance=encoder_instance,
+                init_loc_fn=init_loc_fn,
                 **guide_kwargs,
             )
         return _guide
@@ -336,15 +389,7 @@ class QuantileMixin:
 
         return means
 
-    def posterior_quantile(
-        self,
-        q: float = 0.5,
-        batch_size: int = 2048,
-        use_gpu: bool = None,
-        use_median: bool = False,
-        exclude_vars: list = None,
-        data_loader_indices=None,
-    ):
+    def posterior_quantile(self, exclude_vars: list = None, batch_size: int = None, **kwargs):
         """
         Compute median of the posterior distribution of each parameter.
 
@@ -363,25 +408,13 @@ class QuantileMixin:
         """
         if exclude_vars is None:
             exclude_vars = []
+        if kwargs is None:
+            kwargs = dict()
 
         if batch_size is not None:
-            return self._posterior_quantile_minibatch(
-                q=q,
-                batch_size=batch_size,
-                use_gpu=use_gpu,
-                use_median=use_median,
-                exclude_vars=exclude_vars,
-                data_loader_indices=data_loader_indices,
-            )
+            return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
         else:
-            return self._posterior_quantile(
-                q=q,
-                batch_size=batch_size,
-                use_gpu=use_gpu,
-                use_median=use_median,
-                exclude_vars=exclude_vars,
-                data_loader_indices=data_loader_indices,
-            )
+            return self._posterior_quantile(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
 
 
 class PltExportMixin:
@@ -604,30 +637,45 @@ class PyroAggressiveConvergence(Callback):
         Compute aggressive training convergence criteria for amortised inference.
         """
         pyro_guide = pl_module.module.guide
-        if self.dataloader is None:
-            dl = trainer.datamodule.train_dataloader()
-        else:
-            dl = self.dataloader
-        for tensors in dl:
-            tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
-            args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
-            break
-        mi_ = pyro_guide.mutual_information(*args, **kwargs)
-        mi_ = np.array([v for v in mi_.values()]).sum()
-        pl_module.log("MI", mi_, prog_bar=True)
-        if len(pl_module.mi) > 1:
-            if pl_module.mi[-1] >= (mi_ - self.tolerance):
-                pl_module.n_epochs_patience += 1
-        else:
-            pl_module.n_epochs_patience = 0
-        if pl_module.n_epochs_patience > self.patience:
-            # stop aggressive training by setting epoch counter to max epochs
-            # pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
-            logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
-        pl_module.mi.append(mi_)
+        if hasattr(pyro_guide, "mutual_information"):
+            if self.dataloader is None:
+                dl = trainer.datamodule.train_dataloader()
+            else:
+                dl = self.dataloader
+            for tensors in dl:
+                tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
+                args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
+                break
+            mi_ = pyro_guide.mutual_information(*args, **kwargs)
+            mi_ = np.array([v for v in mi_.values()]).sum()
+            pl_module.log("MI", mi_, prog_bar=True)
+            if len(pl_module.mi) > 1:
+                if pl_module.mi[-1] >= (mi_ - self.tolerance):
+                    pl_module.n_epochs_patience += 1
+            else:
+                pl_module.n_epochs_patience = 0
+            if pl_module.n_epochs_patience > self.patience:
+                # stop aggressive training by setting epoch counter to max epochs
+                # pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
+                logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
+            pl_module.mi.append(mi_)
 
 
-class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
+class PyroTrainingPlan(PyroTrainingPlan_scvi):
+    def training_epoch_end(self, outputs):
+        """Training epoch end for Pyro training."""
+        elbo = 0
+        n = 0
+        for out in outputs:
+            elbo += out["loss"]
+            n += 1
+        elbo /= n
+        self.log("elbo_train", elbo, prog_bar=True)
+        gc.collect()
+        torch.cuda.empty_cache()
+
+
+class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
     """
     Lightning module task to train Pyro scvi-tools modules.
     Parameters
@@ -756,6 +804,8 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
             n += 1
         elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def training_step(self, batch, batch_idx):
 
