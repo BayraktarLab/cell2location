@@ -3,6 +3,10 @@ contact_links:
   - name: scverse Discorse
     url: https://discourse.scverse.org/c/ecosytem/cell2location/
     about: Ask usage questions, how to solve your problems using cell2location and other scvi-tools packages.
+    
+  - name: Frequently asked questions
+    url: https://github.com/BayraktarLab/cell2location/issues?q=is%3Aissue+is%3Aopen+label%3AFAQ
+    about: Before asking a question please check this list (issue with FAQ tag).
 
   - name: cell2location Community Discussions [deprecated]
     url: https://discourse.scverse.org/c/ecosytem/cell2location/
