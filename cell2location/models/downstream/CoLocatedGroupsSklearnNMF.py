@@ -174,7 +174,7 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
                 "max_iter": self.n_iter,
             }
             
-            if "alpha_W" in NMF.__code__.co_varnames:
+            if "alpha_W" in NMF.__init__.__code__.co_varnames:
                 nmf_kwargs["alpha_W"] = self.alpha
             else:
                 nmf_kwargs["alpha"] = self.alpha
