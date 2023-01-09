@@ -270,7 +270,7 @@ class QuantileMixin:
 
         """
 
-        gpus, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_use_gpu_arg(use_gpu)
 
         self.module.eval()
 
@@ -370,7 +370,7 @@ class QuantileMixin:
         """
 
         self.module.eval()
-        gpus, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_use_gpu_arg(use_gpu)
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
         train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
@@ -444,7 +444,6 @@ class PltExportMixin:
 
     def plot_history(self, iter_start=0, iter_end=-1, ax=None):
         r"""Plot training history
-
         Parameters
         ----------
         iter_start
@@ -453,22 +452,19 @@ class PltExportMixin:
             omit last iterations from the plot
         ax
             matplotlib axis
-
         """
         if ax is None:
-            ax = plt
-            ax.set_xlabel = plt.xlabel
-            ax.set_ylabel = plt.ylabel
+            ax = plt.gca()
         if iter_end == -1:
             iter_end = len(self.history_["elbo_train"])
 
         ax.plot(
-            self.history_["elbo_train"].index[iter_start:iter_end],
+            np.array(self.history_["elbo_train"].index[iter_start:iter_end]),
             np.array(self.history_["elbo_train"].values.flatten())[iter_start:iter_end],
             label="train",
         )
         ax.legend()
-        ax.xlim(0, len(self.history_["elbo_train"]))
+        ax.set_xlim(0, len(self.history_["elbo_train"]))
         ax.set_xlabel("Training epochs")
         ax.set_ylabel("-ELBO loss")
         plt.tight_layout()

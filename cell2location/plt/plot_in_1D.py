@@ -66,10 +66,8 @@ def plot_absolute_abundances_1D(
     if celltype_subset:
         adata_sp = subset_anndata(adata_sp, celltype_subset, dimName)
 
-    celltypes = [
-        x.split("mean_spot_factors")[-1] for x in adata_sp.obs.columns if len(x.split("mean_spot_factors")) == 2
-    ]
-    abundances = adata_sp.obs.loc[:, [len(x.split("mean_spot_factors")) == 2 for x in adata_sp.obs.columns]]
+    celltypes = [x.split("meanscell_abundance_w_sf_")[-1] for x in adata_sp.obsm["means_cell_abundance_w_sf"].columns]
+    abundances = adata_sp.obsm["means_cell_abundance_w_sf"]
 
     if roi_subset:
         celltypesForPlot = np.repeat(celltypes, sum(roi_subset))
