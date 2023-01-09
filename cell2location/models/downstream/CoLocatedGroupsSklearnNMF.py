@@ -165,7 +165,7 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
                 self.x_data = self.X_data
 
             from sklearn.decomposition import NMF
-            
+
             nmf_kwargs = {
                 **self.nmf_kwd_args,
                 "n_components": self.n_fact,
@@ -173,15 +173,13 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
                 "l1_ratio": self.l1_ratio,
                 "max_iter": self.n_iter,
             }
-            
+
             if "alpha_W" in NMF.__init__.__code__.co_varnames:
                 nmf_kwargs["alpha_W"] = self.alpha
             else:
                 nmf_kwargs["alpha"] = self.alpha
 
-            self.models[name] = NMF(
-                **nmf_kwargs
-            )
+            self.models[name] = NMF(**nmf_kwargs)
             W = self.models[name].fit_transform(self.x_data)
             H = self.models[name].components_
             self.results[name] = {
