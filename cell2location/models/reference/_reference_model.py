@@ -231,13 +231,12 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
                 raise ValueError("No quantiles to export - please add add_to_obsm=['q05', 'q50', 'q95'].")
             self.samples = dict()
             for i in add_to_varm:
-                q = float(i[1:]) / 100.0
-            self.samples[f"post_sample_{i}"] = self.posterior_quantile(q=q, **sample_kwargs)
+                q = float(f"0.{i[1:]}")
+                self.samples[f"post_sample_{i}"] = self.posterior_quantile(q=q, **sample_kwargs)
         else:
             # generate samples from posterior distributions for all parameters
             # and compute mean, 5%/95% quantiles and standard deviation
             self.samples = self.sample_posterior(**sample_kwargs)
-            # TODO use add_to_obsm to determine which quantiles need to be computed,
 
         # export posterior distribution summary for all parameters and
         # annotation (model, date, var, obs and cell type names) to anndata object

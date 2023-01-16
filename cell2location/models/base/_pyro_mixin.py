@@ -308,7 +308,6 @@ class QuantileMixin:
                     means_ = self.module.guide.median(*args, **kwargs)
                 else:
                     means_ = self.module.guide.quantiles([q], *args, **kwargs)
-
                 means_ = {
                     k: means_[k].cpu().numpy()
                     for k in means_.keys()
@@ -337,6 +336,12 @@ class QuantileMixin:
         for k in global_means.keys():
             means[k] = global_means[k]
 
+        # quantile returns tensors with 0th dimension = 1
+        if not (use_median and q == 0.5) and (
+            not isinstance(self.module.guide, AutoAmortisedHierarchicalNormalMessenger)
+        ):
+            means = {k: means[k].squeeze(0) for k in means.keys()}
+
         self.module.to(device)
 
         return means
@@ -347,7 +352,7 @@ class QuantileMixin:
         q: float = 0.5,
         batch_size: int = None,
         use_gpu: bool = None,
-        use_median: bool = False,
+        use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
     ):
@@ -387,6 +392,12 @@ class QuantileMixin:
             means = self.module.guide.quantiles([q], *args, **kwargs)
         means = {k: means[k].cpu().detach().numpy() for k in means.keys() if k not in exclude_vars}
 
+        # quantile returns tensors with 0th dimension = 1
+        if not (use_median and q == 0.5) and (
+            not isinstance(self.module.guide, AutoAmortisedHierarchicalNormalMessenger)
+        ):
+            means = {k: means[k].squeeze(0) for k in means.keys()}
+
         return means
 
     def posterior_quantile(self, exclude_vars: list = None, batch_size: int = None, **kwargs):
@@ -410,6 +421,10 @@ class QuantileMixin:
             exclude_vars = []
         if kwargs is None:
             kwargs = dict()
+
+        if isinstance(self.module.guide, AutoNormal):
+            # median in AutoNormal does not require minibatches
+            batch_size = None
 
         if batch_size is not None:
             return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
@@ -572,9 +587,9 @@ class PltExportMixin:
             factor_names_ = self.factor_names_[factor_names_key]
         else:
             factor_names_ = self.factor_names_
-
+        site = samples[f"post_sample_{summary_name}"].get(site_name, None)
         return pd.DataFrame(
-            samples[f"post_sample_{summary_name}"].get(site_name, None),
+            site,
             columns=self.adata.var_names,
             index=[f"{summary_name}{name_prefix}_{site_name}_{i}" for i in factor_names_],
         ).T

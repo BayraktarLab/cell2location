@@ -14,6 +14,26 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 )
 
 
+def export_posterior(model, dataset):
+
+    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50"])  # quantile 0.50
+    dataset = model.export_posterior(
+        dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 10}
+    )  # quantile 0.50
+    dataset = model.export_posterior(dataset, use_quantiles=True)  # default
+    dataset = model.export_posterior(dataset, use_quantiles=True, sample_kwargs={"batch_size": 10})
+
+
+def export_posterior_sc(model, dataset):
+
+    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50"])  # quantile 0.50
+    dataset = model.export_posterior(
+        dataset, use_quantiles=True, add_to_varm=["q50"], sample_kwargs={"batch_size": 10}
+    )  # quantile 0.50
+    dataset = model.export_posterior(dataset, use_quantiles=True)  # default
+    dataset = model.export_posterior(dataset, use_quantiles=True, sample_kwargs={"batch_size": 10})
+
+
 def test_cell2location():
     save_path = "./cell2location_model_test"
     if torch.cuda.is_available():
@@ -34,7 +54,7 @@ def test_cell2location():
     # test plot_QC
     sc_model.plot_QC()
     # test quantile export
-    dataset = sc_model.export_posterior(dataset, use_quantiles=True)
+    export_posterior_sc(sc_model, dataset)
     sc_model.plot_QC(summary_name="q05")
     # test save/load
     sc_model.save(save_path, overwrite=True, save_anndata=True)
@@ -58,7 +78,7 @@ def test_cell2location():
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
     # test quantile export
-    dataset = st_model.export_posterior(dataset, use_quantiles=True)
+    export_posterior(st_model, dataset)
     st_model.plot_QC(summary_name="q05")
     ##  minibatches of locations  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
@@ -149,6 +169,8 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
+    # test quantile export
+    export_posterior(st_model, dataset)
 
     ### test downstream analysis ###
     _, _ = run_colocation(
