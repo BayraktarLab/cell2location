@@ -162,3 +162,20 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+
+    ##  Model with extra categorical covariates  ##
+    dataset_sp = dataset.copy()
+    Cell2location.setup_anndata(
+        dataset_sp, labels_key="labels", batch_key="batch", categorical_covariate_keys=["labels"]
+    )
+    st_model = Cell2location(
+        dataset_sp,
+        cell_state_df=inf_aver,
+        N_cells_per_location=30,
+        detection_alpha=200,
+    )
+    # test full data training
+    st_model.train(max_epochs=1)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    # full data
+    st_model.export_posterior(dataset_sp, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
