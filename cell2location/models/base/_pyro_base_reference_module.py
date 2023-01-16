@@ -1,4 +1,5 @@
-from scvi._compat import Literal
+from typing import Literal
+
 from scvi.module.base import PyroBaseModuleClass
 
 from cell2location.models.base._pyro_mixin import AutoGuideMixinModule, init_to_value

@@ -1,6 +1,5 @@
-from typing import Optional
+from typing import Literal, Optional
 
-from scvi._compat import Literal
 from scvi.module.base import PyroBaseModuleClass
 
 from ._pyro_mixin import AutoGuideMixinModule, init_to_value
