@@ -4,8 +4,7 @@ import pyro
 import pyro.distributions as dist
 import torch
 from pyro.nn import PyroModule
-from scvi import _CONSTANTS
-from scvi.data._anndata import get_from_registry
+from scvi import REGISTRY_KEYS
 from scvi.nn import one_hot
 
 # class NegativeBinomial(TorchDistributionMixin, ScVINegativeBinomial):
@@ -13,7 +12,7 @@ from scvi.nn import one_hot
 
 
 class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
-    """
+    r"""
     Cell2location models the elements of :math:`D` as Negative Binomial distributed,
     given an unobserved gene expression level (rate) :math:`mu` and a gene- and batch-specific
     over-dispersion parameter :math:`\alpha_{e,g}` which accounts for unexplained variance:
@@ -28,16 +27,16 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         \mu_{s,g} = (m_{g} \left (\sum_{f} {w_{s,f} \: g_{f,g}} \right) + s_{e,g}) y_{s}
 
     Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`,
-      which can be interpreted as the expected number of cells at location :math:`s`
-      that express reference signature :math:`f`;
+    which can be interpreted as the expected number of cells at location :math:`s`
+    that express reference signature :math:`f`;
     :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`,
-      `cell_state_df` input ;
+    `cell_state_df` input ;
     :math:`m_{g}` denotes a gene-specific scaling parameter which adjusts for global differences in sensitivity
-      between technologies (platform effect);
+    between technologies (platform effect);
     :math:`y_{s}` denotes a location/observation-specific scaling parameter which adjusts for differences in sensitivity
-      between observations and batches;
+    between observations and batches;
     :math:`s_{e,g}` is additive component that account for gene- and location-specific shift,
-      such as due to contaminating or free-floating RNA.
+    such as due to contaminating or free-floating RNA.
 
     To account for the similarity of location patterns across cell types, :math:`w_{s,f}` is modelled using
     another layer  of decomposition (factorization) using :math:`r={1, .., R}` groups of cell types,
@@ -48,7 +47,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
 
     Approximate Variational Inference is used to estimate the posterior distribution of all model parameters.
 
-    Estimation of absolute cell abundance `w_{s,f}` is guided using informed prior on the number of cells
+    Estimation of absolute cell abundance :math:`w_{s,f}` is guided using informed prior on the number of cells
     (argument called `N_cells_per_location`). It is a tissue-level global estimate, which can be derived from histology
     images (H&E or DAPI), ideally paired to the spatial expression data or at least representing the same tissue type.
     This parameter can be estimated by manually counting nuclei in a 10-20 locations in the histology image
@@ -63,12 +62,12 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
     the mean sensitivity for each batch :math:`y_e`:
 
     .. math::
-        y_s ~ Gamma(detection_alpha, detection_alpha / y_e)
+        y_s \sim Gamma(detection\_alpha, detection\_alpha / y_e)
 
     where y_e is unknown/latent average detection efficiency in each batch/experiment:
 
     .. math::
-        y_e ~ Gamma(10, 10 / detection_mean)
+        y_e \sim Gamma(10, 10 / detection\_mean)
 
     """
 
@@ -181,23 +180,26 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
 
     @staticmethod
     def _get_fn_args_from_batch(tensor_dict):
-        x_data = tensor_dict[_CONSTANTS.X_KEY]
+        x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
-        batch_index = tensor_dict[_CONSTANTS.BATCH_KEY]
+        batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
         return (x_data, ind_x, batch_index), {}
 
     def create_plates(self, x_data, idx, batch_index):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def list_obs_plate_vars(self):
-        """Create a dictionary with:
+        """
+        Create a dictionary with:
+
         1. "name" - the name of observation/minibatch plate;
         2. "input" - indexes of model args to provide to encoder network when using amortised inference;
         3. "sites" - dictionary with
-            keys - names of variables that belong to the observation plate (used to recognise
-             and merge posterior samples for minibatch variables)
-            values - the dimensions in non-plate axis of each variable (used to construct output
-             layer of encoder network when using amortised inference)
+
+          * keys - names of variables that belong to the observation plate
+            (used to recognise and merge posterior samples for minibatch variables)
+          * values - the dimensions in non-plate axis of each variable (used to
+            construct output layer of encoder network when using amortised inference)
         """
 
         return {
@@ -299,7 +301,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         # cell state signatures (e.g. background, free-floating RNA)
         s_g_gene_add_alpha_hyp = pyro.sample(
             "s_g_gene_add_alpha_hyp",
-            dist.Gamma(self.gene_add_alpha_hyp_prior_alpha, self.gene_add_alpha_hyp_prior_beta),
+            dist.Gamma(self.ones * self.gene_add_alpha_hyp_prior_alpha, self.ones * self.gene_add_alpha_hyp_prior_beta),
         )
         s_g_gene_add_mean = pyro.sample(
             "s_g_gene_add_mean",
@@ -326,7 +328,7 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
         # =====================Gene-specific overdispersion ======================= #
         alpha_g_phi_hyp = pyro.sample(
             "alpha_g_phi_hyp",
-            dist.Gamma(self.alpha_g_phi_hyp_prior_alpha, self.alpha_g_phi_hyp_prior_beta),
+            dist.Gamma(self.ones * self.alpha_g_phi_hyp_prior_alpha, self.ones * self.alpha_g_phi_hyp_prior_beta),
         )
         alpha_g_inverse = pyro.sample(
             "alpha_g_inverse",
@@ -357,15 +359,16 @@ class LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(
             mRNA = w_sf * (self.cell_state * m_g).sum(-1)
             pyro.deterministic("u_sf_mRNA_factors", mRNA)
 
-    def compute_expected(self, samples, adata, ind_x=None):
-        r"""Compute expected expression of each gene in each location. Useful for evaluating how well
+    def compute_expected(self, samples, adata_manager, ind_x=None):
+        r"""
+        Compute expected expression of each gene in each location. Useful for evaluating how well
         the model learned expression pattern of all genes in the data.
         """
         if ind_x is None:
-            ind_x = np.arange(adata.n_obs).astype(int)
+            ind_x = np.arange(adata_manager.adata.n_obs).astype(int)
         else:
             ind_x = ind_x.astype(int)
-        obs2sample = get_from_registry(adata, _CONSTANTS.BATCH_KEY)
+        obs2sample = adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
         mu = (
             np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"]

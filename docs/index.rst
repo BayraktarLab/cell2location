@@ -8,7 +8,7 @@ Welcome to cell2location's documentation!
 
 For installation instructions see: https://github.com/BayraktarLab/cell2location#Installation
 
-For FAQ and to ask any questions please use GitHub Discussions: https://github.com/BayraktarLab/cell2location/discussions
+For FAQ and to ask any questions please use scverse discourse: on cell2location https://discourse.scverse.org/c/ecosytem/cell2location/42, on scvi-tools https://discourse.scverse.org/c/help/scvi-tools/7 or in Visium data https://discourse.scverse.org/c/general/visium/32.
 
 For reporting bugs or other issues with cell2location please use GitHub Issues: https://github.com/BayraktarLab/cell2location/issues
 
@@ -39,20 +39,10 @@ Additionally we provide 2 models for downstream analysis of cell abundance estim
 
 .. toctree::
    :maxdepth: 2
-   :caption: Using docker and singularity environments, common errors:
+   :caption: Common errors, using containers:
 
-   dockersingularity
    commonerrors
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Pymc3 Tutorials (advanced use, Nanostring WTA):
-
-   installing_pymc3
-   notebooks/cell2location_for_NanostringWTA
-   notebooks/cell2location_estimating_signatures
-   notebooks/cell2location_short_demo
-   notebooks/cell2location_short_demo_downstream
+   dockersingularity
 
 .. toctree::
    :maxdepth: 4
@@ -66,9 +56,14 @@ Additionally we provide 2 models for downstream analysis of cell abundance estim
    cell2location.plt
    cell2location.utils
    cell2location.pyro_infrastructure
-   cell2location.pymc3
-   cell2location.reference_models_torch
    cell2location.distributions
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Nanostring WTA Tutorial (pymc3):
+
+   installing_pymc3
+   notebooks/cell2location_for_NanostringWTA
 
 Indices and tables
 ==================

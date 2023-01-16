@@ -16,10 +16,12 @@ def plot_absolute_abundances_1D(
     colourCode=None,
     figureSize=(12, 8),
 ):
-    r"""Plot absolute abundance of celltypes in a dotplot across 1 dimension
+    r"""
+    Plot absolute abundance of celltypes in a dotplot across 1 dimension
+
     :param adata_sp: anndata object for spatial data with celltype abundance included in .obs (this is returned by running cell2location first)
     :param celltype_subset: list of a subset of cell type names to be plotted
-    :params slide & radial_position: if wanting to plot only data from one slide + one radial position, include in these parameters
+    :param slide&radial_position: if wanting to plot only data from one slide + one radial position, include in these parameters
     :param cell_types: parameter for only plotting specific cell types where column names in adata_sp.obs are meanSpot[celltype] format
     :param roi_subset: optionally a boolean for only using part of the data in adata_sp (corresponding to a specific ROI)
     :param saving: optionally a string value, which will result in the plot to be saved under this name
@@ -64,10 +66,8 @@ def plot_absolute_abundances_1D(
     if celltype_subset:
         adata_sp = subset_anndata(adata_sp, celltype_subset, dimName)
 
-    celltypes = [
-        x.split("mean_spot_factors")[-1] for x in adata_sp.obs.columns if len(x.split("mean_spot_factors")) == 2
-    ]
-    abundances = adata_sp.obs.loc[:, [len(x.split("mean_spot_factors")) == 2 for x in adata_sp.obs.columns]]
+    celltypes = [x.split("meanscell_abundance_w_sf_")[-1] for x in adata_sp.obsm["means_cell_abundance_w_sf"].columns]
+    abundances = adata_sp.obsm["means_cell_abundance_w_sf"]
 
     if roi_subset:
         celltypesForPlot = np.repeat(celltypes, sum(roi_subset))
@@ -170,12 +170,12 @@ def plot_density_1D(
         celltypesForPlot = np.repeat(celltypes, sum(subset))
         vcForPlot = np.array([adata_sp.obs[dimName].loc[subset] for j in range(len(celltypes))]).flatten()
         countsForPlot = np.array(
-            [abundances.iloc[:, j].loc[subset] / roi_area[subset] * 10 ** 6 for j in range(len(celltypes))]
+            [abundances.iloc[:, j].loc[subset] / roi_area[subset] * 10**6 for j in range(len(celltypes))]
         )
     else:
         celltypesForPlot = np.repeat(celltypes, np.shape(adata_sp)[0])
         vcForPlot = np.array([adata_sp.obs[dimName] for j in range(len(celltypes))]).flatten()
-        countsForPlot = np.array([abundances.iloc[:, j] / roi_area * 10 ** 6 for j in range(len(celltypes))])
+        countsForPlot = np.array([abundances.iloc[:, j] / roi_area * 10**6 for j in range(len(celltypes))])
 
     if type(colourCode) is dict:
         colourCode = pd.DataFrame(data=colourCode.values(), index=colourCode.keys(), columns=["Colours"])

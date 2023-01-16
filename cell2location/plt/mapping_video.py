@@ -6,15 +6,17 @@ from .plot_spatial import plot_spatial_general as plot_spatial
 
 
 def interpolate_coord(start=10, end=5, steps=100, accel_power=3, accelerate=True, jitter=None):
-    r"""Interpolate coordinates between start_array and end_array positions in N steps
-        with non-linearity in movement according to acc_power,
-        and accelerate change in coordinates (True) or slow it down (False).
+    r"""
+    Interpolate coordinates between start_array and end_array positions in N steps
+    with non-linearity in movement according to acc_power,
+    and accelerate change in coordinates (True) or slow it down (False).
+
     :param jitter: shift positions by a random number by sampling:
-                  new_coord = np.random.normal(mean=coord, sd=jitter), reasonable values 0.01-0.1
+      new_coord = np.random.normal(mean=coord, sd=jitter), reasonable values 0.01-0.1
     """
 
     seq = np.linspace(np.zeros_like(start), np.ones_like(end), steps)
-    seq = seq ** accel_power
+    seq = seq**accel_power
 
     if jitter is not None:
         seq = np.random.normal(loc=seq, scale=jitter * np.abs(seq))
@@ -87,8 +89,10 @@ def plot_video_mapping(
     save_extension="png",
     colorbar_shape={"vertical_gaps": 2, "horizontal_gaps": 0.13},
 ):
-    r"""Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
-        We use linear interpolation of UMAP and spot coordinates to create movement.
+    r"""
+    Create frames for a video illustrating the approach from UMAP of single cells to their spatial locations.
+    We use linear interpolation of UMAP and spot coordinates to create movement.
+
     :param adata_vis: anndata with Visium data (including spatial slot in `.obsm`)
     :param adata: anndata with single cell data (including X_umap slot in `.obsm`)
     :param sample_ids: pd.Series - sample ID for each spot

@@ -341,7 +341,7 @@ def plot_spatial_general(
             colors_ryb[i] = rgb_to_ryb(colors[i, :, :3])
 
         def kernel(w):
-            return w ** 2
+            return w**2
 
         kernel_weights = kernel(weights[:, :, np.newaxis])
         weighted_colors_ryb = (colors_ryb * kernel_weights).sum(axis=1) / kernel_weights.sum(axis=1)
@@ -352,7 +352,7 @@ def plot_spatial_general(
 
         weighted_colors[:, 3] = colors[:, :, 3].max(axis=1)
 
-        ax.scatter(x=coords[:, 0], y=coords[:, 1], c=weighted_colors, s=circle_diameter ** 2)
+        ax.scatter(x=coords[:, 0], y=coords[:, 1], c=weighted_colors, s=circle_diameter**2)
 
         # add text
         if text is not None:

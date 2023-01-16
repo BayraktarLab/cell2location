@@ -70,8 +70,7 @@ def run_colocation(
         "learning_rate": 0.01,
         "use_cuda": False,
         "sample_prior": False,
-        "posterior_summary": "post_sample_q05",
-        "cell_abundance_name": "w_sf",
+        "cell_abundance_obsm": "q05_cell_abundance_w_sf",
         "factor_names": "factor_names",
         "sample_name_col": None,
         "mode": "normal",
@@ -93,11 +92,13 @@ def run_colocation(
         "scanpy_coords_name": "spatial",
         "scanpy_plot_vmax": "p99.2",
         "scanpy_plot_size": 1.3,
+        "scanpy_alpha_img": 0.0,
         "save_model": True,
         "run_name_suffix": "",
         "export_q05": False,
         "plot_histology": False,
         "top_n": 10,
+        "plot_cell_type_loadings_kwargs": dict(),
     }
 
     d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}}
@@ -134,7 +135,7 @@ def run_colocation(
 
     ####### Preparing data #######
     # extract cell density parameter
-    X_data = sp_data.uns["mod"][train_args["posterior_summary"]][train_args["cell_abundance_name"]]
+    X_data = np.array(sp_data.obsm[train_args["cell_abundance_obsm"]].values)
     var_names = sp_data.uns["mod"][train_args["factor_names"]]
     obs_names = sp_data.obs_names
     if train_args["sample_name_col"] is None:
@@ -346,7 +347,9 @@ def run_colocation(
         if not os.path.exists(fig_path):
             mkdir(fig_path)
         # plot co-occuring cell type combinations
-        mod.plot_cell_type_loadings()
+        mod.plot_cell_type_loadings(
+            **export_args["plot_cell_type_loadings_kwargs"],
+        )
 
         save_plot(fig_path, filename=f"n_fact{mod.n_fact}", extension=export_args["plot_extension"])
         if verbose:
@@ -387,7 +390,7 @@ def run_colocation(
                         ncols=6,
                         size=export_args["scanpy_plot_size"],
                         img_key="hires",
-                        alpha_img=0,
+                        alpha_img=export_args["scanpy_alpha_img"],
                         vmin=0,
                         vmax=export_args["scanpy_plot_vmax"],
                         save=f"cell_density_mean_n_fact{mod.n_fact}_s{s}_{export_args['scanpy_plot_vmax']}.{export_args['plot_extension']}",
