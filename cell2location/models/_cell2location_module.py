@@ -484,7 +484,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             mRNA = w_sf * (self.cell_state * m_g).sum(-1)
             pyro.deterministic("u_sf_mRNA_factors", mRNA)
 
-    def compute_expected(self, samples, adata_manager, ind_x=None):
+    def compute_expected(
+        self,
+        samples,
+        adata_manager,
+        ind_x=None,
+        hide_ambient=False,
+        hide_cell_type=False,
+    ):
         r"""Compute expected expression of each gene in each location. Useful for evaluating how well
         the model learned expression pattern of all genes in the data.
         """
@@ -494,10 +501,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             ind_x = ind_x.astype(int)
         obs2sample = adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY)
         obs2sample = pd.get_dummies(obs2sample.flatten()).values[ind_x, :]
-        mu = (
-            np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"]
-            + np.dot(obs2sample, samples["s_g_gene_add"])
-        ) * samples["detection_y_s"][ind_x, :]
+        mu = np.ones((1, 1))
+        if not hide_cell_type:
+            mu = np.dot(samples["w_sf"][ind_x, :], self.cell_state_mat.T) * samples["m_g"]
+        if not hide_ambient:
+            mu = mu + np.dot(obs2sample, samples["s_g_gene_add"])
+        mu = mu * samples["detection_y_s"][ind_x, :]
         alpha = np.dot(obs2sample, 1 / np.power(samples["alpha_g_inverse"], 2))
 
         return {"mu": mu, "alpha": alpha, "ind_x": ind_x}
