@@ -109,20 +109,43 @@ def test_cell2location():
     st_model.train_aggressive(
         max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}, use_gpu=use_gpu
     )
+    # test hiding variables on the list
+    var_list = ["locs.s_g_gene_add_alpha_e_inv"]
+    for k, v in st_model.module.guide.named_parameters():
+        k_in_vars = np.any([i in k for i in var_list])
+        if k_in_vars:
+            print(f"start {k} {v.requires_grad} {v.detach().cpu().numpy()}")
+            v.requires_grad = False
+            s_g_gene_add = v.detach().cpu().numpy()
+    # test that normal training doesn't reactivate them
+    st_model.train(max_epochs=1, batch_size=20, use_gpu=use_gpu)
+    for k, v in st_model.module.guide.named_parameters():
+        k_in_vars = np.any([i in k for i in var_list])
+        if k_in_vars:
+            print(f"train {k} {v.requires_grad} {v.detach().cpu().numpy()}")
+            assert np.all(v.detach().cpu().numpy() == s_g_gene_add)
+            v.requires_grad = False
+    # test that aggressive training doesn't reactivate them
+    st_model.train_aggressive(
+        max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}, use_gpu=use_gpu
+    )
+    for k, v in st_model.module.guide.named_parameters():
+        k_in_vars = np.any([i in k for i in var_list])
+        if k_in_vars:
+            assert np.all(v.detach().cpu().numpy() == s_g_gene_add)
     # test computing median
-    if True:
-        if use_gpu:
-            device = f"cuda:{use_gpu}"
-        else:
-            device = "cpu"
-        train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
-        for batch in train_dl:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            args, kwargs = st_model.module._get_fn_args_from_batch(batch)
-            break
-        st_model.module.guide.median(*args, **kwargs)
-        st_model.module.guide.quantiles([0.5], *args, **kwargs)
-        st_model.module.guide.mutual_information(*args, **kwargs)
+    if use_gpu:
+        device = f"cuda:{use_gpu}"
+    else:
+        device = "cpu"
+    train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
+    for batch in train_dl:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        args, kwargs = st_model.module._get_fn_args_from_batch(batch)
+        break
+    st_model.module.guide.median(*args, **kwargs)
+    st_model.module.guide.quantiles([0.5], *args, **kwargs)
+    st_model.module.guide.mutual_information(*args, **kwargs)
     # export the estimated cell abundance (summary of the posterior distribution)
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})

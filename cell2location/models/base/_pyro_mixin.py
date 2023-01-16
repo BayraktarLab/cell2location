@@ -1,7 +1,9 @@
+import functools
+import gc
 import logging
 from datetime import date
 from functools import partial
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -11,14 +13,21 @@ import pyro
 import pytorch_lightning as pl
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
+from pyro.infer.autoguide import (
+    AutoNormal,
+    init_to_feasible,
+    init_to_mean,
+    init_to_median,
+)
+from pyro.infer.autoguide.initialization import _is_multivariate
+from pyro.util import torch_isnan
 from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_use_gpu_arg
 from scvi.module.base import PyroBaseModuleClass
-from scvi.train import PyroTrainingPlan
+from scvi.train import PyroTrainingPlan as PyroTrainingPlan_scvi
 
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
@@ -27,13 +36,56 @@ from ...distributions.AutoAmortisedNormalMessenger import (
 logger = logging.getLogger(__name__)
 
 
+def init_to_median_scaled(
+    site=None,
+    num_samples=15,
+    scaling_factor=1.0,
+    *,
+    fallback: Optional[Callable] = init_to_feasible,
+):
+    """
+    Initialize to the prior median; fallback to ``fallback`` (defaults to
+    :func:`init_to_feasible`) if mean is undefined.
+
+    :param callable fallback: Fallback init strategy, for sites not specified
+        in ``values``.
+    :raises ValueError: If ``fallback=None`` and no value for a site is given
+        in ``values``.
+    """
+    if site is None:
+        return functools.partial(init_to_median, num_samples=num_samples, fallback=fallback)
+
+    # The median undefined for multivariate distributions.
+    if _is_multivariate(site["fn"]):
+        return init_to_feasible(site)
+
+    try:
+        # Try to compute empirical mean.
+        samples = site["fn"].sample(sample_shape=(num_samples,))
+        value = samples.median(dim=0)[0]
+        if torch_isnan(value):
+            raise ValueError
+        if hasattr(site["fn"], "_validate_sample"):
+            site["fn"]._validate_sample(value)
+        value._pyro_custom_init = False
+        if scaling_factor is None:
+            scaling_factor = np.sqrt(np.prod(value.shape))
+        scaling_factor = torch.tensor(scaling_factor, device=value.device)
+        return value / scaling_factor
+    except (RuntimeError, ValueError):
+        pass
+    if fallback is not None:
+        return fallback(site)
+    raise ValueError(f"No init strategy specified for site {repr(site['name'])}")
+
+
 def init_to_value(site=None, values={}):
     if site is None:
         return partial(init_to_value, values=values)
     if site["name"] in values:
         return values[site["name"]]
     else:
-        return init_to_mean(site, fallback=init_to_feasible)
+        return init_to_median(site, num_samples=501, fallback=init_to_mean)
 
 
 class AutoGuideMixinModule:
@@ -83,7 +135,9 @@ class AutoGuideMixinModule:
         else:
             encoder_kwargs = encoder_kwargs if isinstance(encoder_kwargs, dict) else dict()
             n_hidden = encoder_kwargs["n_hidden"] if "n_hidden" in encoder_kwargs.keys() else 200
-            if isinstance(data_transform, np.ndarray):
+            if data_transform is None:
+                pass
+            elif isinstance(data_transform, np.ndarray):
                 # add extra info about gene clusters as input to NN
                 self.register_buffer("gene_clusters", torch.tensor(data_transform.astype("float32")))
                 n_in = model.n_vars + data_transform.shape[1]
@@ -115,7 +169,10 @@ class AutoGuideMixinModule:
             amortised_vars = model.list_obs_plate_vars()
             if len(amortised_vars["input"]) >= 2:
                 encoder_kwargs["n_cat_list"] = n_cat_list
-            amortised_vars["input_transform"][0] = data_transform
+            if data_transform is not None:
+                amortised_vars["input_transform"][0] = data_transform
+            if "n_in" in amortised_vars.keys():
+                n_in = amortised_vars["n_in"]
             if getattr(model, "discrete_variables", None) is not None:
                 model = poutine.block(model, hide=model.discrete_variables)
             _guide = AutoAmortisedHierarchicalNormalMessenger(
@@ -126,6 +183,7 @@ class AutoGuideMixinModule:
                 encoder_kwargs=encoder_kwargs,
                 encoder_mode=encoder_mode,
                 encoder_instance=encoder_instance,
+                init_loc_fn=init_loc_fn,
                 **guide_kwargs,
             )
         return _guide
@@ -180,7 +238,13 @@ class QuantileMixin:
 
     @torch.no_grad()
     def _posterior_quantile_minibatch(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
+        self,
+        q: float = 0.5,
+        batch_size: int = 2048,
+        use_gpu: bool = None,
+        use_median: bool = False,
+        exclude_vars: list = None,
+        data_loader_indices=None,
     ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
@@ -210,7 +274,7 @@ class QuantileMixin:
 
         self.module.eval()
 
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
 
         # sample local parameters
         i = 0
@@ -233,7 +297,11 @@ class QuantileMixin:
                     means = self.module.guide.median(*args, **kwargs)
                 else:
                     means = self.module.guide.quantiles([q], *args, **kwargs)
-                means = {k: means[k].cpu().numpy() for k in means.keys() if k in obs_plate_sites}
+                means = {
+                    k: means[k].cpu().numpy()
+                    for k in means.keys()
+                    if (k in obs_plate_sites) and (k not in exclude_vars)
+                }
 
             else:
                 if use_median and q == 0.5:
@@ -241,7 +309,11 @@ class QuantileMixin:
                 else:
                     means_ = self.module.guide.quantiles([q], *args, **kwargs)
 
-                means_ = {k: means_[k].cpu().numpy() for k in means_.keys() if k in obs_plate_sites}
+                means_ = {
+                    k: means_[k].cpu().numpy()
+                    for k in means_.keys()
+                    if (k in obs_plate_sites) and (k not in exclude_vars)
+                }
                 means = {k: np.concatenate([means[k], means_[k]], axis=obs_plate_dim) for k in means.keys()}
             i += 1
 
@@ -256,7 +328,11 @@ class QuantileMixin:
             global_means = self.module.guide.median(*args, **kwargs)
         else:
             global_means = self.module.guide.quantiles([q], *args, **kwargs)
-        global_means = {k: global_means[k].cpu().numpy() for k in global_means.keys() if k not in obs_plate_sites}
+        global_means = {
+            k: global_means[k].cpu().numpy()
+            for k in global_means.keys()
+            if (k not in obs_plate_sites) and (k not in exclude_vars)
+        }
 
         for k in global_means.keys():
             means[k] = global_means[k]
@@ -267,7 +343,13 @@ class QuantileMixin:
 
     @torch.no_grad()
     def _posterior_quantile(
-        self, q: float = 0.5, batch_size: int = None, use_gpu: bool = None, use_median: bool = False
+        self,
+        q: float = 0.5,
+        batch_size: int = None,
+        use_gpu: bool = None,
+        use_median: bool = False,
+        exclude_vars: list = None,
+        data_loader_indices=None,
     ):
         """
         Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
@@ -291,7 +373,7 @@ class QuantileMixin:
         _, _, device = parse_use_gpu_arg(use_gpu)
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size)
+        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
         # sample global parameters
         tensor_dict = next(iter(train_dl))
         args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
@@ -303,13 +385,11 @@ class QuantileMixin:
             means = self.module.guide.median(*args, **kwargs)
         else:
             means = self.module.guide.quantiles([q], *args, **kwargs)
-        means = {k: means[k].cpu().detach().numpy() for k in means.keys()}
+        means = {k: means[k].cpu().detach().numpy() for k in means.keys() if k not in exclude_vars}
 
         return means
 
-    def posterior_quantile(
-        self, q: float = 0.5, batch_size: int = 2048, use_gpu: bool = None, use_median: bool = False
-    ):
+    def posterior_quantile(self, exclude_vars: list = None, batch_size: int = None, **kwargs):
         """
         Compute median of the posterior distribution of each parameter.
 
@@ -326,13 +406,15 @@ class QuantileMixin:
         -------
 
         """
+        if exclude_vars is None:
+            exclude_vars = []
+        if kwargs is None:
+            kwargs = dict()
 
         if batch_size is not None:
-            return self._posterior_quantile_minibatch(
-                q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median
-            )
+            return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
         else:
-            return self._posterior_quantile(q=q, batch_size=batch_size, use_gpu=use_gpu, use_median=use_median)
+            return self._posterior_quantile(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
 
 
 class PltExportMixin:
@@ -553,30 +635,45 @@ class PyroAggressiveConvergence(Callback):
         Compute aggressive training convergence criteria for amortised inference.
         """
         pyro_guide = pl_module.module.guide
-        if self.dataloader is None:
-            dl = trainer.datamodule.train_dataloader()
-        else:
-            dl = self.dataloader
-        for tensors in dl:
-            tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
-            args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
-            break
-        mi_ = pyro_guide.mutual_information(*args, **kwargs)
-        mi_ = np.array([v for v in mi_.values()]).sum()
-        pl_module.log("MI", mi_, prog_bar=True)
-        if len(pl_module.mi) > 1:
-            if pl_module.mi[-1] >= (mi_ - self.tolerance):
-                pl_module.n_epochs_patience += 1
-        else:
-            pl_module.n_epochs_patience = 0
-        if pl_module.n_epochs_patience > self.patience:
-            # stop aggressive training by setting epoch counter to max epochs
-            # pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
-            logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
-        pl_module.mi.append(mi_)
+        if hasattr(pyro_guide, "mutual_information"):
+            if self.dataloader is None:
+                dl = trainer.datamodule.train_dataloader()
+            else:
+                dl = self.dataloader
+            for tensors in dl:
+                tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
+                args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
+                break
+            mi_ = pyro_guide.mutual_information(*args, **kwargs)
+            mi_ = np.array([v for v in mi_.values()]).sum()
+            pl_module.log("MI", mi_, prog_bar=True)
+            if len(pl_module.mi) > 1:
+                if pl_module.mi[-1] >= (mi_ - self.tolerance):
+                    pl_module.n_epochs_patience += 1
+            else:
+                pl_module.n_epochs_patience = 0
+            if pl_module.n_epochs_patience > self.patience:
+                # stop aggressive training by setting epoch counter to max epochs
+                # pl_module.aggressive_epochs_counter = pl_module.n_aggressive_epochs + 1
+                logger.info('Stopped aggressive training after "{}" epochs'.format(pl_module.aggressive_epochs_counter))
+            pl_module.mi.append(mi_)
 
 
-class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
+class PyroTrainingPlan(PyroTrainingPlan_scvi):
+    def training_epoch_end(self, outputs):
+        """Training epoch end for Pyro training."""
+        elbo = 0
+        n = 0
+        for out in outputs:
+            elbo += out["loss"]
+            n += 1
+        elbo /= n
+        self.log("elbo_train", elbo, prog_bar=True)
+        gc.collect()
+        torch.cuda.empty_cache()
+
+
+class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
     """
     Lightning module task to train Pyro scvi-tools modules.
     Parameters
@@ -641,6 +738,10 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
 
         self.aggressive_vars = aggressive_vars
         self.invert_aggressive_selection = invert_aggressive_selection
+        # keep frozen variables as frozen
+        self.requires_grad_false_vars = [k for k, v in self.module.guide.named_parameters() if not v.requires_grad] + [
+            k for k, v in self.module.model.named_parameters() if not v.requires_grad
+        ]
 
         self.svi = pyro.infer.SVI(
             model=pyro_module.model,
@@ -652,24 +753,47 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
     def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
 
         for k, v in self.module.guide.named_parameters():
-            k_in_vars = np.any([i in k for i in self.aggressive_vars])
-            # hide variables on the list if they are not hidden
-            if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
-                v.requires_grad = False
-            # expose variables on the list if they are hidden
-            if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
-                v.requires_grad = True
+            if not np.any([i in k for i in self.requires_grad_false_vars]):
+                k_in_vars = np.any([i in k for i in self.aggressive_vars])
+                # hide variables on the list if they are not hidden
+                if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables on the list if they are hidden
+                if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
+                    v.requires_grad = True
 
-            # hide variables not on the list if they are not hidden
-            if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
-                v.requires_grad = False
-            # expose variables not on the list if they are hidden
-            if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
-                v.requires_grad = True
+                # hide variables not on the list if they are not hidden
+                if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables not on the list if they are hidden
+                if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
+                    v.requires_grad = True
+
+        for k, v in self.module.model.named_parameters():
+            if not np.any([i in k for i in self.requires_grad_false_vars]):
+                k_in_vars = np.any([i in k for i in self.aggressive_vars])
+                # hide variables on the list if they are not hidden
+                if k_in_vars and v.requires_grad and (aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables on the list if they are hidden
+                if k_in_vars and (not v.requires_grad) and (aggressive_vars_status == "expose"):
+                    v.requires_grad = True
+
+                # hide variables not on the list if they are not hidden
+                if (not k_in_vars) and v.requires_grad and (non_aggressive_vars_status == "hide"):
+                    v.requires_grad = False
+                # expose variables not on the list if they are hidden
+                if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
+                    v.requires_grad = True
 
     def training_epoch_end(self, outputs):
 
         self.aggressive_epochs_counter += 1
+
+        self.change_requires_grad(
+            aggressive_vars_status="expose",
+            non_aggressive_vars_status="expose",
+        )
 
         elbo = 0
         n = 0
@@ -678,6 +802,8 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
             n += 1
         elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def training_step(self, batch, batch_idx):
 
