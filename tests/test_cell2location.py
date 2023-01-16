@@ -33,6 +33,9 @@ def test_cell2location():
     dataset = sc_model.export_posterior(dataset, sample_kwargs={"num_samples": 10})
     # test plot_QC
     sc_model.plot_QC()
+    # test quantile export
+    dataset = sc_model.export_posterior(dataset, use_quantiles=True)
+    sc_model.plot_QC(summary_name="q05")
     # test save/load
     sc_model.save(save_path, overwrite=True, save_anndata=True)
     sc_model = RegressionModel.load(save_path)
@@ -54,6 +57,9 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+    # test quantile export
+    dataset = st_model.export_posterior(dataset, use_quantiles=True)
+    st_model.plot_QC(summary_name="q05")
     ##  minibatches of locations  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)

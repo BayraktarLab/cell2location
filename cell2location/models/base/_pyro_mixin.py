@@ -408,11 +408,13 @@ class PltExportMixin:
             "factor_names": list(self.factor_names_),
             "var_names": self.adata.var_names.tolist(),
             "obs_names": self.adata.obs_names.tolist(),
-            "post_sample_means": samples["post_sample_means"],
-            "post_sample_stds": samples["post_sample_stds"],
-            "post_sample_q05": samples["post_sample_q05"],
-            "post_sample_q95": samples["post_sample_q95"],
+            "post_sample_means": samples["post_sample_means"] if "post_sample_means" in samples else None,
+            "post_sample_stds": samples["post_sample_stds"] if "post_sample_stds" in samples else None,
         }
+        # add posterior quantiles
+        for k, v in samples.items():
+            if k.startswith("post_sample_"):
+                results[k] = v
         if type(self.factor_names_) is dict:
             results["factor_names"] = self.factor_names_
 
