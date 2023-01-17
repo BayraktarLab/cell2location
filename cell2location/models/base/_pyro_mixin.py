@@ -242,7 +242,7 @@ class QuantileMixin:
         q: float = 0.5,
         batch_size: int = 2048,
         use_gpu: bool = None,
-        use_median: bool = False,
+        use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
     ):
@@ -423,7 +423,7 @@ class QuantileMixin:
             kwargs = dict()
 
         if isinstance(self.module.guide, AutoNormal):
-            # median in AutoNormal does not require minibatches
+            # median/quantiles in AutoNormal does not require minibatches
             batch_size = None
 
         if batch_size is not None:

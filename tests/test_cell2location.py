@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from pyro import poutine
+from pyro.infer.autoguide import AutoHierarchicalNormalMessenger
 from scvi.data import synthetic_iid
 from scvi.dataloaders import AnnDataLoader
 
@@ -16,7 +16,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 def export_posterior(model, dataset):
 
-    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50"])  # quantile 0.50
+    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50", "q001"])  # quantile 0.50
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
@@ -26,7 +26,7 @@ def export_posterior(model, dataset):
 
 def export_posterior_sc(model, dataset):
 
-    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50"])  # quantile 0.50
+    dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50", "q001"])  # quantile 0.50
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_varm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
@@ -97,22 +97,55 @@ def test_cell2location():
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
     # test computing any quantile of the posterior distribution
-    if not isinstance(st_model.module.guide, poutine.messenger.Messenger):
-        st_model.posterior_quantile(q=0.5, use_gpu=use_gpu)
+    st_model.posterior_quantile(q=0.5, use_gpu=use_gpu)
     # test computing median
-    if True:
-        if use_gpu:
-            device = f"cuda:{use_gpu}"
-        else:
-            device = "cpu"
-        train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
-        for batch in train_dl:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            args, kwargs = st_model.module._get_fn_args_from_batch(batch)
-            break
-        st_model.module.guide.median(*args, **kwargs)
+    if use_gpu:
+        device = f"cuda:{use_gpu}"
+    else:
+        device = "cpu"
+    train_dl = AnnDataLoader(st_model.adata_manager, shuffle=False, batch_size=50)
+    for batch in train_dl:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        args, kwargs = st_model.module._get_fn_args_from_batch(batch)
+        break
+    st_model.module.guide.median(*args, **kwargs)
     # test computing expected expression per cell type
     st_model.module.model.compute_expected_per_cell_type(st_model.samples["post_sample_q05"], st_model.adata_manager)
+
+    ### test Messenger guide class ###
+    Cell2location.setup_anndata(dataset, batch_key="batch")
+    st_model = Cell2location(
+        dataset,
+        cell_state_df=inf_aver,
+        N_cells_per_location=30,
+        detection_alpha=200,
+        create_autoguide_kwargs={"guide_class": AutoHierarchicalNormalMessenger},
+    )
+    # test minibatch training
+    st_model.train(max_epochs=1, batch_size=50, use_gpu=use_gpu)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    # minibatches of locations
+    dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
+    # test plot_QC
+    st_model.plot_QC()
+    # test save/load
+    st_model.save(save_path, overwrite=True, save_anndata=True)
+    st_model = Cell2location.load(save_path)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    # minibatches of locations
+    dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
+    # test computing any quantile of the posterior distribution
+    # test quantile export
+    dataset = st_model.export_posterior(
+        dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 50}
+    )  # only quantile 0.50 works with Messenger guide
+    dataset = st_model.export_posterior(
+        dataset,
+        use_quantiles=True,
+        add_to_obsm=["q50"],
+    )  # only quantile 0.50 works with Messenger guide
+    assert dataset.uns["mod"]["post_sample_q50"]["w_sf"].shape == (dataset.n_obs, dataset.obs["labels"].nunique())
+
     ### test amortised inference with default cell2location model ###
     ##  full data  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
