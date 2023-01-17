@@ -42,7 +42,7 @@ Create conda environment and install `cell2location` package
 conda create -y -n cell2loc_env python=3.9
 
 conda activate cell2loc_env
-pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials]
+pip install cell2location[tutorials]
 ```
 
 Finally, to use this environment in jupyter notebook, add jupyter kernel for this environment:
