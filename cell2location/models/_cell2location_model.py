@@ -303,6 +303,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         sample_kwargs: Optional[dict] = None,
         export_slot: str = "mod",
         add_to_obsm: list = ["means", "stds", "q05", "q95"],
+        use_quantiles: bool = False,
     ):
         """
         Summarise posterior distribution and export results (cell abundance) to anndata object:
@@ -326,6 +327,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             adata.uns slot where to export results
         add_to_obsm
             posterior distribution summary to export in adata.obsm (['means', 'stds', 'q05', 'q95']).
+        use_quantiles
+            compute quantiles directly (True, more memory efficient) or use samples (False, default).
+            If True, means and stds cannot be computed so are not exported and returned.
         Returns
         -------
 
@@ -333,11 +337,19 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         sample_kwargs = sample_kwargs if isinstance(sample_kwargs, dict) else dict()
 
-        # generate samples from posterior distributions for all parameters
-        # and compute mean, 5%/95% quantiles and standard deviation
-        self.samples = self.sample_posterior(**sample_kwargs)
-        # TODO use add_to_obsm to determine which quantiles need to be computed,
-        # and if means and stds are not in the list - use quantile methods rather than sampling posterior
+        # get posterior distribution summary
+        if use_quantiles:
+            add_to_obsm = [i for i in add_to_obsm if (i not in ["means", "stds"]) and ("q" in i)]
+            if len(add_to_obsm) == 0:
+                raise ValueError("No quantiles to export - please add add_to_obsm=['q05', 'q50', 'q95'].")
+            self.samples = dict()
+            for i in add_to_obsm:
+                q = float(f"0.{i[1:]}")
+                self.samples[f"post_sample_{i}"] = self.posterior_quantile(q=q, **sample_kwargs)
+        else:
+            # generate samples from posterior distributions for all parameters
+            # and compute mean, 5%/95% quantiles and standard deviation
+            self.samples = self.sample_posterior(**sample_kwargs)
 
         # export posterior distribution summary for all parameters and
         # annotation (model, date, var, obs and cell type names) to anndata object
