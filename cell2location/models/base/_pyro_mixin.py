@@ -1,9 +1,8 @@
-import functools
 import gc
 import logging
 from datetime import date
 from functools import partial
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -13,14 +12,7 @@ import pyro
 import pytorch_lightning as pl
 import torch
 from pyro import poutine
-from pyro.infer.autoguide import (
-    AutoNormal,
-    init_to_feasible,
-    init_to_mean,
-    init_to_median,
-)
-from pyro.infer.autoguide.initialization import _is_multivariate
-from pyro.util import torch_isnan
+from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
 from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
@@ -36,56 +28,13 @@ from ...distributions.AutoAmortisedNormalMessenger import (
 logger = logging.getLogger(__name__)
 
 
-def init_to_median_scaled(
-    site=None,
-    num_samples=15,
-    scaling_factor=1.0,
-    *,
-    fallback: Optional[Callable] = init_to_feasible,
-):
-    """
-    Initialize to the prior median; fallback to ``fallback`` (defaults to
-    :func:`init_to_feasible`) if mean is undefined.
-
-    :param callable fallback: Fallback init strategy, for sites not specified
-        in ``values``.
-    :raises ValueError: If ``fallback=None`` and no value for a site is given
-        in ``values``.
-    """
-    if site is None:
-        return functools.partial(init_to_median, num_samples=num_samples, fallback=fallback)
-
-    # The median undefined for multivariate distributions.
-    if _is_multivariate(site["fn"]):
-        return init_to_feasible(site)
-
-    try:
-        # Try to compute empirical mean.
-        samples = site["fn"].sample(sample_shape=(num_samples,))
-        value = samples.median(dim=0)[0]
-        if torch_isnan(value):
-            raise ValueError
-        if hasattr(site["fn"], "_validate_sample"):
-            site["fn"]._validate_sample(value)
-        value._pyro_custom_init = False
-        if scaling_factor is None:
-            scaling_factor = np.sqrt(np.prod(value.shape))
-        scaling_factor = torch.tensor(scaling_factor, device=value.device)
-        return value / scaling_factor
-    except (RuntimeError, ValueError):
-        pass
-    if fallback is not None:
-        return fallback(site)
-    raise ValueError(f"No init strategy specified for site {repr(site['name'])}")
-
-
-def init_to_value(site=None, values={}):
+def init_to_value(site=None, values={}, init_fn=init_to_mean):
     if site is None:
         return partial(init_to_value, values=values)
     if site["name"] in values:
         return values[site["name"]]
     else:
-        return init_to_median(site, num_samples=501, fallback=init_to_mean)
+        return init_fn(site)
 
 
 class AutoGuideMixinModule:

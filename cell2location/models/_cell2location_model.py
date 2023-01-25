@@ -203,7 +203,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             kwargs["plan_kwargs"]["loss_fn"] = Trace_ELBO(num_particles=num_particles)
         if scale_elbo != 1.0:
             if scale_elbo is None:
-                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_genes"])
+                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_vars"])
             kwargs["plan_kwargs"]["scale_elbo"] = scale_elbo
 
         super().train(**kwargs)

@@ -1,5 +1,6 @@
 from typing import Literal, Optional
 
+from pyro.infer.autoguide import init_to_mean
 from scvi.module.base import PyroBaseModuleClass
 
 from ._pyro_mixin import AutoGuideMixinModule, init_to_value
@@ -88,4 +89,4 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
             init_vals = {k: getattr(self.model, f"init_val_{k}") for k in self.model.np_init_vals.keys()}
         else:
             init_vals = dict()
-        return init_to_value(site=site, values=init_vals)
+        return init_to_value(site=site, values=init_vals, init_fn=init_to_mean)
