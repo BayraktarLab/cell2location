@@ -101,7 +101,7 @@ def run_colocation(
         "plot_cell_type_loadings_kwargs": dict(),
     }
 
-    d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}}
+    d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.000001}, "alpha": 0.01}
 
     # replace defaults with parameters supplied
     for k in train_args.keys():
