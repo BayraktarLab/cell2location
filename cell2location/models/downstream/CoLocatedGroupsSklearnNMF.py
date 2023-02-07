@@ -100,7 +100,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         l1_ratio=0.5,
         nmf_kwd_args={},
     ):
-
         ############# Initialise parameters ################
         super().__init__(
             X_data, n_fact, 0, n_iter, 0, 0, verbose, var_names, var_names_read, obs_names, fact_names, sample_id
@@ -156,7 +155,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         init_names = ["init_" + str(i + 1) for i in np.arange(n)]
 
         for i, name in enumerate(init_names):
-
             # when type is molecular cross-validation or bootstrap,
             # replace self.x_data with new data
             if np.isin(n_type, ["cv", "bootstrap"]):
@@ -233,7 +231,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
             )
 
     def plot_cell_type_loadings(self, selected_cell_types=None, **kwargs):
-
         if selected_cell_types is None:
             selected_cell_types = self.var_names_read
 

@@ -84,7 +84,6 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         return self._amortised
 
     def init_to_value(self, site):
-
         if getattr(self.model, "np_init_vals", None) is not None:
             init_vals = {k: getattr(self.model, f"init_val_{k}") for k in self.model.np_init_vals.keys()}
         else:

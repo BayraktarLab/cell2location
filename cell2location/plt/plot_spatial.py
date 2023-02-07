@@ -209,11 +209,9 @@ def plot_spatial_general(
     cmaps = [cmaps[i] for i in reorder_cmap]
 
     with mpl.style.context(style):
-
         fig = plt.figure()
 
         if colorbar_position == "right":
-
             if colorbar_grid is None:
                 colorbar_grid = (len(labels), 1)
 
@@ -295,7 +293,6 @@ def plot_spatial_general(
         weights = np.zeros(counts.shape)
 
         for c in c_ord:
-
             min_color_intensity = counts[:, c].min()
             max_color_intensity = np.min([np.quantile(counts[:, c], max_color_quantile), max_col[c]])
 
