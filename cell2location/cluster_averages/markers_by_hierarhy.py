@@ -58,11 +58,9 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
     names = {}
 
     if len(inf_aver.shape) == 2:  # using summarised posterior samples
-
         results["level_1"] = pd.DataFrame(inf_aver, index=var_names, columns=list(hierarhy_df.index))
 
         for k in np.arange(hierarhy_df.shape[1]) + 2:
-
             k_names = list(hierarhy_df.iloc[:, k - 2].unique())
             k_level = hierarhy_df.shape[1] + 3 - k
             results[f"level_{k_level}"] = pd.DataFrame(index=var_names, columns=k_names)
@@ -98,7 +96,6 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
         return sep_inf_aver
 
     elif len(inf_aver.shape) == 3:  # using all posterior samples
-
         n_genes = inf_aver.shape[0]
         n_samples = inf_aver.shape[2]
 
@@ -106,7 +103,6 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
         names["level_1"] = list(hierarhy_df.index)
 
         for k in np.arange(hierarhy_df.shape[1]) + 2:
-
             k_names = list(hierarhy_df.iloc[:, k - 2].unique())
             k_level = hierarhy_df.shape[1] + 3 - k
             results[f"level_{k_level}"] = np.zeros((n_genes, len(k_names), n_samples))

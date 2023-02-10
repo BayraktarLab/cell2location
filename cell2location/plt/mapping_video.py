@@ -349,7 +349,6 @@ def plot_video_mapping(
 
     # plot evolving from averages to spatial locations
     for i3 in tqdm(range(step_n[4])):
-
         # sel_clust_df_1 = expand_1by1(sel_clust_df)
 
         dfs = []
@@ -382,7 +381,6 @@ def plot_video_mapping(
 
     # plot a few final images
     for i4 in tqdm(range(step_n[5])):
-
         dfs = []
         clusters = []
         for i in range(sel_clust_df.shape[1]):
