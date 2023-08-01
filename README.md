@@ -228,6 +228,8 @@ adata_incl_nontissue = read_all_and_qc(
 Since Version 0.9.0 (released on 2023-04-11), the function `AnnData.concatenate()` has been deprecated in favour of `anndata.concat()` as per the official release notes ([Reference](https://anndata.readthedocs.io/en/latest/release-notes/index.html#id4)). Here is the updated code snippet of `read_all_and_qc`:
 
 ```python
+from anndata import concat
+
 def read_all_and_qc(
     sample_annot, Sample_ID_col, file_col, sp_data_folder, 
     count_file='filtered_feature_bc_matrix.h5',
