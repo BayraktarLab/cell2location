@@ -224,3 +224,48 @@ adata_incl_nontissue = read_all_and_qc(
     count_file='raw_feature_bc_matrix.h5',
 )
 ```
+
+Since Version 0.9.0 (released on 2023-04-11), the function `AnnData.concatenate()` has been deprecated in favour of `anndata.concat()` as per the official release notes ([Reference](https://anndata.readthedocs.io/en/latest/release-notes/index.html#id4)). Here is the updated code snippet of `read_all_and_qc`:
+
+```python
+def read_all_and_qc(
+    sample_annot, Sample_ID_col, file_col, sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+):
+    """
+    Read and concatenate all Visium files.
+    """
+
+    # read all samples and store them in a list
+    adatas = []
+    for i, s in enumerate(sample_annot[Sample_ID_col]):
+        adata_i = read_and_qc(s, Sample_ID_col[file_col][i], path=sp_data_folder) 
+        adatas.append(adata_i)
+    # combine individual samples
+    adata = concat(
+        adatas,
+        merge="unique",
+        label="batch",
+        keys=sample_annot[Sample_ID_col].tolist(), 
+        index_unique=None
+    )
+
+    sample_annot.index = sample_annot[Sample_ID_col]
+    for c in sample_annot.columns:
+        sample_annot.loc[:, c] = sample_annot[c].astype(str)
+    adata.obs[sample_annot.columns] = sample_annot.reindex(index=adata.obs['sample']).values
+    
+    return adata
+
+adata = read_all_and_qc(
+    sample_annot=sample_annot, 
+    Sample_ID_col='Sample_ID', 
+    file_col='file', 
+    sp_data_folder=sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+)
+
+cell2location.models.Cell2location.setup_anndata(
+    adata=adata_vis,
+    batch_key="batch")
+```
