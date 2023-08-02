@@ -247,6 +247,7 @@ def read_all_and_qc(
     adata = concat(
         adatas,
         merge="unique",
+        uns_merge="unique",
         label="batch",
         keys=sample_annot[Sample_ID_col].tolist(), 
         index_unique=None
