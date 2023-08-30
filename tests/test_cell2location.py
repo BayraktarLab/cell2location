@@ -4,7 +4,8 @@ from pyro.infer.autoguide import AutoHierarchicalNormalMessenger
 from scvi.data import synthetic_iid
 from scvi.dataloaders import AnnDataLoader
 
-from cell2location import run_colocation
+from cell2location import compute_weighted_average_around_target, run_colocation
+from cell2location.cell_comm.around_target import melt_signal_target_data_frame
 from cell2location.models import Cell2location, RegressionModel
 from cell2location.models.simplified._cell2location_v3_no_factorisation_module import (
     LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
@@ -41,6 +42,7 @@ def test_cell2location():
     else:
         use_gpu = False
     dataset = synthetic_iid(n_labels=5)
+    dataset.obsm["X_spatial"] = np.random.normal(0, 1, [dataset.n_obs, 2])
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
     # train regression model to get signatures of cell types
@@ -245,4 +247,67 @@ def test_cell2location():
     st_model.train(max_epochs=1, use_gpu=use_gpu)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
-    st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+    dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+
+    # test compute_weighted_average_around_target
+    normalisation_key = "detection_y_s"
+    dataset.obsm[normalisation_key] = dataset.uns["mod"]["post_sample_q05"][normalisation_key]
+    # average of other cell types
+    compute_weighted_average_around_target(
+        dataset,
+        target_cell_type_quantile=0.995,
+        source_cell_type_quantile=0.95,
+        normalisation_quantile=0.999,
+        sample_key="batch",
+    )
+    # average of genes
+    compute_weighted_average_around_target(
+        dataset,
+        target_cell_type_quantile=0.995,
+        source_cell_type_quantile=0.80,
+        normalisation_quantile=0.999,
+        normalisation_key=normalisation_key,
+        genes_to_use_as_source=dataset.var_names,
+        gene_symbols=None,
+        sample_key="batch",
+    )
+
+    distance_bins = [
+        [5, 50],
+        [50, 100],
+        [100, 150],
+        [150, 200],
+        [200, 250],
+        [300, 350],
+        [350, 400],
+        [400, 450],
+        [450, 500],
+        [500, 550],
+        [550, 600],
+        [600, 650],
+        [650, 700],
+    ]
+    weighted_avg_dict = dict()
+    for distance_bin in distance_bins:
+        # average of other cell types
+        compute_weighted_average_around_target(
+            dataset,
+            target_cell_type_quantile=0.995,
+            source_cell_type_quantile=0.95,
+            normalisation_quantile=0.999,
+            distance_bin=distance_bin,
+            sample_key="batch",
+        )
+        # average of genes
+        weighted_avg_dict[str(distance_bin)] = compute_weighted_average_around_target(
+            dataset,
+            target_cell_type_quantile=0.995,
+            source_cell_type_quantile=0.80,
+            normalisation_quantile=0.999,
+            normalisation_key=normalisation_key,
+            genes_to_use_as_source=dataset.var_names,
+            gene_symbols=None,
+            distance_bin=distance_bin,
+            sample_key="batch",
+        )
+    melt_signal_target_data_frame(weighted_avg_dict, distance_bins)

@@ -612,7 +612,7 @@ class PyroAggressiveConvergence(Callback):
             mi_ = np.array([v for v in mi_.values()]).sum()
             pl_module.log("MI", mi_, prog_bar=True)
             if len(pl_module.mi) > 1:
-                if pl_module.mi[-1] >= (mi_ - self.tolerance):
+                if abs(mi_ - pl_module.mi[-1]) < self.tolerance:
                     pl_module.n_epochs_patience += 1
             else:
                 pl_module.n_epochs_patience = 0
