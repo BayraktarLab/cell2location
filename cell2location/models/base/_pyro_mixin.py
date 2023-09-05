@@ -4,16 +4,16 @@ from datetime import date
 from functools import partial
 from typing import Optional, Union
 
+import lightning.pytorch as pl
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
-import lightning.pytorch as pl
 import torch
+from lightning.pytorch.callbacks import Callback
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
-from lightning.pytorch.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
