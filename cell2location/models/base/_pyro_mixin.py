@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
-from pytorch_lightning.callbacks import Callback
+from lightning.pytorch.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
@@ -592,9 +592,9 @@ class PyroAggressiveConvergence(Callback):
         self.patience = patience
         self.tolerance = tolerance
 
-    def _on_train_epoch_end(
+    def on_train_epoch_end(
         self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", unused: Optional = None
-    ) -> None:  # TODO this function is not essential but broken
+    ) -> None:
         """
         Compute aggressive training convergence criteria for amortised inference.
         """
