@@ -17,7 +17,7 @@ from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
-from scvi.model._utils import parse_use_gpu_arg
+from scvi.model._utils import parse_device_args
 from scvi.module.base import PyroBaseModuleClass
 from scvi.train import PyroTrainingPlan as PyroTrainingPlan_scvi
 
@@ -189,7 +189,8 @@ class QuantileMixin:
         self,
         q: float = 0.5,
         batch_size: int = 2048,
-        use_gpu: bool = None,
+        accelerator: str = "gpu",
+        device: Union[int, str] = "auto",
         use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
@@ -218,7 +219,12 @@ class QuantileMixin:
 
         """
 
-        _, _, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_device_args(
+            accelerator=accelerator,
+            devices=device,
+            return_device="torch",
+            validate_single_device=True,
+        )
 
         self.module.eval()
 
@@ -298,7 +304,8 @@ class QuantileMixin:
         self,
         q: float = 0.5,
         batch_size: int = None,
-        use_gpu: bool = None,
+        accelerator: str = "gpu",
+        device: Union[int, str] = "auto",
         use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
@@ -322,7 +329,12 @@ class QuantileMixin:
         """
 
         self.module.eval()
-        _, _, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_device_args(
+            accelerator=accelerator,
+            devices=device,
+            return_device="torch",
+            validate_single_device=True,
+        )
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
         train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
