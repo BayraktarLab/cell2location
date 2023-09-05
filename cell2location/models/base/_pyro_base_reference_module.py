@@ -1,4 +1,5 @@
-from scvi._compat import Literal
+from typing import Literal
+
 from scvi.module.base import PyroBaseModuleClass
 
 from cell2location.models.base._pyro_mixin import AutoGuideMixinModule, init_to_value
@@ -64,7 +65,6 @@ class RegressionBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         return self.model.list_obs_plate_vars()
 
     def init_to_value(self, site):
-
         if getattr(self.model, "np_init_vals", None) is not None:
             init_vals = {k: getattr(self.model, f"init_val_{k}") for k in self.model.np_init_vals.keys()}
         else:

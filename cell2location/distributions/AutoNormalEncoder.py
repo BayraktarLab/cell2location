@@ -1,5 +1,6 @@
 from contextlib import ExitStack  # python 3
 from copy import deepcopy
+from typing import Literal
 
 import numpy as np
 import pyro
@@ -13,7 +14,6 @@ from pyro.infer.autoguide.guides import deep_getattr, deep_setattr
 from pyro.infer.autoguide.utils import helpful_support_errors
 from pyro.nn import PyroModule, PyroParam
 from pyro.nn.module import to_pyro_module_
-from scvi._compat import Literal
 from scvi.nn import FCLayers
 from torch.distributions import biject_to
 
@@ -181,7 +181,6 @@ class AutoNormalEncoder(AutoGuide):
         self.init_param_scale = init_param_scale
 
     def _setup_prototype(self, *args, **kwargs):
-
         super()._setup_prototype(*args, **kwargs)
 
         self._event_dims = {}

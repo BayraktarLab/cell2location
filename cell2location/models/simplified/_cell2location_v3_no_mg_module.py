@@ -92,7 +92,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         detection_hyp_prior={"mean_alpha": 10.0},
         w_sf_mean_var_ratio=5.0,
     ):
-
         super().__init__()
 
         self.n_obs = n_obs
@@ -209,7 +208,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoM
         }
 
     def forward(self, x_data, idx, batch_index):
-
         obs2sample = one_hot(batch_index, self.n_batch)
 
         obs_plate = self.create_plates(x_data, idx, batch_index)

@@ -17,7 +17,7 @@ from scvi.data.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
-from scvi.dataloaders import DataSplitter, DeviceBackedDataSplitter
+from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import TrainRunner
@@ -203,7 +203,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             kwargs["plan_kwargs"]["loss_fn"] = Trace_ELBO(num_particles=num_particles)
         if scale_elbo != 1.0:
             if scale_elbo is None:
-                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_genes"])
+                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_vars"])
             kwargs["plan_kwargs"]["scale_elbo"] = scale_elbo
 
         super().train(**kwargs)
@@ -212,8 +212,11 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         self,
         max_epochs: Optional[int] = 1000,
         use_gpu: Optional[Union[str, int, bool]] = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
         train_size: float = 1,
         validation_size: Optional[float] = None,
+        shuffle_set_split: bool = True,
         batch_size: int = None,
         early_stopping: bool = False,
         lr: Optional[float] = None,
@@ -266,14 +269,16 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 validation_size=validation_size,
                 batch_size=batch_size,
                 use_gpu=use_gpu,
+                accelerator=accelerator,
+                device=device,
             )
         else:
-            data_splitter = DataSplitter(
+            data_splitter = self._data_splitter_cls(
                 self.adata_manager,
                 train_size=train_size,
                 validation_size=validation_size,
+                shuffle_set_split=shuffle_set_split,
                 batch_size=batch_size,
-                use_gpu=use_gpu,
             )
         training_plan = PyroAggressiveTrainingPlan(pyro_module=self.module, **plan_kwargs)
 
@@ -291,6 +296,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             data_splitter=data_splitter,
             max_epochs=max_epochs,
             use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=device,
             **trainer_kwargs,
         )
         res = runner()
@@ -303,6 +310,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         sample_kwargs: Optional[dict] = None,
         export_slot: str = "mod",
         add_to_obsm: list = ["means", "stds", "q05", "q95"],
+        use_quantiles: bool = False,
     ):
         """
         Summarise posterior distribution and export results (cell abundance) to anndata object:
@@ -326,6 +334,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             adata.uns slot where to export results
         add_to_obsm
             posterior distribution summary to export in adata.obsm (['means', 'stds', 'q05', 'q95']).
+        use_quantiles
+            compute quantiles directly (True, more memory efficient) or use samples (False, default).
+            If True, means and stds cannot be computed so are not exported and returned.
         Returns
         -------
 
@@ -333,11 +344,19 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         sample_kwargs = sample_kwargs if isinstance(sample_kwargs, dict) else dict()
 
-        # generate samples from posterior distributions for all parameters
-        # and compute mean, 5%/95% quantiles and standard deviation
-        self.samples = self.sample_posterior(**sample_kwargs)
-        # TODO use add_to_obsm to determine which quantiles need to be computed,
-        # and if means and stds are not in the list - use quantile methods rather than sampling posterior
+        # get posterior distribution summary
+        if use_quantiles:
+            add_to_obsm = [i for i in add_to_obsm if (i not in ["means", "stds"]) and ("q" in i)]
+            if len(add_to_obsm) == 0:
+                raise ValueError("No quantiles to export - please add add_to_obsm=['q05', 'q50', 'q95'].")
+            self.samples = dict()
+            for i in add_to_obsm:
+                q = float(f"0.{i[1:]}")
+                self.samples[f"post_sample_{i}"] = self.posterior_quantile(q=q, **sample_kwargs)
+        else:
+            # generate samples from posterior distributions for all parameters
+            # and compute mean, 5%/95% quantiles and standard deviation
+            self.samples = self.sample_posterior(**sample_kwargs)
 
         # export posterior distribution summary for all parameters and
         # annotation (model, date, var, obs and cell type names) to anndata object

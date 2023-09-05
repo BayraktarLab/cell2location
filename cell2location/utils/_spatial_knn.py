@@ -185,7 +185,6 @@ def spatial_knn(
 
     # rejigger the neighour pool by including the spatially adjacent ones
     for i in np.arange(expression.shape[0]):
-
         # identify the spatial neighbours for the spot and compute their distance
         mask = np.isin(numtemp, coord_ind[i])
 

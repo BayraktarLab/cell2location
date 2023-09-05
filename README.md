@@ -7,6 +7,7 @@
 [![Stars](https://img.shields.io/github/stars/BayraktarLab/cell2location?logo=GitHub&color=yellow)](https://github.com/BayraktarLab/cell2location/stargazers)
 ![Build Status](https://github.com/BayraktarLab/cell2location/actions/workflows/test.yml/badge.svg?event=push)
 [![Documentation Status](https://readthedocs.org/projects/cell2location/badge/?version=latest)](https://cell2location.readthedocs.io/en/stable/?badge=latest)
+[![Downloads](https://pepy.tech/badge/cell2location)](https://pepy.tech/project/cell2location)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb)
 [![Docker image on quay.io](https://img.shields.io/badge/container-quay.io/vitkl/cell2location-brightgreen "Docker image on quay.io")](https://quay.io/vitkl/cell2location) 
 
@@ -42,7 +43,7 @@ Create conda environment and install `cell2location` package
 conda create -y -n cell2loc_env python=3.9
 
 conda activate cell2loc_env
-pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials]
+pip install cell2location[tutorials]
 ```
 
 Finally, to use this environment in jupyter notebook, add jupyter kernel for this environment:
@@ -222,4 +223,52 @@ adata_incl_nontissue = read_all_and_qc(
     sp_data_folder=sp_data_folder, 
     count_file='raw_feature_bc_matrix.h5',
 )
+```
+
+Since Version 0.9.0 (released on 2023-04-11), the function `AnnData.concatenate()` has been deprecated in favour of `anndata.concat()` as per the official release notes ([Reference](https://anndata.readthedocs.io/en/latest/release-notes/index.html#id4)). Here is the updated code snippet of `read_all_and_qc`:
+
+```python
+from anndata import concat
+
+def read_all_and_qc(
+    sample_annot, Sample_ID_col, file_col, sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+):
+    """
+    Read and concatenate all Visium files.
+    """
+
+    # read all samples and store them in a list
+    adatas = []
+    for i, s in enumerate(sample_annot[Sample_ID_col]):
+        adata_i = read_and_qc(s, Sample_ID_col[file_col][i], path=sp_data_folder) 
+        adatas.append(adata_i)
+    # combine individual samples
+    adata = concat(
+        adatas,
+        merge="unique",
+        uns_merge="unique",
+        label="batch",
+        keys=sample_annot[Sample_ID_col].tolist(), 
+        index_unique=None
+    )
+
+    sample_annot.index = sample_annot[Sample_ID_col]
+    for c in sample_annot.columns:
+        sample_annot.loc[:, c] = sample_annot[c].astype(str)
+    adata.obs[sample_annot.columns] = sample_annot.reindex(index=adata.obs['sample']).values
+
+    return adata
+
+adata = read_all_and_qc(
+    sample_annot=sample_annot, 
+    Sample_ID_col='Sample_ID', 
+    file_col='file', 
+    sp_data_folder=sp_data_folder, 
+    count_file='filtered_feature_bc_matrix.h5',
+)
+
+cell2location.models.Cell2location.setup_anndata(
+    adata=adata_vis,
+    batch_key="batch")
 ```

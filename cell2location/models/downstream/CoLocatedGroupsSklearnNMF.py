@@ -100,7 +100,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         l1_ratio=0.5,
         nmf_kwd_args={},
     ):
-
         ############# Initialise parameters ################
         super().__init__(
             X_data, n_fact, 0, n_iter, 0, 0, verbose, var_names, var_names_read, obs_names, fact_names, sample_id
@@ -156,7 +155,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
         init_names = ["init_" + str(i + 1) for i in np.arange(n)]
 
         for i, name in enumerate(init_names):
-
             # when type is molecular cross-validation or bootstrap,
             # replace self.x_data with new data
             if np.isin(n_type, ["cv", "bootstrap"]):
@@ -166,14 +164,20 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
 
             from sklearn.decomposition import NMF
 
-            self.models[name] = NMF(
-                n_components=self.n_fact,
-                init=self.init,
-                alpha=self.alpha,
-                l1_ratio=self.l1_ratio,
-                max_iter=self.n_iter,
-                **self.nmf_kwd_args
-            )
+            nmf_kwargs = {
+                **self.nmf_kwd_args,
+                "n_components": self.n_fact,
+                "init": self.init,
+                "l1_ratio": self.l1_ratio,
+                "max_iter": self.n_iter,
+            }
+
+            if "alpha_W" in NMF.__init__.__code__.co_varnames:
+                nmf_kwargs["alpha_W"] = self.alpha
+            else:
+                nmf_kwargs["alpha"] = self.alpha
+
+            self.models[name] = NMF(**nmf_kwargs)
             W = self.models[name].fit_transform(self.x_data)
             H = self.models[name].components_
             self.results[name] = {
@@ -227,7 +231,6 @@ class CoLocatedGroupsSklearnNMF(BaseModel):
             )
 
     def plot_cell_type_loadings(self, selected_cell_types=None, **kwargs):
-
         if selected_cell_types is None:
             selected_cell_types = self.var_names_read
 

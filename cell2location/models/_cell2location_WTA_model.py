@@ -164,7 +164,6 @@ class Cell2location_WTA(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltEx
         ]
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
-        adata_manager.summary_stats["n_neg_probes"] = adata.obsm[neg_probes_key].shape[0]
         cls.register_manager(adata_manager)
 
     def train(

@@ -101,7 +101,7 @@ def run_colocation(
         "plot_cell_type_loadings_kwargs": dict(),
     }
 
-    d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.00001}}
+    d_model_kwargs = {"init": "random", "random_state": 0, "nmf_kwd_args": {"tol": 0.000001}, "alpha": 0.01}
 
     # replace defaults with parameters supplied
     for k in train_args.keys():
@@ -374,7 +374,6 @@ def run_colocation(
                 sc_spatial_present = np.any(np.isin(list(sp_data.uns.keys()), ["spatial"]))
 
                 if sc_spatial_present:
-
                     sc.settings.figdir = fig_path
 
                     s_ind = sp_data.obs[train_args["sample_name_col"]] == s
@@ -414,7 +413,6 @@ def run_colocation(
                         )
 
                 else:
-
                     # if coordinates exist plot
                     if export_args["scanpy_coords_name"] is not None:
                         # move spatial coordinates to obs for compatibility with our plotter

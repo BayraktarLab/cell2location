@@ -48,13 +48,11 @@ def plot_absolute_abundances_1D(
     plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
     def subset_obs_column(adata, celltype):
-
         obs_columns = adata.obs.loc[:, [celltype in x.split("mean_spot_factors") for x in adata.obs.columns]]
         columns_names = obs_columns.columns
         return columns_names
 
     def subset_anndata(adata, celltype, dimName):
-
         adata_subset = adata.copy()
         names = subset_obs_column(adata, celltype)
         adata_subset.obs = adata_subset.obs.loc[:, names]
