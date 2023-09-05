@@ -4,7 +4,6 @@ import numpy as np
 
 
 def plot_genes_per_cell_type(slide, genes, ctypes):
-
     n_genes = len(genes)
     n_ctypes = len(ctypes)
     fig, axs = plt.subplots(
@@ -14,7 +13,6 @@ def plot_genes_per_cell_type(slide, genes, ctypes):
 
     # plots of every gene
     for j in range(n_genes):
-
         # limit color scale at 99.2% quantile of gene expression (computed across cell types)
         quantile_across_ct = np.array(
             [

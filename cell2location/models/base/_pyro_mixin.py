@@ -60,7 +60,6 @@ class AutoGuideMixinModule:
         guide_class=AutoNormal,
         guide_kwargs: Optional[dict] = None,
     ):
-
         if guide_kwargs is None:
             guide_kwargs = dict()
 
@@ -228,7 +227,6 @@ class QuantileMixin:
         # sample local parameters
         i = 0
         for tensor_dict in train_dl:
-
             args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
             args = [a.to(device) for a in args]
             kwargs = {k: v.to(device) for k, v in kwargs.items()}
@@ -715,7 +713,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
         )
 
     def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
-
         for k, v in self.module.guide.named_parameters():
             if not np.any([i in k for i in self.requires_grad_false_vars]):
                 k_in_vars = np.any([i in k for i in self.aggressive_vars])
@@ -751,7 +748,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
                     v.requires_grad = True
 
     def on_train_epoch_end(self, outputs):
-
         self.aggressive_epochs_counter += 1
 
         self.change_requires_grad(
@@ -770,7 +766,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
         torch.cuda.empty_cache()
 
     def training_step(self, batch, batch_idx):
-
         args, kwargs = self.module._get_fn_args_from_batch(batch)
         # Set KL weight if necessary.
         # Note: if applied, ELBO loss in progress bar is the effective KL annealed loss, not the true ELBO.

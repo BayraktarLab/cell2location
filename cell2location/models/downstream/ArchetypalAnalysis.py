@@ -96,7 +96,6 @@ class ArchetypalAnalysis(BaseModel):
         random_state=0,
         pcha_kwd_args={},
     ):
-
         ############# Initialise parameters ################
         super().__init__(
             X_data, n_fact, 0, n_iter, 0, 0, verbose, var_names, var_names_read, obs_names, fact_names, sample_id
@@ -149,7 +148,6 @@ class ArchetypalAnalysis(BaseModel):
         init_names = ["init_" + str(i + 1) for i in np.arange(n)]
 
         for i, name in enumerate(init_names):
-
             # when type is molecular cross-validation or bootstrap,
             # replace self.x_data with new data
             if np.isin(n_type, ["cv", "bootstrap"]):
