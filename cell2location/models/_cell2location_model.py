@@ -279,8 +279,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 validation_size=validation_size,
                 shuffle_set_split=shuffle_set_split,
                 batch_size=batch_size,
-                accelerator=accelerator,
-                device=device,
             )
         training_plan = PyroAggressiveTrainingPlan(pyro_module=self.module, **plan_kwargs)
 
