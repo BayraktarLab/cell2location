@@ -163,13 +163,13 @@ def test_cell2location():
     )
     # test minibatch training
     st_model.train(max_epochs=1, batch_size=20, accelerator=accelerator)
-    # st_model.train_aggressive(
-    #    max_epochs=3,
-    #    batch_size=20,
-    #    plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
-    #    accelerator=accelerator,
-    #    use_gpu=use_gpu,
-    # )
+    st_model.train_aggressive(
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        accelerator=accelerator,
+        use_gpu=use_gpu,
+    )
     # test hiding variables on the list
     var_list = ["locs.s_g_gene_add_alpha_e_inv"]
     for k, v in st_model.module.guide.named_parameters():
@@ -187,13 +187,13 @@ def test_cell2location():
             assert np.all(v.detach().cpu().numpy() == s_g_gene_add)
             v.requires_grad = False
     # test that aggressive training doesn't reactivate them
-    # st_model.train_aggressive(
-    #    max_epochs=3,
-    #    batch_size=20,
-    #    plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
-    #    accelerator=accelerator,
-    #    use_gpu=use_gpu,
-    # )
+    st_model.train_aggressive(
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        accelerator=accelerator,
+        use_gpu=use_gpu,
+    )
     for k, v in st_model.module.guide.named_parameters():
         k_in_vars = np.any([i in k for i in var_list])
         if k_in_vars:
