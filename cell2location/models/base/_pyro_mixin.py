@@ -630,8 +630,10 @@ class PyroTrainingPlan(PyroTrainingPlan_scvi):
         for out in outputs:
             elbo += out["loss"]
             n += 1
-        elbo /= n
+        if n > 0:
+            elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        self.training_step_outputs.clear()
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -749,7 +751,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
                     v.requires_grad = True
 
     def on_train_epoch_end(self):
-        outputs = self.training_step_outputs
         self.aggressive_epochs_counter += 1
 
         self.change_requires_grad(
@@ -757,13 +758,16 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
             non_aggressive_vars_status="expose",
         )
 
+        outputs = self.training_step_outputs
         elbo = 0
         n = 0
         for out in outputs:
             elbo += out["loss"]
             n += 1
-        elbo /= n
+        if n > 0:
+            elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        self.training_step_outputs.clear()
         gc.collect()
         torch.cuda.empty_cache()
 
