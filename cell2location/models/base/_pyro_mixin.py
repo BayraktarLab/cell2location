@@ -750,7 +750,7 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
                 if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
                     v.requires_grad = True
 
-    def training_epoch_end(self, outputs):
+    def on_train_epoch_end(self, outputs):
 
         self.aggressive_epochs_counter += 1
 
