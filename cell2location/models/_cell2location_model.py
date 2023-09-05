@@ -17,7 +17,7 @@ from scvi.data.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
-from scvi.dataloaders import DataSplitter, DeviceBackedDataSplitter
+from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import TrainRunner
@@ -212,8 +212,11 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         self,
         max_epochs: Optional[int] = 1000,
         use_gpu: Optional[Union[str, int, bool]] = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
         train_size: float = 1,
         validation_size: Optional[float] = None,
+        shuffle_set_split: bool = True,
         batch_size: int = None,
         early_stopping: bool = False,
         lr: Optional[float] = None,
@@ -266,14 +269,16 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 validation_size=validation_size,
                 batch_size=batch_size,
                 use_gpu=use_gpu,
+                accelerator=accelerator,
+                device=device,
             )
         else:
-            data_splitter = DataSplitter(
+            data_splitter = self._data_splitter_cls(
                 self.adata_manager,
                 train_size=train_size,
                 validation_size=validation_size,
+                shuffle_set_split=shuffle_set_split,
                 batch_size=batch_size,
-                use_gpu=use_gpu,
             )
         training_plan = PyroAggressiveTrainingPlan(pyro_module=self.module, **plan_kwargs)
 
@@ -291,6 +296,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             data_splitter=data_splitter,
             max_epochs=max_epochs,
             use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=device,
             **trainer_kwargs,
         )
         res = runner()

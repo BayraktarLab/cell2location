@@ -7,6 +7,7 @@ from rich.logging import RichHandler
 from torch.distributions import biject_to, transform_to
 
 from . import models
+from .cell_comm.around_target import compute_weighted_average_around_target
 from .run_colocation import run_colocation
 
 # https://github.com/python-poetry/poetry/pull/2366#issuecomment-652418094
@@ -46,4 +47,5 @@ logger.propagate = False
 __all__ = [
     "models",
     "run_colocation",
+    "compute_weighted_average_around_target",
 ]
