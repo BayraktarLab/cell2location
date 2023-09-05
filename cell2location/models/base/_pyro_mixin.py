@@ -622,8 +622,9 @@ class PyroAggressiveConvergence(Callback):
 
 
 class PyroTrainingPlan(PyroTrainingPlan_scvi):
-    def on_train_epoch_end(self, outputs):
+    def on_train_epoch_end(self):
         """Training epoch end for Pyro training."""
+        outputs = self.training_step_outputs
         elbo = 0
         n = 0
         for out in outputs:
@@ -747,7 +748,8 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
                 if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
                     v.requires_grad = True
 
-    def on_train_epoch_end(self, outputs):
+    def on_train_epoch_end(self):
+        outputs = self.training_step_outputs
         self.aggressive_epochs_counter += 1
 
         self.change_requires_grad(
