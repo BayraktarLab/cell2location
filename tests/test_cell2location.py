@@ -164,7 +164,9 @@ def test_cell2location():
     # test minibatch training
     st_model.train(max_epochs=1, batch_size=20, accelerator=accelerator)
     st_model.train_aggressive(
-        max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
         accelerator=accelerator,
         use_gpu=use_gpu,
     )
@@ -186,7 +188,9 @@ def test_cell2location():
             v.requires_grad = False
     # test that aggressive training doesn't reactivate them
     st_model.train_aggressive(
-        max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
         accelerator=accelerator,
         use_gpu=use_gpu,
     )
