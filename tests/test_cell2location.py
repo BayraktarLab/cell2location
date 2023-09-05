@@ -17,6 +17,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 def export_posterior(model, dataset):
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50", "q001"])  # quantile 0.50
+    assert "data_target" not in dataset.uns["mod"]["post_sample_q50"].keys()
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
@@ -26,6 +27,7 @@ def export_posterior(model, dataset):
 
 def export_posterior_sc(model, dataset):
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50", "q001"])  # quantile 0.50
+    assert "data_target" not in dataset.uns["mod"]["post_sample_q50"].keys()
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_varm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
