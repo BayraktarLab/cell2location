@@ -624,7 +624,7 @@ class PyroAggressiveConvergence(Callback):
 
 
 class PyroTrainingPlan(PyroTrainingPlan_scvi):
-    def training_epoch_end(self, outputs):
+    def on_train_epoch_end(self, outputs):
         """Training epoch end for Pyro training."""
         elbo = 0
         n = 0
