@@ -592,9 +592,9 @@ class PyroAggressiveConvergence(Callback):
         self.patience = patience
         self.tolerance = tolerance
 
-    def on_train_epoch_end(
+    def _on_train_epoch_end(
         self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", unused: Optional = None
-    ) -> None:
+    ) -> None:  # TODO this function is not essential but broken
         """
         Compute aggressive training convergence criteria for amortised inference.
         """
