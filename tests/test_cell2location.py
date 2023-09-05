@@ -99,7 +99,7 @@ def test_cell2location():
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
     # test computing any quantile of the posterior distribution
-    st_model.posterior_quantile(q=0.5, use_gpu=use_gpu)
+    st_model.posterior_quantile(q=0.5, accelerator=accelerator)
     # test computing median
     if use_gpu:
         device = f"cuda:{use_gpu}"
