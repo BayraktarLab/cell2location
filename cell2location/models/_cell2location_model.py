@@ -17,7 +17,7 @@ from scvi.data.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
-from scvi.dataloaders import DataSplitter, DeviceBackedDataSplitter
+from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import TrainRunner
