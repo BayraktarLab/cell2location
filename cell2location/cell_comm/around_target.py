@@ -70,6 +70,10 @@ def compute_weighted_average_around_target(
         source_names = adata.uns["mod"]["factor_names"]
     else:
         source_names = genes_to_use_as_source
+        # if using gene symbols get var names:
+        if gene_symbols is not None:
+            genes_to_use_as_source = adata.var_names[adata.var[gene_symbols].isin(genes_to_use_as_source).values]
+            source_names = adata.var[gene_symbols][adata.var[gene_symbols].isin(genes_to_use_as_source).values]
 
     cell_abundance_key_ = cell_abundance_quantile_key + cell_abundance_key
     cell_abundance_key = cell_abundance_quantile_key + "_" + cell_abundance_key
@@ -95,9 +99,6 @@ def compute_weighted_average_around_target(
             axis=0,
         )
     else:
-        # if using gene symbols get var names:
-        if gene_symbols is not None:
-            genes_to_use_as_source = adata.var_names[adata.var[gene_symbols].isin(genes_to_use_as_source)]
         # get RNA abundance data
         if layer is None:
             source_cell_type_data = adata[:, genes_to_use_as_source].X.toarray()
