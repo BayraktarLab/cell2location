@@ -43,7 +43,6 @@ class BaseModel:
         fact_names=None,
         sample_id=None,
     ):
-
         # Initialise parameters
         self.X_data = X_data
         self.n_fact = n_fact
@@ -228,11 +227,10 @@ class BaseModel:
         if mean_field_slot is None:
             mean_field_slot = self.hist.keys()
 
-        if type(mean_field_slot) == str:
+        if isinstance(mean_field_slot, str):
             mean_field_slot = [mean_field_slot]
 
         for i in mean_field_slot:
-
             if iter_end == -1:
                 iter_end = np.array(self.hist[i]).flatten().shape[0]
 
@@ -271,7 +269,6 @@ class BaseModel:
         plt.tight_layout()
 
     def plot_posterior_vs_data(self, gene_fact_name="gene_factors", cell_fact_name="cell_factors"):
-
         # extract posterior samples of scaled gene and cell factors (before the final likelihood step)
         gene_fact_s = self.samples["post_sample_means"][gene_fact_name]
         cell_factors_scaled_s = self.samples["post_sample_means"][cell_fact_name]

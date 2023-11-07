@@ -176,7 +176,6 @@ class RegressionBackgroundDetectionTechPyroModel(PyroModule):
         }
 
     def forward(self, x_data, idx, batch_index, label_index, extra_categoricals):
-
         obs2sample = one_hot(batch_index, self.n_batch)
         obs2label = one_hot(label_index, self.n_factors)
         if self.n_extra_categoricals is not None:

@@ -99,7 +99,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         init_alpha=20.0,
         dropout_p=0.0,
     ):
-
         super().__init__()
 
         self.n_obs = n_obs
@@ -241,7 +240,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         }
 
     def forward(self, x_data, idx, batch_index):
-
         obs2sample = one_hot(batch_index, self.n_batch)
 
         obs_plate = self.create_plates(x_data, idx, batch_index)

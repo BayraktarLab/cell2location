@@ -181,7 +181,6 @@ class AutoNormalEncoder(AutoGuide):
         self.init_param_scale = init_param_scale
 
     def _setup_prototype(self, *args, **kwargs):
-
         super()._setup_prototype(*args, **kwargs)
 
         self._event_dims = {}

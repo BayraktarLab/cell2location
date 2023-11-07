@@ -4,20 +4,20 @@ from datetime import date
 from functools import partial
 from typing import Optional, Union
 
+import lightning.pytorch as pl
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyro
-import pytorch_lightning as pl
 import torch
+from lightning.pytorch.callbacks import Callback
 from pyro import poutine
 from pyro.infer.autoguide import AutoNormal, init_to_feasible, init_to_mean
-from pytorch_lightning.callbacks import Callback
 from scipy.sparse import issparse
 from scvi import REGISTRY_KEYS
 from scvi.dataloaders import AnnDataLoader
-from scvi.model._utils import parse_use_gpu_arg
+from scvi.model._utils import parse_device_args
 from scvi.module.base import PyroBaseModuleClass
 from scvi.train import PyroTrainingPlan as PyroTrainingPlan_scvi
 
@@ -60,7 +60,6 @@ class AutoGuideMixinModule:
         guide_class=AutoNormal,
         guide_kwargs: Optional[dict] = None,
     ):
-
         if guide_kwargs is None:
             guide_kwargs = dict()
 
@@ -190,7 +189,8 @@ class QuantileMixin:
         self,
         q: float = 0.5,
         batch_size: int = 2048,
-        use_gpu: bool = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
         use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
@@ -219,7 +219,12 @@ class QuantileMixin:
 
         """
 
-        _, _, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_device_args(
+            accelerator=accelerator,
+            devices=device,
+            return_device="torch",
+            validate_single_device=True,
+        )
 
         self.module.eval()
 
@@ -228,7 +233,6 @@ class QuantileMixin:
         # sample local parameters
         i = 0
         for tensor_dict in train_dl:
-
             args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
             args = [a.to(device) for a in args]
             kwargs = {k: v.to(device) for k, v in kwargs.items()}
@@ -300,7 +304,8 @@ class QuantileMixin:
         self,
         q: float = 0.5,
         batch_size: int = None,
-        use_gpu: bool = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
         use_median: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
@@ -324,7 +329,12 @@ class QuantileMixin:
         """
 
         self.module.eval()
-        _, _, device = parse_use_gpu_arg(use_gpu)
+        _, _, device = parse_device_args(
+            accelerator=accelerator,
+            devices=device,
+            return_device="torch",
+            validate_single_device=True,
+        )
         if batch_size is None:
             batch_size = self.adata_manager.adata.n_obs
         train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
@@ -624,15 +634,18 @@ class PyroAggressiveConvergence(Callback):
 
 
 class PyroTrainingPlan(PyroTrainingPlan_scvi):
-    def training_epoch_end(self, outputs):
+    def on_train_epoch_end(self):
         """Training epoch end for Pyro training."""
+        outputs = self.training_step_outputs
         elbo = 0
         n = 0
         for out in outputs:
             elbo += out["loss"]
             n += 1
-        elbo /= n
+        if n > 0:
+            elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        self.training_step_outputs.clear()
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -715,7 +728,6 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
         )
 
     def change_requires_grad(self, aggressive_vars_status, non_aggressive_vars_status):
-
         for k, v in self.module.guide.named_parameters():
             if not np.any([i in k for i in self.requires_grad_false_vars]):
                 k_in_vars = np.any([i in k for i in self.aggressive_vars])
@@ -750,8 +762,7 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
                 if (not k_in_vars) and (not v.requires_grad) and (non_aggressive_vars_status == "expose"):
                     v.requires_grad = True
 
-    def training_epoch_end(self, outputs):
-
+    def on_train_epoch_end(self):
         self.aggressive_epochs_counter += 1
 
         self.change_requires_grad(
@@ -759,18 +770,20 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan_scvi):
             non_aggressive_vars_status="expose",
         )
 
+        outputs = self.training_step_outputs
         elbo = 0
         n = 0
         for out in outputs:
             elbo += out["loss"]
             n += 1
-        elbo /= n
+        if n > 0:
+            elbo /= n
         self.log("elbo_train", elbo, prog_bar=True)
+        self.training_step_outputs.clear()
         gc.collect()
         torch.cuda.empty_cache()
 
     def training_step(self, batch, batch_idx):
-
         args, kwargs = self.module._get_fn_args_from_batch(batch)
         # Set KL weight if necessary.
         # Note: if applied, ELBO loss in progress bar is the effective KL annealed loss, not the true ELBO.

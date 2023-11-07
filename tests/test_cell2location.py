@@ -16,7 +16,6 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 
 def export_posterior(model, dataset):
-
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50", "q001"])  # quantile 0.50
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 10}
@@ -26,7 +25,6 @@ def export_posterior(model, dataset):
 
 
 def export_posterior_sc(model, dataset):
-
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50", "q001"])  # quantile 0.50
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_varm=["q50"], sample_kwargs={"batch_size": 10}
@@ -39,8 +37,10 @@ def test_cell2location():
     save_path = "./cell2location_model_test"
     if torch.cuda.is_available():
         use_gpu = int(torch.cuda.is_available())
+        accelerator = "gpu"
     else:
-        use_gpu = False
+        use_gpu = None
+        accelerator = "cpu"
     dataset = synthetic_iid(n_labels=5)
     dataset.obsm["X_spatial"] = np.random.normal(0, 1, [dataset.n_obs, 2])
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
@@ -48,9 +48,9 @@ def test_cell2location():
     # train regression model to get signatures of cell types
     sc_model = RegressionModel(dataset)
     # test full data training
-    sc_model.train(max_epochs=1, use_gpu=use_gpu)
+    sc_model.train(max_epochs=1, accelerator=accelerator)
     # test minibatch training
-    sc_model.train(max_epochs=1, batch_size=1000, use_gpu=use_gpu)
+    sc_model.train(max_epochs=1, batch_size=1000, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     dataset = sc_model.export_posterior(dataset, sample_kwargs={"num_samples": 10})
     # test plot_QC
@@ -75,7 +75,7 @@ def test_cell2location():
     ##  full data  ##
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test full data training
-    st_model.train(max_epochs=1, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
@@ -86,7 +86,7 @@ def test_cell2location():
     Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)
     # test minibatch training
-    st_model.train(max_epochs=1, batch_size=50, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, batch_size=50, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
@@ -99,7 +99,7 @@ def test_cell2location():
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
     # test computing any quantile of the posterior distribution
-    st_model.posterior_quantile(q=0.5, use_gpu=use_gpu)
+    st_model.posterior_quantile(q=0.5, accelerator=accelerator)
     # test computing median
     if use_gpu:
         device = f"cuda:{use_gpu}"
@@ -124,7 +124,7 @@ def test_cell2location():
         create_autoguide_kwargs={"guide_class": AutoHierarchicalNormalMessenger},
     )
     # test minibatch training
-    st_model.train(max_epochs=1, batch_size=50, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, batch_size=50, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # minibatches of locations
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": 50})
@@ -160,9 +160,13 @@ def test_cell2location():
         encoder_mode="multiple",
     )
     # test minibatch training
-    st_model.train(max_epochs=1, batch_size=20, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, batch_size=20, accelerator=accelerator)
     st_model.train_aggressive(
-        max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}, use_gpu=use_gpu
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        accelerator=accelerator,
+        use_gpu=use_gpu,
     )
     # test hiding variables on the list
     var_list = ["locs.s_g_gene_add_alpha_e_inv"]
@@ -173,7 +177,7 @@ def test_cell2location():
             v.requires_grad = False
             s_g_gene_add = v.detach().cpu().numpy()
     # test that normal training doesn't reactivate them
-    st_model.train(max_epochs=1, batch_size=20, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, batch_size=20, accelerator=accelerator)
     for k, v in st_model.module.guide.named_parameters():
         k_in_vars = np.any([i in k for i in var_list])
         if k_in_vars:
@@ -182,7 +186,11 @@ def test_cell2location():
             v.requires_grad = False
     # test that aggressive training doesn't reactivate them
     st_model.train_aggressive(
-        max_epochs=3, batch_size=20, plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5}, use_gpu=use_gpu
+        max_epochs=3,
+        batch_size=20,
+        plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
+        accelerator=accelerator,
+        use_gpu=use_gpu,
     )
     for k, v in st_model.module.guide.named_parameters():
         k_in_vars = np.any([i in k for i in var_list])
@@ -230,7 +238,7 @@ def test_cell2location():
         model_class=LocationModelMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
     )
     # test full data training
-    st_model.train(max_epochs=1, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
@@ -244,7 +252,7 @@ def test_cell2location():
         model_class=LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel,
     )
     # test full data training
-    st_model.train(max_epochs=1, use_gpu=use_gpu)
+    st_model.train(max_epochs=1, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
