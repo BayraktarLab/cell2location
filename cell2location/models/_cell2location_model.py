@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy
+import torch
 from anndata import AnnData
 from pyro import clear_param_store
 from pyro.infer import Trace_ELBO, TraceEnum_ELBO
@@ -159,6 +160,12 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
+
+    def train_compiled(self, compile_mode=None, compile_dynamic=None, **kwargs):
+        self.train(**kwargs, max_steps=1)
+        self.module._model = torch.compile(self.module.model, mode=compile_mode, dynamic=compile_dynamic)
+        self.module._guide = torch.compile(self.module.guide, mode=compile_mode, dynamic=compile_dynamic)
+        self.train(**kwargs)
 
     def train(
         self,
