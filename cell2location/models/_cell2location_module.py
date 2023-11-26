@@ -218,11 +218,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
         batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
+        kwargs = {}
         if "positions" in tensor_dict.keys():
-            positions = tensor_dict["positions"]
-        else:
-            positions = None
-        return (x_data, ind_x, batch_index, positions), {}
+            kwargs["positions"] = tensor_dict["positions"]
+        return (x_data, ind_x, batch_index), kwargs
 
     def create_plates(self, x_data, idx, batch_index, positions: torch.Tensor = None):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
