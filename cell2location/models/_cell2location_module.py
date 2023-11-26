@@ -296,6 +296,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 "b_s_groups_per_location": 1,
                 "z_sr_groups_factors": self.n_groups,
                 "w_sf": self.n_factors,
+                "prior_w_sf": self.n_factors,
                 "detection_y_s": 1,
             },
         }
@@ -540,8 +541,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return w_sf_mu
 
     def independent_prior_on_w_sf(self, obs_plate):
-        n_cells_per_location = pyro.sample(
-            "n_cells_per_location",
+        n_s_cells_per_location = pyro.sample(
+            "n_s_cells_per_location",
             dist.Gamma(
                 self.N_cells_per_location * self.N_cells_mean_var_ratio,
                 self.N_cells_mean_var_ratio,
@@ -555,7 +556,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         # cell group loadings
         shape = self.ones_1_n_factors * a_factors_per_location / self.n_factors_tensor
-        rate = self.ones_1_n_factors / (n_cells_per_location / a_factors_per_location)
+        rate = self.ones_1_n_factors / (n_s_cells_per_location / a_factors_per_location)
 
         with obs_plate:
             w_sf = pyro.sample(
