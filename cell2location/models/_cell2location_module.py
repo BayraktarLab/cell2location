@@ -559,7 +559,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return w_sf
 
     def forward(self, x_data, idx, batch_index, positions: torch.Tensor = None):
-        if self.sliding_window_size is not None:
+        if self.sliding_window_size > 0:
             # remove observations that will not be included after convolution with padding='valid'
             idx = self.crop_according_to_valid_padding(idx)
             batch_index = self.crop_according_to_valid_padding(batch_index)
@@ -649,7 +649,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 k = "w_sf"
                 w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
 
-        if self.sliding_window_size is not None:
+        if self.sliding_window_size > 0:
             w_sf = self.aggregate_conv2d(w_sf, padding="valid")
             pyro.deterministic("aggregated_w_sf", w_sf)
 
@@ -730,7 +730,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
             if self.dropout_p != 0:
                 x_data = self.dropout(x_data)
-            if self.sliding_window_size is not None:
+            if self.sliding_window_size > 0:
                 x_data = self.aggregate_conv2d(x_data)
             with obs_plate:
                 pyro.sample(
