@@ -20,6 +20,7 @@ from scvi.dataloaders import AnnDataLoader
 from scvi.model._utils import parse_device_args
 from scvi.module.base import PyroBaseModuleClass
 from scvi.train import PyroTrainingPlan as PyroTrainingPlan_scvi
+from scvi.utils import track
 
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
@@ -35,6 +36,74 @@ def init_to_value(site=None, values={}, init_fn=init_to_mean):
         return values[site["name"]]
     else:
         return init_fn(site)
+
+
+def expand_zeros_along_dim(tensor, size, dim):
+    shape = np.array(tensor.shape)
+    shape[dim] = size
+    return np.zeros(shape)
+
+
+def complete_tensor_along_dim(tensor, indices, dim, value, mode="put"):
+    shape = value.shape
+    shape = np.ones(len(shape))
+    shape[dim] = len(indices)
+    shape = shape.astype(int)
+    indices = indices.reshape(shape)
+    if mode == "take":
+        return np.take_along_axis(arr=tensor, indices=indices, axis=dim)
+    np.put_along_axis(arr=tensor, indices=indices, values=value, axis=dim)
+    return tensor
+
+
+def _complete_full_tensors_using_plates(means_global, means, plate_dict, obs_plate_sites, plate_indices, plate_dim):
+    # complete full sized tensors with minibatch values given minibatch indices
+    for k in means_global.keys():
+        # find which and how many plates contain this tensor
+        plates = [plate for plate in plate_dict.keys() if k in obs_plate_sites[plate].keys()]
+        if len(plates) == 1:
+            # if only one plate contains this tensor, complete it using the plate indices
+            means_global[k] = complete_tensor_along_dim(
+                means_global[k],
+                plate_indices[plates[0]],
+                plate_dim[plates[0]],
+                means[k],
+            )
+        elif len(plates) == 2:
+            # subset data to index for plate 0 and fill index for plate 1
+            means_global_k = complete_tensor_along_dim(
+                means_global[k],
+                plate_indices[plates[0]],
+                plate_dim[plates[0]],
+                means[k],
+                mode="take",
+            )
+            means_global_k = complete_tensor_along_dim(
+                means_global_k,
+                plate_indices[plates[1]],
+                plate_dim[plates[1]],
+                means[k],
+            )
+            # fill index for plate 0 in the full data
+            means_global[k] = complete_tensor_along_dim(
+                means_global[k],
+                plate_indices[plates[0]],
+                plate_dim[plates[0]],
+                means_global_k,
+            )
+            # TODO add a test - observed variables should be identical if this code works correctly
+            # This code works correctly but the test needs to be added eventually
+            # np.allclose(
+            #     samples['data_chromatin'].squeeze(-1).T,
+            #     mod_reg.adata_manager.get_from_registry('X')[
+            #         :, ~mod_reg.adata_manager.get_from_registry('gene_bool').ravel()
+            #     ].toarray()
+            # )
+        else:
+            NotImplementedError(
+                f"Posterior sampling/mean/median/quantile not supported for variables with > 2 plates: {k} has {len(plates)}"
+            )
+    return means_global
 
 
 class AutoGuideMixinModule:
@@ -136,6 +205,79 @@ class QuantileMixin:
 
         return optim_param
 
+    def _get_obs_plate_sites_v2(
+        self,
+        args: list,
+        kwargs: dict,
+        plate_name: str = None,
+        return_observed: bool = False,
+        return_deterministic: bool = True,
+    ):
+        """
+        Automatically guess which model sites belong to observation/minibatch plate.
+        This function requires minibatch plate name specified in `self.module.list_obs_plate_vars["name"]`.
+        Parameters
+        ----------
+        args
+            Arguments to the model.
+        kwargs
+            Keyword arguments to the model.
+        return_observed
+            Record samples of observed variables.
+        Returns
+        -------
+        Dictionary with keys corresponding to site names and values to plate dimension.
+        """
+        if plate_name is None:
+            plate_name = self.module.list_obs_plate_vars["name"]
+
+        def try_trace(args, kwargs):
+            try:
+                trace_ = poutine.trace(self.module.guide).get_trace(*args, **kwargs)
+                trace_ = poutine.trace(poutine.replay(self.module.model, trace_)).get_trace(*args, **kwargs)
+            except ValueError:
+                # if sample is unsuccessful try again
+                trace_ = try_trace(args, kwargs)
+            return trace_
+
+        trace = try_trace(args, kwargs)
+
+        # find plate dimension
+        obs_plate = {
+            name: {
+                fun.name: fun
+                for fun in site["cond_indep_stack"]
+                if (fun.name in plate_name) or (fun.name == plate_name)
+            }
+            for name, site in trace.nodes.items()
+            if (
+                (site["type"] == "sample")  # sample statement
+                and (
+                    ((not site.get("is_observed", True)) or return_observed)  # don't save observed unless requested
+                    or (site.get("infer", False).get("_deterministic", False) and return_deterministic)
+                )  # unless it is deterministic
+                and not isinstance(site.get("fn", None), poutine.subsample_messenger._Subsample)  # don't save plates
+            )
+            if any(f.name == plate_name for f in site["cond_indep_stack"])
+        }
+
+        return obs_plate
+
+    def _get_dataloader(
+        self,
+        batch_size,
+        data_loader_indices,
+        dl_kwargs={},
+    ):
+        train_dl = AnnDataLoader(
+            self.adata_manager,
+            shuffle=False,
+            batch_size=batch_size,
+            indices=data_loader_indices,
+            **dl_kwargs,
+        )
+        return train_dl
+
     @torch.no_grad()
     def _posterior_quantile_minibatch(
         self,
@@ -144,8 +286,10 @@ class QuantileMixin:
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         use_median: bool = True,
+        return_observed: bool = True,
         exclude_vars: list = None,
         data_loader_indices=None,
+        show_progress: bool = True,
     ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
@@ -180,76 +324,149 @@ class QuantileMixin:
 
         self.module.eval()
 
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
+        train_dl = self._get_dataloader(
+            batch_size=batch_size,
+            data_loader_indices=data_loader_indices,
+        )
 
-        # sample local parameters
         i = 0
-        for tensor_dict in train_dl:
+        for tensor_dict in track(
+            train_dl,
+            style="tqdm",
+            description=f"Computing posterior quantile {q}, data batch: ",
+            disable=not show_progress,
+        ):
             args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
             args = [a.to(device) for a in args]
             kwargs = {k: v.to(device) for k, v in kwargs.items()}
             self.to_device(device)
 
             if i == 0:
-                # find plate sites
-                obs_plate_sites = self._get_obs_plate_sites(args, kwargs, return_observed=True)
-                if len(obs_plate_sites) == 0:
-                    # if no local variables - don't sample
-                    break
-                # find plate dimension
-                obs_plate_dim = list(obs_plate_sites.values())[0]
-                if use_median and q == 0.5:
-                    means = self.module.guide.median(*args, **kwargs)
-                else:
-                    means = self.module.guide.quantiles([q], *args, **kwargs)
-                means = {
-                    k: means[k].cpu().numpy()
-                    for k in means.keys()
-                    if (k in obs_plate_sites) and (k not in exclude_vars)
+                minibatch_plate_names = self.module.list_obs_plate_vars["name"]
+                plates = self.module.model.create_plates(*args, **kwargs)
+                if not isinstance(plates, list):
+                    plates = [plates]
+                # find plate indices & dim
+                plate_dict = {
+                    plate.name: plate
+                    for plate in plates
+                    if ((plate.name in minibatch_plate_names) or (plate.name == minibatch_plate_names))
                 }
+                plate_size = {name: plate.size for name, plate in plate_dict.items()}
+                if data_loader_indices is not None:
+                    # set total plate size to the number of indices in DL not total number of observations
+                    # this option is not really used
+                    plate_size = {
+                        name: len(train_dl.indices)
+                        for name, plate in plate_dict.items()
+                        if plate.name == minibatch_plate_names
+                    }
+                plate_dim = {name: plate.dim for name, plate in plate_dict.items()}
+                plate_indices = {name: plate.indices.detach().cpu().numpy() for name, plate in plate_dict.items()}
+                # find plate sites
+                obs_plate_sites = {
+                    plate: self._get_obs_plate_sites_v2(args, kwargs, plate_name=plate, return_observed=return_observed)
+                    for plate in plate_dict.keys()
+                }
+                if use_median and q == 0.5:
+                    # use median rather than quantile method
+                    def try_median(args, kwargs):
+                        try:
+                            means_ = self.module.guide.median(*args, **kwargs)
+                        except ValueError:
+                            # if sample is unsuccessful try again
+                            means_ = try_median(args, kwargs)
+                        return means_
 
+                    means = try_median(args, kwargs)
+                else:
+
+                    def try_quantiles(args, kwargs):
+                        try:
+                            means_ = self.module.guide.quantiles([q], *args, **kwargs)
+                        except ValueError:
+                            # if sample is unsuccessful try again
+                            means_ = try_quantiles(args, kwargs)
+                        return means_
+
+                    means = try_quantiles(args, kwargs)
+                means = {k: means[k].detach().cpu().numpy() for k in means.keys() if k not in exclude_vars}
+                means_global = means.copy()
+                for plate in plate_dict.keys():
+                    # create full sized tensors according to plate size
+                    means_global = {
+                        k: (
+                            expand_zeros_along_dim(means_global[k], plate_size[plate], plate_dim[plate])
+                            if k in obs_plate_sites[plate].keys()
+                            else means_global[k]
+                        )
+                        for k in means_global.keys()
+                    }
+                # complete full sized tensors with minibatch values given minibatch indices
+                means_global = _complete_full_tensors_using_plates(
+                    means_global=means_global,
+                    means=means,
+                    plate_dict=plate_dict,
+                    obs_plate_sites=obs_plate_sites,
+                    plate_indices=plate_indices,
+                    plate_dim=plate_dim,
+                )
+                if np.all([len(v) == 0 for v in obs_plate_sites.values()]):
+                    # if no local variables - don't sample further - return results now
+                    break
             else:
                 if use_median and q == 0.5:
-                    means_ = self.module.guide.median(*args, **kwargs)
+
+                    def try_median(args, kwargs):
+                        try:
+                            means_ = self.module.guide.median(*args, **kwargs)
+                        except ValueError:
+                            # if sample is unsuccessful try again
+                            means_ = try_median(args, kwargs)
+                        return means_
+
+                    means = try_median(args, kwargs)
                 else:
-                    means_ = self.module.guide.quantiles([q], *args, **kwargs)
-                means_ = {
-                    k: means_[k].cpu().numpy()
-                    for k in means_.keys()
-                    if (k in obs_plate_sites) and (k not in exclude_vars)
+
+                    def try_quantiles(args, kwargs):
+                        try:
+                            means_ = self.module.guide.quantiles([q], *args, **kwargs)
+                        except ValueError:
+                            # if sample is unsuccessful try again
+                            means_ = try_quantiles(args, kwargs)
+                        return means_
+
+                    means = try_quantiles(args, kwargs)
+                means = {k: means[k].detach().cpu().numpy() for k in means.keys() if k not in exclude_vars}
+                # find plate indices & dim
+                plates = self.module.model.create_plates(*args, **kwargs)
+                if not isinstance(plates, list):
+                    plates = [plates]
+                plate_dict = {
+                    plate.name: plate
+                    for plate in plates
+                    if ((plate.name in minibatch_plate_names) or (plate.name == minibatch_plate_names))
                 }
-                means = {k: np.concatenate([means[k], means_[k]], axis=obs_plate_dim) for k in means.keys()}
+                plate_indices = {name: plate.indices.detach().cpu().numpy() for name, plate in plate_dict.items()}
+                # TODO - is this correct to call this function again? find plate sites
+                obs_plate_sites = {
+                    plate: self._get_obs_plate_sites_v2(args, kwargs, plate_name=plate, return_observed=return_observed)
+                    for plate in plate_dict.keys()
+                }
+                # complete full sized tensors with minibatch values given minibatch indices
+                means_global = _complete_full_tensors_using_plates(
+                    means_global=means_global,
+                    means=means,
+                    plate_dict=plate_dict,
+                    obs_plate_sites=obs_plate_sites,
+                    plate_indices=plate_indices,
+                    plate_dim=plate_dim,
+                )
             i += 1
-
-        # sample global parameters
-        tensor_dict = next(iter(train_dl))
-        args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
-        args = [a.to(device) for a in args]
-        kwargs = {k: v.to(device) for k, v in kwargs.items()}
-        self.to_device(device)
-
-        if use_median and q == 0.5:
-            global_means = self.module.guide.median(*args, **kwargs)
-        else:
-            global_means = self.module.guide.quantiles([q], *args, **kwargs)
-        global_means = {
-            k: global_means[k].cpu().numpy()
-            for k in global_means.keys()
-            if (k not in obs_plate_sites) and (k not in exclude_vars)
-        }
-
-        for k in global_means.keys():
-            means[k] = global_means[k]
-
-        # quantile returns tensors with 0th dimension = 1
-        if not (use_median and q == 0.5) and (
-            not isinstance(self.module.guide, AutoAmortisedHierarchicalNormalMessenger)
-        ):
-            means = {k: means[k].squeeze(0) for k in means.keys()}
 
         self.module.to(device)
 
-        return means
+        return means_global
 
     @torch.no_grad()
     def _posterior_quantile(
