@@ -272,7 +272,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 train_size=train_size,
                 validation_size=validation_size,
                 batch_size=batch_size,
-                use_gpu=use_gpu,
                 accelerator=accelerator,
                 device=device,
             )
@@ -299,7 +298,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             training_plan=training_plan,
             data_splitter=data_splitter,
             max_epochs=max_epochs,
-            use_gpu=use_gpu,
             accelerator=accelerator,
             devices=device,
             **trainer_kwargs,

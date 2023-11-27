@@ -179,7 +179,6 @@ def test_cell2location():
         batch_size=20,
         plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
         accelerator=accelerator,
-        use_gpu=use_gpu,
     )
     # test hiding variables on the list
     var_list = ["locs.s_g_gene_add_alpha_e_inv"]
@@ -203,7 +202,6 @@ def test_cell2location():
         batch_size=20,
         plan_kwargs={"n_aggressive_epochs": 1, "n_aggressive_steps": 5},
         accelerator=accelerator,
-        use_gpu=use_gpu,
     )
     for k, v in st_model.module.guide.named_parameters():
         k_in_vars = np.any([i in k for i in var_list])
@@ -396,6 +394,24 @@ def test_cell2location_with_aggregation(
         amortised=amortised,
         encoder_mode="multiple",
         amortised_sliding_window_size=amortised_sliding_window_size,
+        encoder_kwargs={
+            "dropout_rate": 0.1,
+            "n_hidden": {
+                "multiple": 256,
+                "single": 256,
+                "n_s_cells_per_location": 10,
+                "b_s_groups_per_location": 10,
+                "a_s_factors_per_location": 10,
+                "z_sr_groups_factors": 64,
+                "w_sf": 256,
+                "prior_w_sf": 256,
+                "detection_y_s": 10,
+            },
+            "use_batch_norm": False,
+            "use_layer_norm": True,
+            "n_layers": 1,
+            "activation_fn": torch.nn.ELU,
+        },
     )
     shuffle = False if (sliding_window_size > 0) or (amortised_sliding_window_size > 0) else True
     # test full data training
