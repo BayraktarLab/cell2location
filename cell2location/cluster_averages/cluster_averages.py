@@ -1,3 +1,4 @@
+import dask
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
@@ -44,7 +45,11 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
     averages_mat = np.zeros((1, x.shape[1]))
 
     for c in all_clusters:
-        sparse_subset = csr_matrix(x[np.isin(adata.obs[labels], c), :])
+        with dask.config.set(**{"array.slicing.split_large_chunks": False}):
+            cur_data = x[np.isin(adata.obs[labels], c), :]
+            if isinstance(cur_data, dask.array.core.Array):
+                cur_data = cur_data.compute()
+        sparse_subset = csr_matrix(cur_data)
         aver = sparse_subset.mean(0)
         averages_mat = np.concatenate((averages_mat, aver))
     averages_mat = averages_mat[1:, :].T

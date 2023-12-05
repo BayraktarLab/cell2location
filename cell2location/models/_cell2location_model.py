@@ -215,7 +215,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     def train_aggressive(
         self,
         max_epochs: Optional[int] = 1000,
-        use_gpu: Optional[Union[str, int, bool]] = None,
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         train_size: float = 1,

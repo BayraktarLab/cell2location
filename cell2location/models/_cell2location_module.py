@@ -437,6 +437,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # distances [observations, observations]
         distances = distances.view(*[distances.shape[0], distances.shape[1], 1, 1])
         distances = distances + self.eps
+        # hide self effect (same cell type, same location)
+        zero_diag = torch.diag(self.ones.expand(distances.shape[-3])).unsqueeze(-1).unsqueeze(-1)
+        zero_diag_tfs = torch.diag(self.ones.expand(self.n_factors)).unsqueeze(-3).unsqueeze(-3)
+        zero_diag = -zero_diag * zero_diag_tfs + self.ones
         # pyro version
         param_shape = [1, 1, self.n_factors, self.n_factors]
         # sigmoid function ============
@@ -451,7 +455,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             f"{name}_sigmoid_bias",
             dist.Normal(prior, self.ones).expand(param_shape).to_event(len(param_shape)),
         )  # [self.n_factors, self.n_factors]
-        sigmoid_distance_function = self.inverse_sigmoid_lm(distances, sigmoid_weight, sigmoid_bias, scaling=None)
+        sigmoid_distance_function = (
+            self.inverse_sigmoid_lm(distances, sigmoid_weight, sigmoid_bias, scaling=None) * zero_diag
+        )
         # gamma function ============
         prior = torch.tensor(1.0, device=distances.device)
         gamma_concentration = pyro.sample(
@@ -464,12 +470,16 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             dist.Gamma(prior, prior).expand(param_shape).to_event(len(param_shape)),
         )  # [self.n_factors, self.n_factors]
         gamma_distance = gamma_distance / torch.tensor(average_distance_prior, device=distances.device)
-        gamma_distance_function = self.gamma_pdf(
-            distances,
-            concentration=gamma_concentration,
-            rate=gamma_distance,
-            scaling=None,
+        gamma_distance_function = (
+            self.gamma_pdf(
+                distances,
+                concentration=gamma_concentration,
+                rate=gamma_distance,
+                scaling=None,
+            )
+            * zero_diag
         )
+
         # effect ============
         sigmoid_effect = pyro.sample(
             f"{name}_sigmoid_effect",
@@ -479,6 +489,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             f"{name}_gamma_effect",
             dist.SoftLaplace(self.zeros, self.ones).expand([self.n_factors, self.n_factors]).to_event(2),
         )  # [self.n_factors, self.n_factors]
+        # aggregation & transformation ============
         x = torch.einsum(  # sigmoid function
             "hm,pohm,om->ph",
             sigmoid_effect / torch.tensor(np.sqrt(self.n_factors), device=distances.device),
