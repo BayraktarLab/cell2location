@@ -21,7 +21,7 @@ from scvi.data.fields import (
 from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.model.base._pyromixin import PyroJitGuideWarmup
-from scvi.train import TrainRunner
+from scvi.train import PyroTrainingPlan, TrainRunner
 from scvi.utils import setup_anndata_dsp
 
 from cell2location.models._cell2location_module import (
@@ -165,6 +165,119 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         cls.register_manager(adata_manager)
 
     def train(
+        self,
+        max_epochs: int = 30000,
+        batch_size: int = None,
+        train_size: float = 1,
+        lr: float = 0.002,
+        num_particles: int = 1,
+        scale_elbo: float = 1.0,
+        use_gpu: Optional[Union[str, int, bool]] = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
+        validation_size: Optional[float] = None,
+        shuffle_set_split: bool = True,
+        early_stopping: bool = False,
+        training_plan: Optional[PyroTrainingPlan] = None,
+        plan_kwargs: Optional[dict] = None,
+        datasplitter_kwargs: Optional[dict] = None,
+        **trainer_kwargs,
+    ):
+        """Train the model.
+
+        Parameters
+        ----------
+        max_epochs
+            Number of passes through the dataset. If `None`, defaults to
+            `np.min([round((20000 / n_cells) * 400), 400])`
+        %(param_use_gpu)s
+        %(param_accelerator)s
+        %(param_device)s
+        train_size
+            Size of training set in the range [0.0, 1.0].
+        validation_size
+            Size of the test set. If `None`, defaults to 1 - `train_size`. If
+            `train_size + validation_size < 1`, the remaining cells belong to a test set.
+        shuffle_set_split
+            Whether to shuffle indices before splitting. If `False`, the val, train, and test set are split in the
+            sequential order of the data according to `validation_size` and `train_size` percentages.
+        batch_size
+            Minibatch size to use during training. If `None`, no minibatching occurs and all
+            data is copied to device (e.g., GPU).
+        early_stopping
+            Perform early stopping. Additional arguments can be passed in `**kwargs`.
+            See :class:`~scvi.train.Trainer` for further options.
+        lr
+            Optimiser learning rate (default optimiser is :class:`~pyro.optim.ClippedAdam`).
+            Specifying optimiser via plan_kwargs overrides this choice of lr.
+        training_plan
+            Training plan :class:`~scvi.train.PyroTrainingPlan`.
+        plan_kwargs
+            Keyword args for :class:`~scvi.train.PyroTrainingPlan`. Keyword arguments passed to
+            `train()` will overwrite values present in `plan_kwargs`, when appropriate.
+        **trainer_kwargs
+            Other keyword args for :class:`~scvi.train.Trainer`.
+        """
+        # if max_epochs is None:
+        #    max_epochs = get_max_epochs_heuristic(self.adata.n_obs, epochs_cap=1000)
+        if datasplitter_kwargs is None:
+            datasplitter_kwargs = dict()
+
+        plan_kwargs = plan_kwargs if isinstance(plan_kwargs, dict) else {}
+        if lr is not None and "optim" not in plan_kwargs.keys():
+            plan_kwargs.update({"optim_kwargs": {"lr": lr}})
+        if getattr(self.module.model, "discrete_variables", None) and (len(self.module.model.discrete_variables) > 0):
+            plan_kwargs["loss_fn"] = TraceEnum_ELBO(num_particles=num_particles)
+        else:
+            plan_kwargs["loss_fn"] = Trace_ELBO(num_particles=num_particles)
+        if scale_elbo != 1.0:
+            if scale_elbo is None:
+                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_vars"])
+            plan_kwargs["scale_elbo"] = scale_elbo
+
+        if batch_size is None:
+            # use data splitter which moves data to GPU once
+            data_splitter = DeviceBackedDataSplitter(
+                self.adata_manager,
+                train_size=train_size,
+                validation_size=validation_size,
+                batch_size=batch_size,
+                accelerator=accelerator,
+                device=device,
+            )
+        else:
+            data_splitter = self._data_splitter_cls(
+                self.adata_manager,
+                train_size=train_size,
+                validation_size=validation_size,
+                shuffle_set_split=shuffle_set_split,
+                batch_size=batch_size,
+                **datasplitter_kwargs,
+            )
+
+        if training_plan is None:
+            training_plan = self._training_plan_cls(self.module, **plan_kwargs)
+
+        es = "early_stopping"
+        trainer_kwargs[es] = early_stopping if es not in trainer_kwargs.keys() else trainer_kwargs[es]
+
+        if "callbacks" not in trainer_kwargs.keys():
+            trainer_kwargs["callbacks"] = []
+        trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+
+        runner = self._train_runner_cls(
+            self,
+            training_plan=training_plan,
+            data_splitter=data_splitter,
+            max_epochs=max_epochs,
+            use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=device,
+            **trainer_kwargs,
+        )
+        return runner()
+
+    def train_v1(
         self,
         max_epochs: int = 30000,
         batch_size: int = None,
