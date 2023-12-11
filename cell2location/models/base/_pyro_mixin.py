@@ -56,39 +56,59 @@ def complete_tensor_along_dim(tensor, indices, dim, value, mode="put"):
     return tensor
 
 
-def _complete_full_tensors_using_plates(means_global, means, plate_dict, obs_plate_sites, plate_indices, plate_dim):
+def _complete_full_tensors_using_plates(
+    means_global,
+    means,
+    plate_dict,
+    obs_plate_sites,
+    plate_indices,
+    plate_dim,
+    named_dims,
+):
     # complete full sized tensors with minibatch values given minibatch indices
     for k in means_global.keys():
         # find which and how many plates contain this tensor
         plates = [plate for plate in plate_dict.keys() if k in obs_plate_sites[plate].keys()]
         if len(plates) == 1:
             # if only one plate contains this tensor, complete it using the plate indices
+            if k in named_dims.keys():
+                dim = named_dims[k]
+            else:
+                dim = plate_dim[plates[0]]
             means_global[k] = complete_tensor_along_dim(
                 means_global[k],
                 plate_indices[plates[0]],
-                plate_dim[plates[0]],
+                dim,
                 means[k],
             )
         elif len(plates) == 2:
             # subset data to index for plate 0 and fill index for plate 1
+            if k in named_dims.keys() and (k in obs_plate_sites[list(plate_dict.keys())[0]].keys()):
+                dim0 = named_dims[k]
+            else:
+                dim0 = plate_dim[plates[0]]
             means_global_k = complete_tensor_along_dim(
                 means_global[k],
                 plate_indices[plates[0]],
-                plate_dim[plates[0]],
+                dim0,
                 means[k],
                 mode="take",
             )
+            if k in named_dims.keys() and (k in obs_plate_sites[list(plate_dict.keys())[1]].keys()):
+                dim1 = named_dims[k]
+            else:
+                dim1 = plate_dim[plates[1]]
             means_global_k = complete_tensor_along_dim(
                 means_global_k,
                 plate_indices[plates[1]],
-                plate_dim[plates[1]],
+                dim1,
                 means[k],
             )
             # fill index for plate 0 in the full data
             means_global[k] = complete_tensor_along_dim(
                 means_global[k],
                 plate_indices[plates[0]],
-                plate_dim[plates[0]],
+                dim0,
                 means_global_k,
             )
             # TODO add a test - observed variables should be identical if this code works correctly
@@ -269,13 +289,20 @@ class QuantileMixin:
         data_loader_indices,
         dl_kwargs={},
     ):
-        train_dl = AnnDataLoader(
+        if dl_kwargs is None:
+            dl_kwargs = dict()
+        train_dl = self._data_splitter_cls(
             self.adata_manager,
-            shuffle=False,
             batch_size=batch_size,
-            indices=data_loader_indices,
+            # indices=data_loader_indices,
+            train_size=1.0,
+            shuffle_set_split=False,
+            shuffle_training=False,
+            drop_last=False,
             **dl_kwargs,
         )
+        train_dl.setup()
+        train_dl = train_dl.train_dataloader()
         return train_dl
 
     @torch.no_grad()
@@ -290,6 +317,7 @@ class QuantileMixin:
         exclude_vars: list = None,
         data_loader_indices=None,
         show_progress: bool = True,
+        dl_kwargs: Optional[dict] = None,
     ):
         """
         Compute median of the posterior distribution of each parameter, separating local (minibatch) variable
@@ -327,6 +355,7 @@ class QuantileMixin:
         train_dl = self._get_dataloader(
             batch_size=batch_size,
             data_loader_indices=data_loader_indices,
+            dl_kwargs=dl_kwargs,
         )
 
         i = 0
@@ -396,7 +425,15 @@ class QuantileMixin:
                     # create full sized tensors according to plate size
                     means_global = {
                         k: (
-                            expand_zeros_along_dim(means_global[k], plate_size[plate], plate_dim[plate])
+                            expand_zeros_along_dim(
+                                means_global[k],
+                                plate_size[plate],
+                                plate_dim[plate]
+                                if not (
+                                    (k in self.module.model.named_dims.keys()) and (k in obs_plate_sites[plate].keys())
+                                )
+                                else self.module.model.named_dims[k],
+                            )
                             if k in obs_plate_sites[plate].keys()
                             else means_global[k]
                         )
@@ -410,6 +447,7 @@ class QuantileMixin:
                     obs_plate_sites=obs_plate_sites,
                     plate_indices=plate_indices,
                     plate_dim=plate_dim,
+                    named_dims=self.module.model.named_dims,
                 )
                 if np.all([len(v) == 0 for v in obs_plate_sites.values()]):
                     # if no local variables - don't sample further - return results now
@@ -461,6 +499,7 @@ class QuantileMixin:
                     obs_plate_sites=obs_plate_sites,
                     plate_indices=plate_indices,
                     plate_dim=plate_dim,
+                    named_dims=self.module.model.named_dims,
                 )
             i += 1
 
