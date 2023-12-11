@@ -74,6 +74,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     training_wo_observed = False
     training_wo_initial = False
     n_hidden = 256
+    n_cell_compartments = 3
+    named_dims = {
+        "cell_compartment_w_sfk": -3,
+    }
 
     def __init__(
         self,
@@ -108,6 +112,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         amortised_sliding_window_size: Optional[int] = 0,
         image_size: Optional[tuple] = None,
         use_aggregated_w_sf: bool = False,
+        use_aggregated_detection_y_s: bool = False,
+        use_cell_compartments: bool = False,
     ):
         super().__init__()
 
@@ -138,6 +144,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.amortised_sliding_window_size = amortised_sliding_window_size
         self.image_size = image_size
         self.use_aggregated_w_sf = use_aggregated_w_sf
+        self.use_aggregated_detection_y_s = use_aggregated_detection_y_s
+        self.use_cell_compartments = use_cell_compartments
 
         self.weights = PyroModule()
 
@@ -212,6 +220,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
 
         self.register_buffer("ones", torch.ones((1, 1)))
+        self.register_buffer("ones_1d", torch.ones(1))
         self.register_buffer("zeros", torch.zeros((1, 1)))
         self.register_buffer("ones_1_n_groups", torch.ones((1, self.n_groups)))
         self.register_buffer("ones_1_n_factors", torch.ones((1, self.n_factors)))
@@ -298,23 +307,24 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 "z_sr_groups_factors": self.n_groups,
                 "w_sf": self.n_factors,
                 "prior_w_sf": self.n_factors,
+                "cell_compartment_w_sfk": (self.n_factors, int(self.n_cell_compartments - 1)),
                 "detection_y_s": 1,
             },
         }
 
-    def reshape_input_2d(self, x):
+    def reshape_input_2d(self, x, axis=-2, axis_offset=-4):
         # conv2d expects 4d input: [batch, channels, height, width]
         if self.image_size is None:
-            sizex = sizey = int(np.sqrt(x.shape[-2]))
+            sizex = sizey = int(np.sqrt(x.shape[axis]))
         else:
             sizex, sizey = self.image_size
         # here batch dim has just one element
-        return rearrange(x, "(p o) g -> g p o", p=sizex, o=sizey).unsqueeze(-4)
+        return rearrange(x, "(p o) g -> g p o", p=sizex, o=sizey).unsqueeze(axis_offset)
 
-    def reshape_input_2d_inverse(self, x):
+    def reshape_input_2d_inverse(self, x, axis=-2, axis_offset=-4):
         # conv2d expects 4d input: [batch, channels, height, width]
         # here batch dim has just one element
-        return rearrange(x.squeeze(-4), "g p o -> (p o) g")
+        return rearrange(x.squeeze(axis_offset), "g p o -> (p o) g")
 
     def crop_according_to_valid_padding(self, x):
         # remove observations that will not be included after convolution with padding='valid'
@@ -329,13 +339,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         x = self.reshape_input_2d_inverse(x)
         return x
 
-    def aggregate_conv2d(self, x, size=None, padding="valid"):
+    def aggregate_conv2d(self, x, size=None, padding="valid", mean=False):
         # conv2d expects 4d input: [batch, channels, height, width]
         input = self.reshape_input_2d(x)
         # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
         if size is None:
             size = self.sliding_window_size
         weights = torch.ones((x.shape[-1], 1, size, size), device=input.device)
+        if mean:
+            weights = weights / torch.tensor(size * size, device=input.device)
         x = torch.nn.functional.conv2d(
             input,
             weights,
@@ -372,6 +384,36 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         x = self.reshape_input_2d_inverse(x)
         return x
 
+    def redistribute_conv2d(self, x, name, size=None, n_out=None, padding="same"):
+        # pyro version
+
+        # conv2d expects 4d input: [batch, channels, height, width]
+        input = self.reshape_input_2d(x)
+        # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
+        if n_out is None:
+            n_out = x.shape[-1]
+            groups = x.shape[-1]
+        else:
+            groups = 1
+        if size is None:
+            size = self.sliding_window_size
+        weights_shape = [n_out, int(n_out / groups)]
+        weights = pyro.sample(
+            f"{name}_weights",
+            dist.Dirichlet(self.ones_1d.expand([size * size]))
+            .expand(weights_shape)
+            .to_event(reinterpreted_batch_ndims=None),
+        )  # [self.n_factors, self.n_factors]
+        weights = rearrange(weights, "o g (s z) -> o g s z", s=size, z=size)
+        x = torch.nn.functional.conv2d(
+            input,
+            weights,
+            padding=padding,
+            groups=groups,
+        )
+        x = self.reshape_input_2d_inverse(x)
+        return x
+
     def learnable_neighbour_effect_conv2d_nn(self, x, name, size=None, n_out=None, padding="valid"):
         # pure pytorch version
 
@@ -395,9 +437,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     kernel_size=size,
                     padding=padding,
                     groups=groups,
-                ),
+                ).to(input.device),
             )
-        mod = deep_getattr(self.weights, name)
+        mod = deep_getattr(self.weights, name).to(input.device)
         x = mod(input)
         x = self.reshape_input_2d_inverse(x)
         return x
@@ -438,9 +480,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         distances = distances.view(*[distances.shape[0], distances.shape[1], 1, 1])
         distances = distances + self.eps
         # hide self effect (same cell type, same location)
-        zero_diag = torch.diag(self.ones.expand(distances.shape[-3])).unsqueeze(-1).unsqueeze(-1)
-        zero_diag_tfs = torch.diag(self.ones.expand(self.n_factors)).unsqueeze(-3).unsqueeze(-3)
-        zero_diag = -zero_diag * zero_diag_tfs + self.ones
+        zero_diag = torch.diag(self.ones_1d.expand(distances.shape[-3])).unsqueeze(-1).unsqueeze(-1)
+        zero_diag_tfs = torch.diag(self.ones_1d.expand(self.n_factors)).unsqueeze(-3).unsqueeze(-3)
+        zero_diag = -zero_diag * zero_diag_tfs + self.ones_1d
         # pyro version
         param_shape = [1, 1, self.n_factors, self.n_factors]
         # sigmoid function ============
@@ -668,9 +710,27 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 k = "w_sf"
                 w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
 
-        if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
-            w_sf = self.aggregate_conv2d(w_sf, padding="same")
-            pyro.deterministic("aggregated_w_sf", w_sf)
+        if self.use_cell_compartments:
+            with obs_plate:
+                k = "cell_compartment_w_sfk"
+                w_sfk = pyro.sample(
+                    k,
+                    dist.Dirichlet(self.ones_1d.expand((self.n_factors, self.n_cell_compartments))),
+                )  # ( self.n_factors, self.n_obs, self.n_cell_compartments)
+            w_sf = torch.einsum("sfk,sf->fsk", w_sfk, w_sf)
+
+            if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
+                w_sf = self.redistribute_conv2d(
+                    rearrange(w_sf, "f s k -> s (f k)"),
+                    name="redistribute",
+                    padding="same",
+                )
+                w_sf = rearrange(w_sf, "s (f k) -> f s k", f=self.n_factors, k=self.n_cell_compartments)
+                pyro.deterministic("aggregated_w_fsk", w_sf)
+        else:
+            if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
+                w_sf = self.redistribute_conv2d(w_sf, name="redistribute", padding="same")
+                pyro.deterministic("aggregated_w_sf", w_sf)
 
         # =====================Location-specific detection efficiency ======================= #
         # y_s with hierarchical mean prior
@@ -695,6 +755,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 k,
                 dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
             )  # (self.n_obs, 1)
+
+        if (self.sliding_window_size > 0) and self.use_aggregated_detection_y_s:
+            detection_y_s = self.aggregate_conv2d(detection_y_s, padding="same", mean=True)
+            pyro.deterministic("aggregated_detection_y_s", detection_y_s)
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
@@ -738,7 +802,18 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
             # expected expression
-            mu = ((w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
+            if self.use_cell_compartments:
+                k = "cell_compartment_g_fgk"
+                cell_compartment_g_fgk = pyro.sample(
+                    k,
+                    dist.Dirichlet(self.ones_1d.expand((1, 1, self.n_cell_compartments)))
+                    .expand([self.n_factors, self.n_vars])
+                    .to_event(reinterpreted_batch_ndims=None),
+                )  # ( self.n_factors, self.n_vars, self.n_cell_compartments)
+                mu = torch.einsum("fsk,fgk,fg->sg", w_sf, cell_compartment_g_fgk, self.cell_state)
+            else:
+                mu = w_sf @ self.cell_state
+            mu = (mu * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
             alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
             # convert mean and overdispersion to total count and logits
             # total_count, logits = _convert_mean_disp_to_counts_logits(
@@ -749,7 +824,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
             if self.dropout_p != 0:
                 x_data = self.dropout(x_data)
-            if self.sliding_window_size > 0:
+            if (self.sliding_window_size > 0) and not self.use_aggregated_w_sf:
                 x_data = self.aggregate_conv2d(x_data, padding="same")
             with obs_plate:
                 pyro.sample(
@@ -760,8 +835,13 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
-            mRNA = w_sf * (self.cell_state * m_g).sum(-1)
-            pyro.deterministic("u_sf_mRNA_factors", mRNA)
+            if not self.training:
+                if self.use_cell_compartments:
+                    mRNA = torch.einsum("fsk,fgk,fg->fsk", w_sf, cell_compartment_g_fgk, self.cell_state * m_g)
+                    pyro.deterministic("u_fsk_mRNA_factors", mRNA)
+                else:
+                    mRNA = w_sf * (self.cell_state * m_g).sum(-1)
+                    pyro.deterministic("u_sf_mRNA_factors", mRNA)
 
     def compute_expected(
         self,
