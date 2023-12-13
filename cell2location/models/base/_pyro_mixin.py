@@ -1,4 +1,5 @@
 import gc
+import inspect
 import logging
 from datetime import date
 from functools import partial
@@ -291,14 +292,19 @@ class QuantileMixin:
     ):
         if dl_kwargs is None:
             dl_kwargs = dict()
+        signature_keys = list(inspect.signature(self._data_splitter_cls).parameters.keys())
+        if "drop_last" in signature_keys:
+            dl_kwargs["drop_last"] = False
+        if "shuffle" in signature_keys:
+            dl_kwargs["shuffle_training"] = False
+        if "shuffle_set_split" in signature_keys:
+            dl_kwargs["shuffle_set_split"] = False
+        if "indices" in signature_keys:
+            dl_kwargs["indices"] = data_loader_indices
         train_dl = self._data_splitter_cls(
             self.adata_manager,
             batch_size=batch_size,
-            # indices=data_loader_indices,
             train_size=1.0,
-            shuffle_set_split=False,
-            shuffle_training=False,
-            drop_last=False,
             **dl_kwargs,
         )
         train_dl.setup()

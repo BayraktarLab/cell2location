@@ -30,9 +30,10 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         encoder_kwargs: Optional[dict] = None,
         create_autoguide_kwargs: Optional[dict] = None,
+        on_load_kwargs: Optional[dict] = None,
         **kwargs,
     ):
-        super().__init__()
+        super().__init__(on_load_kwargs=on_load_kwargs)
         self.hist = []
 
         self._model = model(**kwargs)

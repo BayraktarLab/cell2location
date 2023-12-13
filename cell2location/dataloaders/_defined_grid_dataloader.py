@@ -373,7 +373,7 @@ class SpatialGridAnnDataLoader(DataLoader):
         self,
         adata_manager: AnnDataManager,
         indices: np.ndarray = None,
-        tiles: np.ndarray = None,
+        # tiles: np.ndarray = None,
         shuffle: bool = True,
         batch_size: int = 1,
         data_and_attributes: Optional[dict] = None,
@@ -398,7 +398,7 @@ class SpatialGridAnnDataLoader(DataLoader):
         # print(self.dataset[[[100, 53, 1], [0, 5, 6]]])
 
         sampler_kwargs = {
-            "tiles": tiles,
+            "tiles": adata_manager.get_from_registry("tiles").flatten(),
             "batch_size": batch_size,
             "shuffle": shuffle,
             "drop_last": drop_last,
@@ -492,9 +492,10 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
 
         self.n_train_ = dict()
         self.n_val_ = dict()
-        if self.data_loader_kwargs.get("tiles", None) is None:
-            raise ValueError("tiles must be specified in data_loader_kwargs")
-        tiles = self.data_loader_kwargs.get("tiles", None)
+        # if self.data_loader_kwargs.get("tiles", None) is None:
+        #    raise ValueError("tiles must be specified in data_loader_kwargs")
+        # tiles = self.data_loader_kwargs.get("tiles", None)
+        tiles = self.adata_manager.get_from_registry("tiles").flatten()
         n_tiles = len(np.unique(tiles))
         self.n_train_["n_tiles"], self.n_val_["n_tiles"] = validate_data_split(
             n_tiles,
@@ -508,7 +509,8 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
         n_val = self.n_val_["n_tiles"]
         random_state = np.random.RandomState(seed=scvi.settings.seed)
 
-        tiles = self.data_loader_kwargs.get("tiles", None)
+        tiles = self.adata_manager.get_from_registry("tiles").flatten()
+        # tiles = self.data_loader_kwargs.get("tiles", None)
         tiles_index = np.unique(tiles)
         n_tiles = len(tiles_index)
 

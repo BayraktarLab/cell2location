@@ -374,10 +374,13 @@ def test_cell2location_with_aggregation(
     inf_aver.columns = dataset.uns["mod"]["factor_names"]
     ### test cell2location model with convolutions ###
     use_distance_fun = use_distance_function_prior_on_w_sf or use_distance_function_effect_on_w_sf
+    use_tiles = (sliding_window_size > 0) or (amortised_sliding_window_size > 0)
+    dataset.obs["tiles"] = "tile1"
     Cell2location.setup_anndata(
         dataset,
         batch_key="batch",
         position_key=None if not use_distance_fun else "X_spatial",
+        tiles_key="tiles" if use_tiles else None,
     )
     ##  full data  ##
     st_model = Cell2location(

@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -24,6 +25,7 @@ from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import PyroTrainingPlan, TrainRunner
 from scvi.utils import setup_anndata_dsp
 
+from cell2location.dataloaders._defined_grid_dataloader import SpatialGridDataSplitter
 from cell2location.models._cell2location_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
@@ -111,7 +113,15 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
                 ).astype("float32")
-
+        on_load_batch_size = None
+        if model_kwargs.get("amortised", False):
+            on_load_batch_size = 128
+        if (model_kwargs.get("amortised_sliding_window_size", 0) > 0) or (
+            model_kwargs.get("sliding_window_size", 0) > 0
+        ):
+            on_load_batch_size = 1
+            self._data_splitter_cls = SpatialGridDataSplitter
+            logging.info("Updating data splitter to SpatialGridDataSplitter.")
         self.module = Cell2locationBaseModule(
             model=model_class,
             n_obs=self.summary_stats["n_cells"],
@@ -119,6 +129,10 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             n_factors=self.n_factors_,
             n_batch=self.summary_stats["n_batch"],
             cell_state_mat=self.cell_state_df_.values.astype("float32"),
+            on_load_kwargs={
+                "batch_size": on_load_batch_size,
+                "max_epochs": 1,
+            },
             **model_kwargs,
         )
         self._model_summary_string = f'cell2location model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
@@ -133,6 +147,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
         position_key: Optional[str] = None,
+        tiles_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
         **kwargs,
@@ -160,6 +175,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         ]
         if position_key is not None:
             anndata_fields.append(ObsmField("positions", position_key))
+        if tiles_key is not None:
+            anndata_fields.append(CategoricalObsField("tiles", tiles_key))
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
