@@ -241,9 +241,19 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             kwargs["positions"] = tensor_dict["positions"]
         if "tiles" in tensor_dict.keys():
             kwargs["tiles"] = tensor_dict["tiles"].long().squeeze()
+        if "in_tissue" in tensor_dict.keys():
+            kwargs["in_tissue"] = tensor_dict["in_tissue"].bool()
         return (x_data, ind_x, batch_index), kwargs
 
-    def create_plates(self, x_data, idx, batch_index, tiles: torch.Tensor = None, positions: torch.Tensor = None):
+    def create_plates(
+        self,
+        x_data,
+        idx,
+        batch_index,
+        tiles: torch.Tensor = None,
+        positions: torch.Tensor = None,
+        in_tissue: torch.Tensor = None,
+    ):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def conv2d_aggregate(self, x_data):
@@ -636,7 +646,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )  # (self.n_obs, self.n_factors)
         return w_sf
 
-    def forward(self, x_data, idx, batch_index, tiles: torch.Tensor = None, positions: torch.Tensor = None):
+    def forward(
+        self,
+        x_data,
+        idx,
+        batch_index,
+        tiles: torch.Tensor = None,
+        positions: torch.Tensor = None,
+        in_tissue: torch.Tensor = None,
+    ):
         # if self.sliding_window_size > 0:
         #    # remove observations that will not be included after convolution with padding='valid'
         #    idx = self.crop_according_to_valid_padding(idx.unsqueeze(-1)).squeeze(-1)
@@ -644,7 +662,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         #    if positions is not None:
         #        positions = self.crop_according_to_valid_padding(positions)
         obs2sample = one_hot(batch_index, self.n_batch)
-        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, positions)
+        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, positions, in_tissue)
         if tiles is not None:
             n_tiles = torch.unique(tiles).shape[0]
         else:
@@ -902,7 +920,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                         mu_ = mu
                         alpha_ = alpha
                         x_data_ = x_data
-                    with obs_plate:
+                    with obs_plate, pyro.poutine.mask(mask=in_tissue):
                         pyro.sample(
                             f"data_target_{size}",
                             dist.GammaPoisson(concentration=alpha_, rate=alpha_ / mu_),

@@ -148,6 +148,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         labels_key: Optional[str] = None,
         position_key: Optional[str] = None,
         tiles_key: Optional[str] = None,
+        in_tissue_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
         **kwargs,
@@ -177,6 +178,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             anndata_fields.append(ObsmField("positions", position_key))
         if tiles_key is not None:
             anndata_fields.append(CategoricalObsField("tiles", tiles_key))
+        if in_tissue_key is not None:
+            anndata_fields.append(NumericalObsField("in_tissue", tiles_key))
+
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
