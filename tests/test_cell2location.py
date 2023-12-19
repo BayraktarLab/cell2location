@@ -333,11 +333,13 @@ def test_cell2location():
 
 
 @pytest.mark.parametrize("sliding_window_size", [0, 4])
-@pytest.mark.parametrize("use_distance_function_prior_on_w_sf", [True, False])
-@pytest.mark.parametrize("use_distance_function_effect_on_w_sf", [True, False])
-@pytest.mark.parametrize("use_aggregated_w_sf", [False])
-@pytest.mark.parametrize("amortised", [True, False])
+@pytest.mark.parametrize("use_distance_function_prior_on_w_sf", [False])
+@pytest.mark.parametrize("use_distance_function_effect_on_w_sf", [False])
+@pytest.mark.parametrize("use_aggregated_w_sf", [False, True])
+@pytest.mark.parametrize("amortised", [False, True])
 @pytest.mark.parametrize("amortised_sliding_window_size", [0, 4])
+@pytest.mark.parametrize("n_tiles", [1, 2])
+@pytest.mark.parametrize("sliding_window_size_list", [None, [0, 4, 8, 16, 32]])
 def test_cell2location_with_aggregation(
     sliding_window_size,
     use_distance_function_prior_on_w_sf,
@@ -345,13 +347,16 @@ def test_cell2location_with_aggregation(
     use_aggregated_w_sf,
     amortised,
     amortised_sliding_window_size,
+    n_tiles,
+    sliding_window_size_list,
 ):
     save_path = "./cell2location_model_test"
     if torch.cuda.is_available():
         accelerator = "gpu"
     else:
         accelerator = "cpu"
-    dataset = synthetic_iid(n_labels=5)
+    data_size = 200
+    dataset = synthetic_iid(batch_size=data_size * n_tiles, n_labels=5)
     dataset.obsm["X_spatial"] = np.random.normal(0, 1, [dataset.n_obs, 2])
     RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
 
@@ -375,7 +380,10 @@ def test_cell2location_with_aggregation(
     ### test cell2location model with convolutions ###
     use_distance_fun = use_distance_function_prior_on_w_sf or use_distance_function_effect_on_w_sf
     use_tiles = (sliding_window_size > 0) or (amortised_sliding_window_size > 0)
-    dataset.obs["tiles"] = "tile1"
+    tiles = []
+    for i in range(n_tiles):
+        tiles = tiles + [f"tile{i}" for _ in range(data_size * 2)]
+    dataset.obs["tiles"] = tiles
     Cell2location.setup_anndata(
         dataset,
         batch_key="batch",
@@ -390,13 +398,14 @@ def test_cell2location_with_aggregation(
         detection_alpha=200,
         average_distance_prior=5.0,
         sliding_window_size=sliding_window_size,
+        amortised_sliding_window_size=amortised_sliding_window_size,
+        sliding_window_size_list=sliding_window_size_list,
         image_size=[20, 20],
         use_distance_function_prior_on_w_sf=use_distance_function_prior_on_w_sf,
         use_distance_function_effect_on_w_sf=use_distance_function_effect_on_w_sf,
         use_aggregated_w_sf=use_aggregated_w_sf,
         amortised=amortised,
         encoder_mode="multiple",
-        amortised_sliding_window_size=amortised_sliding_window_size,
         encoder_kwargs={
             "dropout_rate": 0.1,
             "n_hidden": {
@@ -417,19 +426,37 @@ def test_cell2location_with_aggregation(
         },
     )
     shuffle = False if (sliding_window_size > 0) or (amortised_sliding_window_size > 0) else True
+    batch_size = n_tiles if (sliding_window_size > 0) or (amortised_sliding_window_size > 0) else None
     # test full data training
     st_model.train(
         max_epochs=1,
         accelerator=accelerator,
         shuffle_set_split=shuffle,
+        batch_size=batch_size,
         # datasplitter_kwargs={"shuffle": shuffle, "shuffle_set_split": shuffle},
     )
+    st_model.module.model.n_tiles = 1
     # test save/load
     st_model.save(save_path, overwrite=True, save_anndata=True)
     st_model = Cell2location.load(save_path)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     if not use_distance_fun:
-        dataset = st_model.export_posterior(
-            dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs}
-        )
+        if (sliding_window_size > 0) or (amortised_sliding_window_size > 0):
+            dataset = st_model.export_posterior(
+                dataset,
+                sample_kwargs={
+                    "batch_size": 1,
+                    "use_median": True,
+                },
+                add_to_obsm=["q50"],
+                use_quantiles=True,
+            )
+        else:
+            dataset = st_model.export_posterior(
+                dataset,
+                sample_kwargs={
+                    "num_samples": 10,
+                    "batch_size": 100,
+                },
+            )

@@ -240,6 +240,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if datasplitter_kwargs is None:
             datasplitter_kwargs = dict()
 
+        if issubclass(self._data_splitter_cls, SpatialGridDataSplitter):
+            self.module.model.n_tiles = batch_size
+
         plan_kwargs = plan_kwargs if isinstance(plan_kwargs, dict) else {}
         if lr is not None and "optim" not in plan_kwargs.keys():
             plan_kwargs.update({"optim_kwargs": {"lr": lr}})

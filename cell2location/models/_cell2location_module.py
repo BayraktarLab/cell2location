@@ -12,9 +12,6 @@ from scipy.sparse import csr_matrix
 from scvi import REGISTRY_KEYS
 from scvi.nn import one_hot
 
-# class NegativeBinomial(TorchDistributionMixin, ScVINegativeBinomial):
-#    pass
-
 
 class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
     r"""
@@ -78,6 +75,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     named_dims = {
         "cell_compartment_w_sfk": -3,
     }
+    n_tiles = 1
 
     def __init__(
         self,
@@ -107,9 +105,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         dropout_p: float = 0.0,
         use_distance_function_prior_on_w_sf: bool = False,
         use_distance_function_effect_on_w_sf: bool = False,
+        use_independent_prior_on_w_sf: bool = False,
         average_distance_prior: float = 50.0,
         sliding_window_size: Optional[int] = 0,
         amortised_sliding_window_size: Optional[int] = 0,
+        sliding_window_size_list: Optional[list] = None,
         image_size: Optional[tuple] = None,
         use_aggregated_w_sf: bool = False,
         use_aggregated_detection_y_s: bool = False,
@@ -139,9 +139,13 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         self.use_distance_function_prior_on_w_sf = use_distance_function_prior_on_w_sf
         self.use_distance_function_effect_on_w_sf = use_distance_function_effect_on_w_sf
+        self.use_independent_prior_on_w_sf = use_independent_prior_on_w_sf
         self.average_distance_prior = average_distance_prior
-        self.sliding_window_size = sliding_window_size
+        self.sliding_window_size = (
+            sliding_window_size if sliding_window_size_list is None else max(sliding_window_size_list)
+        )
         self.amortised_sliding_window_size = amortised_sliding_window_size
+        self.sliding_window_size_list = np.array(sliding_window_size_list)
         self.image_size = image_size
         self.use_aggregated_w_sf = use_aggregated_w_sf
         self.use_aggregated_detection_y_s = use_aggregated_detection_y_s
@@ -235,14 +239,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         kwargs = {}
         if "positions" in tensor_dict.keys():
             kwargs["positions"] = tensor_dict["positions"]
+        if "tiles" in tensor_dict.keys():
+            kwargs["tiles"] = tensor_dict["tiles"].long().squeeze()
         return (x_data, ind_x, batch_index), kwargs
 
-    def create_plates(self, x_data, idx, batch_index, positions: torch.Tensor = None):
+    def create_plates(self, x_data, idx, batch_index, tiles: torch.Tensor = None, positions: torch.Tensor = None):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def conv2d_aggregate(self, x_data):
         x_data_agg = self.aggregate_conv2d(
             x_data,
+            n_tiles=self.n_tiles,
             size=max(self.amortised_sliding_window_size, self.sliding_window_size),
             padding="same",
         )
@@ -253,6 +260,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         x_data = torch.log1p(x_data)
         x_data_agg = self.learnable_neighbour_effect_conv2d_nn(
             x_data,
+            n_tiles=self.n_tiles,
             name="amortised_sliding_window",
             size=max(self.amortised_sliding_window_size, self.sliding_window_size),
             n_out=self.n_hidden,
@@ -312,36 +320,42 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             },
         }
 
-    def reshape_input_2d(self, x, axis=-2, axis_offset=-4):
+    def reshape_input_2d(self, x, n_tiles=1, axis=-2, axis_offset=-4):
         # conv2d expects 4d input: [batch, channels, height, width]
         if self.image_size is None:
-            sizex = sizey = int(np.sqrt(x.shape[axis]))
+            sizex = sizey = int(np.sqrt(x.shape[axis] / n_tiles))
         else:
             sizex, sizey = self.image_size
         # here batch dim has just one element
-        return rearrange(x, "(p o) g -> g p o", p=sizex, o=sizey).unsqueeze(axis_offset)
+        if n_tiles > 1:
+            return rearrange(x, "(t p o) g -> t g p o", p=sizex, o=sizey, t=n_tiles)
+        else:
+            return rearrange(x, "(p o) g -> g p o", p=sizex, o=sizey).unsqueeze(axis_offset)
 
-    def reshape_input_2d_inverse(self, x, axis=-2, axis_offset=-4):
+    def reshape_input_2d_inverse(self, x, n_tiles=1, axis=-2, axis_offset=-4):
         # conv2d expects 4d input: [batch, channels, height, width]
         # here batch dim has just one element
-        return rearrange(x.squeeze(axis_offset), "g p o -> (p o) g")
+        if n_tiles > 1:
+            return rearrange(x.squeeze(axis_offset), "t g p o -> (t p o) g")
+        else:
+            return rearrange(x.squeeze(axis_offset), "g p o -> (p o) g")
 
-    def crop_according_to_valid_padding(self, x):
+    def crop_according_to_valid_padding(self, x, n_tiles=1):
         # remove observations that will not be included after convolution with padding='valid'
         # reshape to 2d
-        x = self.reshape_input_2d(x)
+        x = self.reshape_input_2d(x, n_tiles=n_tiles)
         # crop to valid observations
         indx = np.arange(self.sliding_window_size // 2, x.shape[-2] - (self.sliding_window_size // 2))
         indy = np.arange(self.sliding_window_size // 2, x.shape[-1] - (self.sliding_window_size // 2))
         x = np.take(x, indx, axis=-2)
         x = np.take(x, indy, axis=-1)
         # reshape back to 1d
-        x = self.reshape_input_2d_inverse(x)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
         return x
 
-    def aggregate_conv2d(self, x, size=None, padding="valid", mean=False):
+    def aggregate_conv2d(self, x, n_tiles=1, size=None, padding="valid", mean=False):
         # conv2d expects 4d input: [batch, channels, height, width]
-        input = self.reshape_input_2d(x)
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
         # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
         if size is None:
             size = self.sliding_window_size
@@ -354,14 +368,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             padding=padding,
             groups=x.shape[-1],
         )
-        x = self.reshape_input_2d_inverse(x)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
         return x
 
-    def learnable_neighbour_effect_conv2d(self, x, name, size=None, n_out=None, padding="valid"):
+    def learnable_neighbour_effect_conv2d(self, x, name, n_tiles=1, size=None, n_out=None, padding="valid"):
         # pyro version
 
         # conv2d expects 4d input: [batch, channels, height, width]
-        input = self.reshape_input_2d(x)
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
         # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
         if n_out is None:
             n_out = x.shape[-1]
@@ -381,14 +395,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             padding=padding,
             groups=groups,
         )
-        x = self.reshape_input_2d_inverse(x)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
         return x
 
-    def redistribute_conv2d(self, x, name, size=None, n_out=None, padding="same"):
+    def redistribute_conv2d(self, x, name, n_tiles=1, size=None, n_out=None, padding="same"):
         # pyro version
 
         # conv2d expects 4d input: [batch, channels, height, width]
-        input = self.reshape_input_2d(x)
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
         # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
         if n_out is None:
             n_out = x.shape[-1]
@@ -411,14 +425,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             padding=padding,
             groups=groups,
         )
-        x = self.reshape_input_2d_inverse(x)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
         return x
 
-    def learnable_neighbour_effect_conv2d_nn(self, x, name, size=None, n_out=None, padding="valid"):
+    def learnable_neighbour_effect_conv2d_nn(self, x, name, n_tiles=1, size=None, n_out=None, padding="valid"):
         # pure pytorch version
 
         # conv2d expects 4d input: [batch, channels, height, width]
-        input = self.reshape_input_2d(x)
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
         # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
         if n_out is None:
             n_out = x.shape[-1]
@@ -441,7 +455,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )
         mod = deep_getattr(self.weights, name).to(input.device)
         x = mod(input)
-        x = self.reshape_input_2d_inverse(x)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
         return x
 
     def inverse_sigmoid_lm(self, x, weight, bias, scaling):
@@ -622,7 +636,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )  # (self.n_obs, self.n_factors)
         return w_sf
 
-    def forward(self, x_data, idx, batch_index, positions: torch.Tensor = None):
+    def forward(self, x_data, idx, batch_index, tiles: torch.Tensor = None, positions: torch.Tensor = None):
         # if self.sliding_window_size > 0:
         #    # remove observations that will not be included after convolution with padding='valid'
         #    idx = self.crop_according_to_valid_padding(idx.unsqueeze(-1)).squeeze(-1)
@@ -630,7 +644,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         #    if positions is not None:
         #        positions = self.crop_according_to_valid_padding(positions)
         obs2sample = one_hot(batch_index, self.n_batch)
-        obs_plate = self.create_plates(x_data, idx, batch_index, positions)
+        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, positions)
+        if tiles is not None:
+            n_tiles = torch.unique(tiles).shape[0]
+        else:
+            n_tiles = 1
 
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
@@ -656,7 +674,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )  # (1, n_vars)
 
         # =====================Cell abundances w_sf======================= #
-        if not (self.use_distance_function_prior_on_w_sf or self.use_distance_function_effect_on_w_sf):
+        if not (
+            self.use_distance_function_prior_on_w_sf
+            or self.use_distance_function_effect_on_w_sf
+            or self.use_independent_prior_on_w_sf
+        ):
             w_sf_mu = self.factorisation_prior_on_w_sf(obs_plate)
             with obs_plate:
                 k = "w_sf"
@@ -709,6 +731,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             with obs_plate:
                 k = "w_sf"
                 w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
+        elif self.use_independent_prior_on_w_sf:
+            w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
+            with obs_plate:
+                k = "w_sf"
+                w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
 
         if self.use_cell_compartments:
             with obs_plate:
@@ -722,6 +749,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
                 w_sf = self.redistribute_conv2d(
                     rearrange(w_sf, "f s k -> s (f k)"),
+                    n_tiles=n_tiles,
                     name="redistribute",
                     padding="same",
                 )
@@ -729,7 +757,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 pyro.deterministic("aggregated_w_fsk", w_sf)
         else:
             if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
-                w_sf = self.redistribute_conv2d(w_sf, name="redistribute", padding="same")
+                w_sf = self.redistribute_conv2d(
+                    w_sf,
+                    name="redistribute",
+                    padding="same",
+                    n_tiles=n_tiles,
+                )
                 pyro.deterministic("aggregated_w_sf", w_sf)
 
         # =====================Location-specific detection efficiency ======================= #
@@ -757,7 +790,13 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )  # (self.n_obs, 1)
 
         if (self.sliding_window_size > 0) and self.use_aggregated_detection_y_s:
-            detection_y_s = self.aggregate_conv2d(detection_y_s, padding="same", mean=True)
+            detection_y_s = self.aggregate_conv2d(
+                detection_y_s,
+                padding="same",
+                mean=True,
+                size=32,
+                n_tiles=n_tiles,
+            )
             pyro.deterministic("aggregated_detection_y_s", detection_y_s)
 
         # =====================Gene-specific additive component ======================= #
@@ -824,14 +863,51 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
             if self.dropout_p != 0:
                 x_data = self.dropout(x_data)
-            if (self.sliding_window_size > 0) and not self.use_aggregated_w_sf:
-                x_data = self.aggregate_conv2d(x_data, padding="same")
-            with obs_plate:
-                pyro.sample(
-                    "data_target",
-                    dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                    obs=x_data,
-                )
+            if self.sliding_window_size_list is None:
+                if (self.sliding_window_size > 0) and not self.use_aggregated_w_sf:
+                    x_data = self.aggregate_conv2d(
+                        x_data,
+                        padding="same",
+                        n_tiles=n_tiles,
+                        size=self.sliding_window_size,
+                    )
+                with obs_plate:
+                    pyro.sample(
+                        "data_target",
+                        dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
+                        obs=x_data,
+                    )
+            else:
+                for i, size in enumerate(self.sliding_window_size_list):
+                    if self.sliding_window_size_list[i] > 0:
+                        mu_ = self.aggregate_conv2d(
+                            mu,
+                            padding="same",
+                            n_tiles=n_tiles,
+                            size=size,
+                        )
+                        alpha_ = alpha * torch.tensor((self.sliding_window_size_list[i] ** 2) / 100, device=mu.device)
+                        alpha_g_size_effect = pyro.sample(
+                            f"alpha_g_size_{size}",
+                            dist.Gamma(self.ones + self.ones, self.ones + self.ones).to_event(2),
+                        )
+                        alpha_ = alpha_ * alpha_g_size_effect
+                        x_data_ = self.aggregate_conv2d(
+                            x_data,
+                            padding="same",
+                            n_tiles=n_tiles,
+                            size=size,
+                        )
+                    else:
+                        mu_ = mu
+                        alpha_ = alpha
+                        x_data_ = x_data
+                    with obs_plate:
+                        pyro.sample(
+                            f"data_target_{size}",
+                            dist.GammaPoisson(concentration=alpha_, rate=alpha_ / mu_),
+                            obs=x_data_,
+                        )
 
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
