@@ -812,7 +812,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 detection_y_s,
                 padding="same",
                 mean=True,
-                size=32,
+                size=20,
                 n_tiles=n_tiles,
             )
             pyro.deterministic("aggregated_detection_y_s", detection_y_s)
@@ -905,11 +905,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                             size=size,
                         )
                         alpha_ = alpha * torch.tensor((self.sliding_window_size_list[i] ** 2) / 100, device=mu.device)
-                        alpha_g_size_effect = pyro.sample(
-                            f"alpha_g_size_{size}",
-                            dist.Gamma(self.ones + self.ones, self.ones + self.ones).to_event(2),
-                        )
-                        alpha_ = alpha_ * alpha_g_size_effect
+                        # alpha_g_size_effect = pyro.sample(
+                        #    f"alpha_g_size_{size}",
+                        #    dist.Gamma(self.ones + self.ones, self.ones + self.ones).to_event(2),
+                        # )
+                        # alpha_ = alpha_ * alpha_g_size_effect
                         x_data_ = self.aggregate_conv2d(
                             x_data,
                             padding="same",
