@@ -29,11 +29,11 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
         amortised: bool = False,
         encoder_mode: Literal["single", "multiple", "single-multiple"] = "single",
         encoder_kwargs: Optional[dict] = None,
-        data_transform="log1p",
         create_autoguide_kwargs: Optional[dict] = None,
+        on_load_kwargs: Optional[dict] = None,
         **kwargs,
     ):
-        super().__init__()
+        super().__init__(on_load_kwargs=on_load_kwargs)
         self.hist = []
 
         self._model = model(**kwargs)
@@ -45,7 +45,6 @@ class Cell2locationBaseModule(PyroBaseModuleClass, AutoGuideMixinModule):
             model=self.model,
             amortised=self.is_amortised,
             encoder_kwargs=encoder_kwargs,
-            data_transform=data_transform,
             encoder_mode=encoder_mode,
             init_loc_fn=self.init_to_value,
             n_cat_list=[kwargs["n_batch"]],

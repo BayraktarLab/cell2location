@@ -5,13 +5,12 @@ import pandas as pd
 import pyro
 import pyro.distributions as dist
 import torch
+from einops import rearrange
+from pyro.infer.autoguide.utils import deep_getattr, deep_setattr
 from pyro.nn import PyroModule
 from scipy.sparse import csr_matrix
 from scvi import REGISTRY_KEYS
 from scvi.nn import one_hot
-
-# class NegativeBinomial(TorchDistributionMixin, ScVINegativeBinomial):
-#    pass
 
 
 class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
@@ -71,6 +70,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     # training mode without observed data (just using priors)
     training_wo_observed = False
     training_wo_initial = False
+    n_hidden = 256
+    n_cell_compartments = 3
+    named_dims = {
+        "cell_compartment_w_sfk": -3,
+    }
+    n_tiles = 1
 
     def __init__(
         self,
@@ -96,8 +101,19 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_hyp_prior={"mean_alpha": 10.0},
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
-        init_alpha=20.0,
-        dropout_p=0.0,
+        init_alpha: float = 20.0,
+        dropout_p: float = 0.0,
+        use_distance_function_prior_on_w_sf: bool = False,
+        use_distance_function_effect_on_w_sf: bool = False,
+        use_independent_prior_on_w_sf: bool = False,
+        average_distance_prior: float = 50.0,
+        sliding_window_size: Optional[int] = 0,
+        amortised_sliding_window_size: Optional[int] = 0,
+        sliding_window_size_list: Optional[list] = None,
+        image_size: Optional[tuple] = None,
+        use_aggregated_w_sf: bool = False,
+        use_aggregated_detection_y_s: bool = False,
+        use_cell_compartments: bool = False,
     ):
         super().__init__()
 
@@ -120,6 +136,22 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.dropout_p = dropout_p
         if self.dropout_p is not None:
             self.dropout = torch.nn.Dropout(p=self.dropout_p)
+
+        self.use_distance_function_prior_on_w_sf = use_distance_function_prior_on_w_sf
+        self.use_distance_function_effect_on_w_sf = use_distance_function_effect_on_w_sf
+        self.use_independent_prior_on_w_sf = use_independent_prior_on_w_sf
+        self.average_distance_prior = average_distance_prior
+        self.sliding_window_size = (
+            sliding_window_size if sliding_window_size_list is None else max(sliding_window_size_list)
+        )
+        self.amortised_sliding_window_size = amortised_sliding_window_size
+        self.sliding_window_size_list = np.array(sliding_window_size_list)
+        self.image_size = image_size
+        self.use_aggregated_w_sf = use_aggregated_w_sf
+        self.use_aggregated_detection_y_s = use_aggregated_detection_y_s
+        self.use_cell_compartments = use_cell_compartments
+
+        self.weights = PyroModule()
 
         if (init_vals is not None) & (type(init_vals) is dict):
             self.np_init_vals = init_vals
@@ -156,6 +188,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("cell_state", torch.tensor(cell_state_mat.T))
 
         self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
+        self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
         self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
         self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
@@ -191,7 +224,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("n_groups_tensor", torch.tensor(self.n_groups))
 
         self.register_buffer("ones", torch.ones((1, 1)))
+        self.register_buffer("ones_1d", torch.ones(1))
+        self.register_buffer("zeros", torch.zeros((1, 1)))
         self.register_buffer("ones_1_n_groups", torch.ones((1, self.n_groups)))
+        self.register_buffer("ones_1_n_factors", torch.ones((1, self.n_factors)))
         self.register_buffer("ones_n_batch_1", torch.ones((self.n_batch, 1)))
         self.register_buffer("eps", torch.tensor(1e-8))
 
@@ -200,10 +236,49 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         x_data = tensor_dict[REGISTRY_KEYS.X_KEY]
         ind_x = tensor_dict["ind_x"].long().squeeze()
         batch_index = tensor_dict[REGISTRY_KEYS.BATCH_KEY]
-        return (x_data, ind_x, batch_index), {}
+        kwargs = {}
+        if "positions" in tensor_dict.keys():
+            kwargs["positions"] = tensor_dict["positions"]
+        if "tiles" in tensor_dict.keys():
+            kwargs["tiles"] = tensor_dict["tiles"].long().squeeze()
+        if "in_tissue" in tensor_dict.keys():
+            kwargs["in_tissue"] = tensor_dict["in_tissue"].bool()
+        return (x_data, ind_x, batch_index), kwargs
 
-    def create_plates(self, x_data, idx, batch_index):
+    def create_plates(
+        self,
+        x_data,
+        idx,
+        batch_index,
+        tiles: torch.Tensor = None,
+        positions: torch.Tensor = None,
+        in_tissue: torch.Tensor = None,
+    ):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
+
+    def conv2d_aggregate(self, x_data):
+        x_data_agg = self.aggregate_conv2d(
+            x_data,
+            n_tiles=self.n_tiles,
+            size=max(self.amortised_sliding_window_size, self.sliding_window_size),
+            padding="same",
+        )
+        x_data = torch.cat([x_data, x_data_agg], dim=-1)
+        return torch.log1p(x_data)
+
+    def learnable_conv2d(self, x_data):
+        x_data = torch.log1p(x_data)
+        x_data_agg = self.learnable_neighbour_effect_conv2d_nn(
+            x_data,
+            n_tiles=self.n_tiles,
+            name="amortised_sliding_window",
+            size=max(self.amortised_sliding_window_size, self.sliding_window_size),
+            n_out=self.n_hidden,
+            padding="same",
+        )
+        # x_data = self.aggregate_conv2d(x_data, padding="same")
+        x_data = torch.cat([x_data, x_data_agg], dim=-1)
+        return x_data
 
     def list_obs_plate_vars(self):
         """
@@ -218,12 +293,25 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
           * values - the dimensions in non-plate axis of each variable (used to construct output
             layer of encoder network when using amortised inference)
         """
+        input_transform = torch.log1p
+        n_in = self.n_vars
+
+        if (self.amortised_sliding_window_size > 0) and (self.sliding_window_size == 0):
+            input_transform = self.learnable_conv2d
+            n_in = self.n_vars + self.n_hidden
+        elif (self.amortised_sliding_window_size == 0) and (self.sliding_window_size > 0):
+            input_transform = self.conv2d_aggregate
+            n_in = self.n_vars * 2
+        elif (self.amortised_sliding_window_size > 0) and (self.sliding_window_size > 0):
+            input_transform = self.learnable_conv2d
+            n_in = self.n_vars + self.n_hidden
 
         return {
             "name": "obs_plate",
             "input": [0, 2],  # expression data + (optional) batch index
+            "n_in": n_in,
             "input_transform": [
-                torch.log1p,
+                input_transform,
                 lambda x: x,
             ],  # how to transform input data before passing to NN
             "input_normalisation": [
@@ -233,16 +321,352 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             "sites": {
                 "n_s_cells_per_location": 1,
                 "b_s_groups_per_location": 1,
+                "a_s_factors_per_location": 1,
                 "z_sr_groups_factors": self.n_groups,
                 "w_sf": self.n_factors,
+                "prior_w_sf": self.n_factors,
+                "cell_compartment_w_sfk": (self.n_factors, int(self.n_cell_compartments - 1)),
                 "detection_y_s": 1,
             },
         }
 
-    def forward(self, x_data, idx, batch_index):
-        obs2sample = one_hot(batch_index, self.n_batch)
+    def reshape_input_2d(self, x, n_tiles=1, axis=-2, axis_offset=-4):
+        # conv2d expects 4d input: [batch, channels, height, width]
+        if self.image_size is None:
+            sizex = sizey = int(np.sqrt(x.shape[axis] / n_tiles))
+        else:
+            sizex, sizey = self.image_size
+        # here batch dim has just one element
+        if n_tiles > 1:
+            return rearrange(x, "(t p o) g -> t g p o", p=sizex, o=sizey, t=n_tiles)
+        else:
+            return rearrange(x, "(p o) g -> g p o", p=sizex, o=sizey).unsqueeze(axis_offset)
 
-        obs_plate = self.create_plates(x_data, idx, batch_index)
+    def reshape_input_2d_inverse(self, x, n_tiles=1, axis=-2, axis_offset=-4):
+        # conv2d expects 4d input: [batch, channels, height, width]
+        # here batch dim has just one element
+        if n_tiles > 1:
+            return rearrange(x.squeeze(axis_offset), "t g p o -> (t p o) g")
+        else:
+            return rearrange(x.squeeze(axis_offset), "g p o -> (p o) g")
+
+    def crop_according_to_valid_padding(self, x, n_tiles=1):
+        # remove observations that will not be included after convolution with padding='valid'
+        # reshape to 2d
+        x = self.reshape_input_2d(x, n_tiles=n_tiles)
+        # crop to valid observations
+        indx = np.arange(self.sliding_window_size // 2, x.shape[-2] - (self.sliding_window_size // 2))
+        indy = np.arange(self.sliding_window_size // 2, x.shape[-1] - (self.sliding_window_size // 2))
+        x = np.take(x, indx, axis=-2)
+        x = np.take(x, indy, axis=-1)
+        # reshape back to 1d
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
+        return x
+
+    def aggregate_conv2d(self, x, n_tiles=1, size=None, padding="valid", mean=False):
+        # conv2d expects 4d input: [batch, channels, height, width]
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
+        # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
+        if size is None:
+            size = self.sliding_window_size
+        weights = torch.ones((x.shape[-1], 1, size, size), device=input.device)
+        if mean:
+            weights = weights / torch.tensor(size * size, device=input.device)
+        x = torch.nn.functional.conv2d(
+            input,
+            weights,
+            padding=padding,
+            groups=x.shape[-1],
+        )
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
+        return x
+
+    def learnable_neighbour_effect_conv2d(self, x, name, n_tiles=1, size=None, n_out=None, padding="valid"):
+        # pyro version
+
+        # conv2d expects 4d input: [batch, channels, height, width]
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
+        # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
+        if n_out is None:
+            n_out = x.shape[-1]
+            groups = x.shape[-1]
+        else:
+            groups = 1
+        if size is None:
+            size = self.sliding_window_size
+        weights_shape = [n_out, int(x.shape[-1] / groups), size, size]
+        weights = pyro.sample(
+            f"{name}_weights",
+            dist.SoftLaplace(self.zeros, self.ones).expand(weights_shape).to_event(len(weights_shape)),
+        )  # [self.n_factors, self.n_factors]
+        x = torch.nn.functional.conv2d(
+            input,
+            weights,
+            padding=padding,
+            groups=groups,
+        )
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
+        return x
+
+    def redistribute_conv2d(self, x, name, n_tiles=1, size=None, n_out=None, padding="same"):
+        # pyro version
+
+        # conv2d expects 4d input: [batch, channels, height, width]
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
+        # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
+        if n_out is None:
+            n_out = x.shape[-1]
+            groups = x.shape[-1]
+        else:
+            groups = 1
+        if size is None:
+            size = self.sliding_window_size
+        weights_shape = [n_out, int(n_out / groups)]
+        weights = pyro.sample(
+            f"{name}_weights",
+            dist.Dirichlet(self.ones_1d.expand([size * size]))
+            .expand(weights_shape)
+            .to_event(reinterpreted_batch_ndims=None),
+        )  # [self.n_factors, self.n_factors]
+        weights = rearrange(weights, "o g (s z) -> o g s z", s=size, z=size)
+        x = torch.nn.functional.conv2d(
+            input,
+            weights,
+            padding=padding,
+            groups=groups,
+        )
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
+        return x
+
+    def learnable_neighbour_effect_conv2d_nn(self, x, name, n_tiles=1, size=None, n_out=None, padding="valid"):
+        # pure pytorch version
+
+        # conv2d expects 4d input: [batch, channels, height, width]
+        input = self.reshape_input_2d(x, n_tiles=n_tiles)
+        # conv2d expects 4d weights: [out_channels, in_channels/groups, height, width]
+        if n_out is None:
+            n_out = x.shape[-1]
+            groups = x.shape[-1]
+        else:
+            groups = 1
+        if size is None:
+            size = self.sliding_window_size
+        if getattr(self.weights, name, None) is None:
+            deep_setattr(
+                self.weights,
+                name,
+                torch.nn.Conv2d(
+                    in_channels=x.shape[-1],
+                    out_channels=n_out,
+                    kernel_size=size,
+                    padding=padding,
+                    groups=groups,
+                ).to(input.device),
+            )
+        mod = deep_getattr(self.weights, name).to(input.device)
+        x = mod(input)
+        x = self.reshape_input_2d_inverse(x, n_tiles=n_tiles)
+        return x
+
+    def inverse_sigmoid_lm(self, x, weight, bias, scaling):
+        if scaling is None:
+            return self.ones - torch.sigmoid(x * weight + bias)
+        return (self.ones - torch.sigmoid(x * weight + bias)) * scaling
+
+    def gamma_pdf(self, x, concentration, rate, scaling):
+        if scaling is None:
+            return (
+                dist.Gamma(
+                    concentration=concentration,
+                    rate=rate,
+                )
+                .log_prob(x)
+                .exp()
+            )
+        return (
+            dist.Gamma(
+                concentration=concentration,
+                rate=rate,
+            )
+            .log_prob(x)
+            .exp()
+            * scaling
+        )
+
+    def distance_function_neighbour_effect(
+        self,
+        x_cm,
+        distances,
+        name,
+        average_distance_prior=50.0,
+    ):
+        # distances [observations, observations]
+        distances = distances.view(*[distances.shape[0], distances.shape[1], 1, 1])
+        distances = distances + self.eps
+        # hide self effect (same cell type, same location)
+        zero_diag = torch.diag(self.ones_1d.expand(distances.shape[-3])).unsqueeze(-1).unsqueeze(-1)
+        zero_diag_tfs = torch.diag(self.ones_1d.expand(self.n_factors)).unsqueeze(-3).unsqueeze(-3)
+        zero_diag = -zero_diag * zero_diag_tfs + self.ones_1d
+        # pyro version
+        param_shape = [1, 1, self.n_factors, self.n_factors]
+        # sigmoid function ============
+        prior = torch.tensor(5.0, device=distances.device)
+        sigmoid_weight = pyro.sample(
+            f"{name}_sigmoid_weight",
+            dist.Gamma(prior, prior).expand(param_shape).to_event(len(param_shape)),
+        )  # [self.n_factors, self.n_factors]
+        sigmoid_weight = sigmoid_weight / torch.tensor(average_distance_prior, device=distances.device)
+        prior = torch.tensor(-2.0, device=distances.device)
+        sigmoid_bias = pyro.sample(
+            f"{name}_sigmoid_bias",
+            dist.Normal(prior, self.ones).expand(param_shape).to_event(len(param_shape)),
+        )  # [self.n_factors, self.n_factors]
+        sigmoid_distance_function = (
+            self.inverse_sigmoid_lm(distances, sigmoid_weight, sigmoid_bias, scaling=None) * zero_diag
+        )
+        # gamma function ============
+        prior = torch.tensor(1.0, device=distances.device)
+        gamma_concentration = pyro.sample(
+            f"{name}_gamma_concentration",
+            dist.Gamma(prior, prior).expand(param_shape).to_event(len(param_shape)),
+        )  # [self.n_factors, self.n_factors]
+        prior = torch.tensor(3.0, device=distances.device)
+        gamma_distance = pyro.sample(
+            f"{name}_gamma_distance",
+            dist.Gamma(prior, prior).expand(param_shape).to_event(len(param_shape)),
+        )  # [self.n_factors, self.n_factors]
+        gamma_distance = gamma_distance / torch.tensor(average_distance_prior, device=distances.device)
+        gamma_distance_function = (
+            self.gamma_pdf(
+                distances,
+                concentration=gamma_concentration,
+                rate=gamma_distance,
+                scaling=None,
+            )
+            * zero_diag
+        )
+
+        # effect ============
+        sigmoid_effect = pyro.sample(
+            f"{name}_sigmoid_effect",
+            dist.SoftLaplace(self.zeros, self.ones).expand([self.n_factors, self.n_factors]).to_event(2),
+        )  # [self.n_factors, self.n_factors]
+        gamma_effect = pyro.sample(
+            f"{name}_gamma_effect",
+            dist.SoftLaplace(self.zeros, self.ones).expand([self.n_factors, self.n_factors]).to_event(2),
+        )  # [self.n_factors, self.n_factors]
+        # aggregation & transformation ============
+        x = torch.einsum(  # sigmoid function
+            "hm,pohm,om->ph",
+            sigmoid_effect / torch.tensor(np.sqrt(self.n_factors), device=distances.device),
+            sigmoid_distance_function,
+            x_cm,
+        ) + torch.einsum(  # gamma function
+            "hm,pohm,om->ph",
+            gamma_effect / torch.tensor(np.sqrt(self.n_factors), device=distances.device),
+            gamma_distance_function,
+            x_cm,
+        )
+        # scale independent input abundances by the output of the distance function
+        x = torch.nn.functional.softplus(x / torch.tensor(100.0, device=distances.device)) / torch.tensor(
+            0.7, device=distances.device
+        )  # average effect of 1
+        x = x_cm * x
+        return x
+
+    def factorisation_prior_on_w_sf(self, obs_plate):
+        # factorisation prior on w_sf models similarity in locations
+        # across cell types f and reflects the absolute scale of w_sf
+        with obs_plate:
+            k = "n_s_cells_per_location"
+            n_s_cells_per_location = pyro.sample(
+                k,
+                dist.Gamma(
+                    self.N_cells_per_location * self.N_cells_mean_var_ratio,
+                    self.N_cells_mean_var_ratio,
+                ),
+            )
+            k = "b_s_groups_per_location"
+            b_s_groups_per_location = pyro.sample(
+                k,
+                dist.Gamma(self.B_groups_per_location, self.ones),
+            )
+
+        # cell group loadings
+        shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
+        rate = self.ones_1_n_groups / (n_s_cells_per_location / b_s_groups_per_location)
+        with obs_plate:
+            k = "z_sr_groups_factors"
+            z_sr_groups_factors = pyro.sample(
+                k,
+                dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
+            )  # (n_obs, n_groups)
+
+        k_r_factors_per_groups = pyro.sample(
+            "k_r_factors_per_groups",
+            dist.Gamma(self.factors_per_groups, self.ones).expand([self.n_groups, 1]).to_event(2),
+        )  # (self.n_groups, 1)
+
+        c2f_shape = k_r_factors_per_groups / self.n_factors_tensor
+
+        x_fr_group2fact = pyro.sample(
+            "x_fr_group2fact",
+            dist.Gamma(c2f_shape, k_r_factors_per_groups).expand([self.n_groups, self.n_factors]).to_event(2),
+        )  # (self.n_groups, self.n_factors)
+
+        w_sf_mu = z_sr_groups_factors @ x_fr_group2fact
+
+        return w_sf_mu
+
+    def independent_prior_on_w_sf(self, obs_plate):
+        with obs_plate:
+            n_s_cells_per_location = pyro.sample(
+                "n_s_cells_per_location",
+                dist.Gamma(
+                    self.N_cells_per_location * self.N_cells_mean_var_ratio,
+                    self.N_cells_mean_var_ratio,
+                ),
+            )
+            a_s_factors_per_location = pyro.sample(
+                "a_s_factors_per_location",
+                dist.Gamma(self.A_factors_per_location, self.ones),
+            )
+
+        # cell group loadings
+        shape = self.ones_1_n_factors * a_s_factors_per_location / self.n_factors_tensor
+        rate = self.ones_1_n_factors / (n_s_cells_per_location / a_s_factors_per_location)
+
+        with obs_plate:
+            w_sf = pyro.sample(
+                "prior_w_sf",
+                dist.Gamma(
+                    shape,
+                    rate,
+                ),
+            )  # (self.n_obs, self.n_factors)
+        return w_sf
+
+    def forward(
+        self,
+        x_data,
+        idx,
+        batch_index,
+        tiles: torch.Tensor = None,
+        positions: torch.Tensor = None,
+        in_tissue: torch.Tensor = None,
+    ):
+        # if self.sliding_window_size > 0:
+        #    # remove observations that will not be included after convolution with padding='valid'
+        #    idx = self.crop_according_to_valid_padding(idx.unsqueeze(-1)).squeeze(-1)
+        #    batch_index = self.crop_according_to_valid_padding(batch_index)
+        #    if positions is not None:
+        #        positions = self.crop_according_to_valid_padding(positions)
+        obs2sample = one_hot(batch_index, self.n_batch)
+        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, positions, in_tissue)
+        if tiles is not None:
+            n_tiles = torch.unique(tiles).shape[0]
+        else:
+            n_tiles = 1
 
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
@@ -268,114 +692,96 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )  # (1, n_vars)
 
         # =====================Cell abundances w_sf======================= #
-        # factorisation prior on w_sf models similarity in locations
-        # across cell types f and reflects the absolute scale of w_sf
-        with obs_plate as ind:
-            k = "n_s_cells_per_location"
-            n_s_cells_per_location = pyro.sample(
-                k,
-                dist.Gamma(
-                    self.N_cells_per_location * self.N_cells_mean_var_ratio,
-                    self.N_cells_mean_var_ratio,
-                ),
-            )
-            if (
-                self.training_wo_observed
-                and not self.training_wo_initial
-                and getattr(self, f"init_val_{k}", None) is not None
-            ):
-                # pre-training Variational distribution to initial values
-                pyro.sample(
-                    k + "_initial",
+        if not (
+            self.use_distance_function_prior_on_w_sf
+            or self.use_distance_function_effect_on_w_sf
+            or self.use_independent_prior_on_w_sf
+        ):
+            w_sf_mu = self.factorisation_prior_on_w_sf(obs_plate)
+            with obs_plate:
+                k = "w_sf"
+                w_sf = pyro.sample(
+                    k,
                     dist.Gamma(
-                        self.init_alpha_tt,
-                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
+                        w_sf_mu * self.w_sf_mean_var_ratio_tensor,
+                        self.w_sf_mean_var_ratio_tensor,
                     ),
-                    obs=n_s_cells_per_location,
-                )  # (self.n_obs, self.n_groups)
-
-            k = "b_s_groups_per_location"
-            b_s_groups_per_location = pyro.sample(
-                k,
-                dist.Gamma(self.B_groups_per_location, self.ones),
-            )
-            if (
-                self.training_wo_observed
-                and not self.training_wo_initial
-                and getattr(self, f"init_val_{k}", None) is not None
-            ):
-                # pre-training Variational distribution to initial values
-                pyro.sample(
-                    k + "_initial",
-                    dist.Gamma(
-                        self.init_alpha_tt,
-                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
-                    ),
-                    obs=b_s_groups_per_location,
-                )  # (self.n_obs, self.n_groups)
-
-        # cell group loadings
-        shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
-        rate = self.ones_1_n_groups / (n_s_cells_per_location / b_s_groups_per_location)
-        with obs_plate as ind:
-            k = "z_sr_groups_factors"
-            z_sr_groups_factors = pyro.sample(
-                k,
-                dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
-            )  # (n_obs, n_groups)
-
-            if (
-                self.training_wo_observed
-                and not self.training_wo_initial
-                and getattr(self, f"init_val_{k}", None) is not None
-            ):
-                # pre-training Variational distribution to initial values
-                pyro.sample(
-                    k + "_initial",
-                    dist.Gamma(
-                        self.init_alpha_tt,
-                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
-                    ),
-                    obs=z_sr_groups_factors,
-                )  # (self.n_obs, self.n_groups)
-
-        k_r_factors_per_groups = pyro.sample(
-            "k_r_factors_per_groups",
-            dist.Gamma(self.factors_per_groups, self.ones).expand([self.n_groups, 1]).to_event(2),
-        )  # (self.n_groups, 1)
-
-        c2f_shape = k_r_factors_per_groups / self.n_factors_tensor
-
-        x_fr_group2fact = pyro.sample(
-            "x_fr_group2fact",
-            dist.Gamma(c2f_shape, k_r_factors_per_groups).expand([self.n_groups, self.n_factors]).to_event(2),
-        )  # (self.n_groups, self.n_factors)
-
-        with obs_plate as ind:
-            w_sf_mu = z_sr_groups_factors @ x_fr_group2fact
-
-            k = "w_sf"
-            w_sf = pyro.sample(
-                k,
-                dist.Gamma(
-                    w_sf_mu * self.w_sf_mean_var_ratio_tensor,
-                    self.w_sf_mean_var_ratio_tensor,
-                ),
-            )  # (self.n_obs, self.n_factors)
-            if (
-                self.training_wo_observed
-                and not self.training_wo_initial
-                and getattr(self, f"init_val_{k}", None) is not None
-            ):
-                # pre-training Variational distribution to initial values
-                pyro.sample(
-                    k + "_initial",
-                    dist.Gamma(
-                        self.init_alpha_tt,
-                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
-                    ),
-                    obs=w_sf,
                 )  # (self.n_obs, self.n_factors)
+        elif self.use_distance_function_prior_on_w_sf:
+            w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
+            # compute distance using positions [observations, 2]
+            distances = (
+                (positions.unsqueeze(1) - positions.unsqueeze(0))  # [observations, 1, 2]  # [1, observations, 2]
+                .pow(2)
+                .sum(-1)
+                .sqrt()
+            )
+            w_sf_mu = self.distance_function_neighbour_effect(
+                x_cm=w_sf_mu,
+                distances=distances,
+                name="w_sf_distance_function",
+                average_distance_prior=self.average_distance_prior,
+            )
+            with obs_plate:
+                k = "w_sf"
+                w_sf = pyro.sample(
+                    k,
+                    dist.Gamma(
+                        w_sf_mu * self.w_sf_mean_var_ratio_tensor,
+                        self.w_sf_mean_var_ratio_tensor,
+                    ),
+                )  # (self.n_obs, self.n_factors)
+        elif self.use_distance_function_effect_on_w_sf:
+            w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
+            # compute distance using positions [observations, 2]
+            distances = (
+                (positions.unsqueeze(1) - positions.unsqueeze(0))  # [observations, 1, 2]  # [1, observations, 2]
+                .pow(2)
+                .sum(-1)
+                .sqrt()
+            )
+            w_sf_mu = self.distance_function_neighbour_effect(
+                x_cm=w_sf_mu,
+                distances=distances,
+                name="w_sf_distance_function",
+                average_distance_prior=self.average_distance_prior,
+            )
+            with obs_plate:
+                k = "w_sf"
+                w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
+        elif self.use_independent_prior_on_w_sf:
+            w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
+            with obs_plate:
+                k = "w_sf"
+                w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
+
+        if self.use_cell_compartments:
+            with obs_plate:
+                k = "cell_compartment_w_sfk"
+                w_sfk = pyro.sample(
+                    k,
+                    dist.Dirichlet(self.ones_1d.expand((self.n_factors, self.n_cell_compartments))),
+                )  # ( self.n_factors, self.n_obs, self.n_cell_compartments)
+            w_sf = torch.einsum("sfk,sf->fsk", w_sfk, w_sf)
+
+            if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
+                w_sf = self.redistribute_conv2d(
+                    rearrange(w_sf, "f s k -> s (f k)"),
+                    n_tiles=n_tiles,
+                    name="redistribute",
+                    padding="same",
+                )
+                w_sf = rearrange(w_sf, "s (f k) -> f s k", f=self.n_factors, k=self.n_cell_compartments)
+                pyro.deterministic("aggregated_w_fsk", w_sf)
+        else:
+            if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
+                w_sf = self.redistribute_conv2d(
+                    w_sf,
+                    name="redistribute",
+                    padding="same",
+                    n_tiles=n_tiles,
+                )
+                pyro.deterministic("aggregated_w_sf", w_sf)
 
         # =====================Location-specific detection efficiency ======================= #
         # y_s with hierarchical mean prior
@@ -401,20 +807,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
             )  # (self.n_obs, 1)
 
-            if (
-                self.training_wo_observed
-                and not self.training_wo_initial
-                and getattr(self, f"init_val_{k}", None) is not None
-            ):
-                # pre-training Variational distribution to initial values
-                pyro.sample(
-                    k + "_initial",
-                    dist.Gamma(
-                        self.init_alpha_tt,
-                        self.init_alpha_tt / getattr(self, f"init_val_{k}")[ind],
-                    ),
-                    obs=detection_y_s,
-                )  # (self.n_obs, 1)
+        if (self.sliding_window_size > 0) and self.use_aggregated_detection_y_s:
+            detection_y_s = self.aggregate_conv2d(
+                detection_y_s,
+                padding="same",
+                mean=True,
+                size=20,
+                n_tiles=n_tiles,
+            )
+            pyro.deterministic("aggregated_detection_y_s", detection_y_s)
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
@@ -458,7 +859,18 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Expected expression ======================= #
         if not self.training_wo_observed:
             # expected expression
-            mu = ((w_sf @ self.cell_state) * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
+            if self.use_cell_compartments:
+                k = "cell_compartment_g_fgk"
+                cell_compartment_g_fgk = pyro.sample(
+                    k,
+                    dist.Dirichlet(self.ones_1d.expand((1, 1, self.n_cell_compartments)))
+                    .expand([self.n_factors, self.n_vars])
+                    .to_event(reinterpreted_batch_ndims=None),
+                )  # ( self.n_factors, self.n_vars, self.n_cell_compartments)
+                mu = torch.einsum("fsk,fgk,fg->sg", w_sf, cell_compartment_g_fgk, self.cell_state)
+            else:
+                mu = w_sf @ self.cell_state
+            mu = (mu * m_g + (obs2sample @ s_g_gene_add)) * detection_y_s
             alpha = obs2sample @ (self.ones / alpha_g_inverse.pow(2))
             # convert mean and overdispersion to total count and logits
             # total_count, logits = _convert_mean_disp_to_counts_logits(
@@ -469,18 +881,61 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
             if self.dropout_p != 0:
                 x_data = self.dropout(x_data)
-            with obs_plate:
-                pyro.sample(
-                    "data_target",
-                    dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
-                    # dist.NegativeBinomial(total_count=total_count, logits=logits),
-                    obs=x_data,
-                )
+            if self.sliding_window_size_list is None:
+                if (self.sliding_window_size > 0) and not self.use_aggregated_w_sf:
+                    x_data = self.aggregate_conv2d(
+                        x_data,
+                        padding="same",
+                        n_tiles=n_tiles,
+                        size=self.sliding_window_size,
+                    )
+                with obs_plate:
+                    pyro.sample(
+                        "data_target",
+                        dist.GammaPoisson(concentration=alpha, rate=alpha / mu),
+                        obs=x_data,
+                    )
+            else:
+                for i, size in enumerate(self.sliding_window_size_list):
+                    if self.sliding_window_size_list[i] > 0:
+                        mu_ = self.aggregate_conv2d(
+                            mu,
+                            padding="same",
+                            n_tiles=n_tiles,
+                            size=size,
+                        )
+                        alpha_ = alpha * torch.tensor((self.sliding_window_size_list[i] ** 2) / 100, device=mu.device)
+                        # alpha_g_size_effect = pyro.sample(
+                        #    f"alpha_g_size_{size}",
+                        #    dist.Gamma(self.ones + self.ones, self.ones + self.ones).to_event(2),
+                        # )
+                        # alpha_ = alpha_ * alpha_g_size_effect
+                        x_data_ = self.aggregate_conv2d(
+                            x_data,
+                            padding="same",
+                            n_tiles=n_tiles,
+                            size=size,
+                        )
+                    else:
+                        mu_ = mu
+                        alpha_ = alpha * torch.tensor((1**2) / 100, device=mu.device)
+                        x_data_ = x_data
+                    with obs_plate, pyro.poutine.mask(mask=in_tissue):
+                        pyro.sample(
+                            f"data_target_{size}",
+                            dist.GammaPoisson(concentration=alpha_, rate=alpha_ / mu_),
+                            obs=x_data_,
+                        )
 
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
-            mRNA = w_sf * (self.cell_state * m_g).sum(-1)
-            pyro.deterministic("u_sf_mRNA_factors", mRNA)
+            if not self.training:
+                if self.use_cell_compartments:
+                    mRNA = torch.einsum("fsk,fgk,fg->fsk", w_sf, cell_compartment_g_fgk, self.cell_state * m_g)
+                    pyro.deterministic("u_fsk_mRNA_factors", mRNA)
+                else:
+                    mRNA = w_sf * (self.cell_state * m_g).sum(-1)
+                    pyro.deterministic("u_sf_mRNA_factors", mRNA)
 
     def compute_expected(
         self,

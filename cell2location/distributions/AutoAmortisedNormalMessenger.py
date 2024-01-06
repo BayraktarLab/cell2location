@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Callable, Literal, Optional, Union
 
+import numpy as np
 import pyro.distributions as dist
 import torch
 from pyro.distributions.distribution import Distribution
@@ -348,6 +349,21 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 linear_scale_encoder = deep_getattr(self.hidden2scales, f"{name}.encoder")
                 loc = linear_loc(linear_loc_encoder(*x_in))
                 scale = self.softplus(linear_scale(linear_scale_encoder(*x_in)) + self._init_scale_unconstrained)
+            # determine parameter dimensions
+            out_dim = self.amortised_plate_sites["sites"][name]
+            if isinstance(out_dim, tuple):
+                from string import ascii_lowercase
+
+                from einops import rearrange
+
+                variables = [ascii_lowercase[i] for i in range(len(out_dim))]
+                variables_str = " ".join(variables)
+                loc = rearrange(
+                    loc, f"z ({variables_str}) -> z {variables_str}", **{v: dim for v, dim in zip(variables, out_dim)}
+                )
+                scale = rearrange(
+                    scale, f"z ({variables_str}) -> z {variables_str}", **{v: dim for v, dim in zip(variables, out_dim)}
+                )
             if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
                 if self.weight_type == "element-wise":
                     # weight is element-wise
@@ -358,6 +374,12 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                         linear_weight_encoder = deep_getattr(self.hidden2weights, f"{name}.encoder")
                         weight = self.softplus(
                             linear_weight(linear_weight_encoder(hidden)) + self._init_weight_unconstrained
+                        )
+                    if isinstance(out_dim, tuple):
+                        weight = rearrange(
+                            weight,
+                            f"z ({variables_str}) -> z {variables_str}",
+                            **{v: dim for v, dim in zip(variables, out_dim)},
                         )
                 if self.weight_type == "scalar":
                     # weight is a single value parameter
@@ -385,6 +407,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 n_hidden = self.n_hidden["single"]
             # determine parameter dimensions
             out_dim = self.amortised_plate_sites["sites"][name]
+            if isinstance(out_dim, tuple):
+                out_dim = np.product(out_dim)
 
         deep_setattr(
             self,

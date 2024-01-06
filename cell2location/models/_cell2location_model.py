@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -17,13 +18,15 @@ from scvi.data.fields import (
     LayerField,
     NumericalJointObsField,
     NumericalObsField,
+    ObsmField,
 )
 from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
 from scvi.model.base._pyromixin import PyroJitGuideWarmup
-from scvi.train import TrainRunner
+from scvi.train import PyroTrainingPlan, TrainRunner
 from scvi.utils import setup_anndata_dsp
 
+from cell2location.dataloaders._defined_grid_dataloader import SpatialGridDataSplitter
 from cell2location.models._cell2location_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel,
 )
@@ -111,7 +114,15 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
                 ).astype("float32")
-
+        on_load_batch_size = None
+        if model_kwargs.get("amortised", False):
+            on_load_batch_size = 128
+        if (model_kwargs.get("amortised_sliding_window_size", 0) > 0) or (
+            model_kwargs.get("sliding_window_size", 0) > 0
+        ):
+            on_load_batch_size = 1
+            self._data_splitter_cls = SpatialGridDataSplitter
+            logging.info("Updating data splitter to SpatialGridDataSplitter.")
         self.module = Cell2locationBaseModule(
             model=model_class,
             n_obs=self.summary_stats["n_cells"],
@@ -119,6 +130,10 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             n_factors=self.n_factors_,
             n_batch=self.summary_stats["n_batch"],
             cell_state_mat=self.cell_state_df_.values.astype("float32"),
+            on_load_kwargs={
+                "batch_size": on_load_batch_size,
+                "max_epochs": 1,
+            },
             **model_kwargs,
         )
         self._model_summary_string = f'cell2location model with the following params: \nn_factors: {self.n_factors_} \nn_batch: {self.summary_stats["n_batch"]} '
@@ -132,6 +147,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         layer: Optional[str] = None,
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
+        position_key: Optional[str] = None,
+        tiles_key: Optional[str] = None,
+        in_tissue_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
         **kwargs,
@@ -157,6 +175,13 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
         ]
+        if position_key is not None:
+            anndata_fields.append(ObsmField("positions", position_key))
+        if tiles_key is not None:
+            anndata_fields.append(CategoricalObsField("tiles", tiles_key))
+        if in_tissue_key is not None:
+            anndata_fields.append(NumericalObsField("in_tissue", tiles_key))
+
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
@@ -168,6 +193,122 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         self.train(**kwargs)
 
     def train(
+        self,
+        max_epochs: int = 30000,
+        batch_size: int = None,
+        train_size: float = 1,
+        lr: float = 0.002,
+        num_particles: int = 1,
+        scale_elbo: float = 1.0,
+        use_gpu: Optional[Union[str, int, bool]] = None,
+        accelerator: str = "auto",
+        device: Union[int, str] = "auto",
+        validation_size: Optional[float] = None,
+        shuffle_set_split: bool = True,
+        early_stopping: bool = False,
+        training_plan: Optional[PyroTrainingPlan] = None,
+        plan_kwargs: Optional[dict] = None,
+        datasplitter_kwargs: Optional[dict] = None,
+        **trainer_kwargs,
+    ):
+        """Train the model.
+
+        Parameters
+        ----------
+        max_epochs
+            Number of passes through the dataset. If `None`, defaults to
+            `np.min([round((20000 / n_cells) * 400), 400])`
+        %(param_use_gpu)s
+        %(param_accelerator)s
+        %(param_device)s
+        train_size
+            Size of training set in the range [0.0, 1.0].
+        validation_size
+            Size of the test set. If `None`, defaults to 1 - `train_size`. If
+            `train_size + validation_size < 1`, the remaining cells belong to a test set.
+        shuffle_set_split
+            Whether to shuffle indices before splitting. If `False`, the val, train, and test set are split in the
+            sequential order of the data according to `validation_size` and `train_size` percentages.
+        batch_size
+            Minibatch size to use during training. If `None`, no minibatching occurs and all
+            data is copied to device (e.g., GPU).
+        early_stopping
+            Perform early stopping. Additional arguments can be passed in `**kwargs`.
+            See :class:`~scvi.train.Trainer` for further options.
+        lr
+            Optimiser learning rate (default optimiser is :class:`~pyro.optim.ClippedAdam`).
+            Specifying optimiser via plan_kwargs overrides this choice of lr.
+        training_plan
+            Training plan :class:`~scvi.train.PyroTrainingPlan`.
+        plan_kwargs
+            Keyword args for :class:`~scvi.train.PyroTrainingPlan`. Keyword arguments passed to
+            `train()` will overwrite values present in `plan_kwargs`, when appropriate.
+        **trainer_kwargs
+            Other keyword args for :class:`~scvi.train.Trainer`.
+        """
+        # if max_epochs is None:
+        #    max_epochs = get_max_epochs_heuristic(self.adata.n_obs, epochs_cap=1000)
+        if datasplitter_kwargs is None:
+            datasplitter_kwargs = dict()
+
+        if issubclass(self._data_splitter_cls, SpatialGridDataSplitter):
+            self.module.model.n_tiles = batch_size
+
+        plan_kwargs = plan_kwargs if isinstance(plan_kwargs, dict) else {}
+        if lr is not None and "optim" not in plan_kwargs.keys():
+            plan_kwargs.update({"optim_kwargs": {"lr": lr}})
+        if getattr(self.module.model, "discrete_variables", None) and (len(self.module.model.discrete_variables) > 0):
+            plan_kwargs["loss_fn"] = TraceEnum_ELBO(num_particles=num_particles)
+        else:
+            plan_kwargs["loss_fn"] = Trace_ELBO(num_particles=num_particles)
+        if scale_elbo != 1.0:
+            if scale_elbo is None:
+                scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_vars"])
+            plan_kwargs["scale_elbo"] = scale_elbo
+
+        if batch_size is None:
+            # use data splitter which moves data to GPU once
+            data_splitter = DeviceBackedDataSplitter(
+                self.adata_manager,
+                train_size=train_size,
+                validation_size=validation_size,
+                batch_size=batch_size,
+                accelerator=accelerator,
+                device=device,
+            )
+        else:
+            data_splitter = self._data_splitter_cls(
+                self.adata_manager,
+                train_size=train_size,
+                validation_size=validation_size,
+                shuffle_set_split=shuffle_set_split,
+                batch_size=batch_size,
+                **datasplitter_kwargs,
+            )
+
+        if training_plan is None:
+            training_plan = self._training_plan_cls(self.module, **plan_kwargs)
+
+        es = "early_stopping"
+        trainer_kwargs[es] = early_stopping if es not in trainer_kwargs.keys() else trainer_kwargs[es]
+
+        if "callbacks" not in trainer_kwargs.keys():
+            trainer_kwargs["callbacks"] = []
+        trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+
+        runner = self._train_runner_cls(
+            self,
+            training_plan=training_plan,
+            data_splitter=data_splitter,
+            max_epochs=max_epochs,
+            use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=device,
+            **trainer_kwargs,
+        )
+        return runner()
+
+    def train_v1(
         self,
         max_epochs: int = 30000,
         batch_size: int = None,
@@ -218,7 +359,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
     def train_aggressive(
         self,
         max_epochs: Optional[int] = 1000,
-        use_gpu: Optional[Union[str, int, bool]] = None,
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         train_size: float = 1,
@@ -275,7 +415,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 train_size=train_size,
                 validation_size=validation_size,
                 batch_size=batch_size,
-                use_gpu=use_gpu,
                 accelerator=accelerator,
                 device=device,
             )
@@ -302,7 +441,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             training_plan=training_plan,
             data_splitter=data_splitter,
             max_epochs=max_epochs,
-            use_gpu=use_gpu,
             accelerator=accelerator,
             devices=device,
             **trainer_kwargs,
