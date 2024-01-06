@@ -918,7 +918,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                         )
                     else:
                         mu_ = mu
-                        alpha_ = alpha
+                        alpha_ = alpha * torch.tensor((1**2) / 100, device=mu.device)
                         x_data_ = x_data
                     with obs_plate, pyro.poutine.mask(mask=in_tissue):
                         pyro.sample(
