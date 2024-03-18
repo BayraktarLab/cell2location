@@ -21,7 +21,8 @@ from scvi.data.fields import (
 )
 from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
-from scvi.model.base._pyromixin import PyroJitGuideWarmup
+
+# from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import PyroTrainingPlan, TrainRunner
 from scvi.utils import setup_anndata_dsp
 
@@ -35,6 +36,7 @@ from cell2location.models.base._pyro_mixin import (
     PyroAggressiveConvergence,
     PyroAggressiveTrainingPlan,
     QuantileMixin,
+    setup_pyro_model,
 )
 from cell2location.utils import select_slide
 
@@ -49,8 +51,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         spatial AnnData object that has been registered via :func:`~scvi.data.setup_anndata`.
     cell_state_df
         pd.DataFrame with reference expression signatures for each gene (rows) in each cell type/population (columns).
-    use_gpu
-        Use the GPU?
     **model_kwargs
         Keyword args for :class:`~cell2location.models.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`
 
@@ -193,7 +193,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         lr: float = 0.002,
         num_particles: int = 1,
         scale_elbo: float = 1.0,
-        use_gpu: Optional[Union[str, int, bool]] = None,
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         validation_size: Optional[float] = None,
@@ -287,14 +286,19 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         if "callbacks" not in trainer_kwargs.keys():
             trainer_kwargs["callbacks"] = []
-        trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+        # trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+        from copy import copy
+
+        dl = copy(data_splitter)
+        dl.setup()
+        dl = dl.train_dataloader()
+        setup_pyro_model(dl, training_plan)
 
         runner = self._train_runner_cls(
             self,
             training_plan=training_plan,
             data_splitter=data_splitter,
             max_epochs=max_epochs,
-            use_gpu=use_gpu,
             accelerator=accelerator,
             devices=device,
             **trainer_kwargs,
@@ -370,9 +374,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         max_epochs
             Number of passes through the dataset. If `None`, defaults to
             `np.min([round((20000 / n_cells) * 400), 400])`
-        use_gpu
-            Use default GPU if available (if None or True), or index of GPU to use (if int),
-            or name of GPU (if str, e.g., `'cuda:0'`), or use CPU (if False).
         train_size
             Size of training set in the range [0.0, 1.0].
         validation_size
@@ -426,8 +427,15 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         if "callbacks" not in trainer_kwargs.keys():
             trainer_kwargs["callbacks"] = []
-        trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+        # trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
         trainer_kwargs["callbacks"].append(PyroAggressiveConvergence())
+
+        from copy import copy
+
+        dl = copy(data_splitter)
+        dl.setup()
+        dl = dl.train_dataloader()
+        setup_pyro_model(dl, training_plan)
 
         runner = TrainRunner(
             self,

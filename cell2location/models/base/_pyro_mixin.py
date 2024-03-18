@@ -30,6 +30,18 @@ from ...distributions.AutoAmortisedNormalMessenger import (
 logger = logging.getLogger(__name__)
 
 
+def setup_pyro_model(dataloader, pl_module):
+    """Way to warmup Pyro Model and Guide in an automated way.
+
+    Setup occurs before any device movement, so params are iniitalized on CPU.
+    """
+    for tensors in dataloader:
+        tens = {k: t.to(pl_module.device) for k, t in tensors.items()}
+        args, kwargs = pl_module.module._get_fn_args_from_batch(tens)
+        pl_module.module.guide(*args, **kwargs)
+        break
+
+
 def init_to_value(site=None, values={}, init_fn=init_to_mean):
     if site is None:
         return partial(init_to_value, values=values)

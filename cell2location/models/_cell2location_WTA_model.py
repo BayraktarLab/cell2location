@@ -47,8 +47,6 @@ class Cell2location_WTA(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltEx
         spatial AnnData object that has been registered via :func:`~scvi.data.setup_anndata`.
     cell_state_df
         pd.DataFrame with reference expression signatures for each gene (rows) in each cell type/population (columns).
-    use_gpu
-        Use the GPU?
     **model_kwargs
         Keyword args for :class:`~cell2location.models.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel`
 
