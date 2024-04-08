@@ -32,6 +32,7 @@ def export_posterior(model, dataset):
     )  # quantile 0.50
     dataset = model.export_posterior(dataset, use_quantiles=True)  # default
     dataset = model.export_posterior(dataset, use_quantiles=True, sample_kwargs={"batch_size": 10})
+    return dataset
 
 
 def export_posterior_sc(model, dataset):
@@ -44,6 +45,7 @@ def export_posterior_sc(model, dataset):
     )  # quantile 0.50
     dataset = model.export_posterior(dataset, use_quantiles=True)  # default
     dataset = model.export_posterior(dataset, use_quantiles=True, sample_kwargs={"batch_size": 10})
+    return dataset
 
 
 def test_cell2location():
@@ -92,8 +94,20 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+    assert "data_target" not in dataset.uns["mod"]["post_sample_means"].keys()
+    assert "u_sf_mRNA_factors" in dataset.uns["mod"]["post_sample_means"].keys()
+    assert dataset.uns["mod"]["post_sample_means"]["w_sf"].shape == (dataset.n_obs, dataset.obs["labels"].nunique())
     # test quantile export
-    export_posterior(st_model, dataset)
+    dataset = export_posterior(st_model, dataset)
+    dataset = st_model.export_posterior(
+        dataset,
+        use_quantiles=True,
+        add_to_obsm=["q50", "q05", "q001"],
+    )
+    assert "data_target" not in dataset.uns["mod"]["post_sample_q50"].keys()
+    assert "u_sf_mRNA_factors" in dataset.uns["mod"]["post_sample_q50"].keys()
+    assert "u_sf_mRNA_factors" in dataset.uns["mod"]["post_sample_q001"].keys()
+    assert dataset.uns["mod"]["post_sample_q50"]["w_sf"].shape == (dataset.n_obs, dataset.obs["labels"].nunique())
     st_model.plot_QC(summary_name="q05")
     ##  minibatches of locations  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
@@ -333,22 +347,20 @@ def test_cell2location():
 
 
 @pytest.mark.parametrize("sliding_window_size", [0, 4])
-@pytest.mark.parametrize("use_distance_function_prior_on_w_sf", [False])
-@pytest.mark.parametrize("use_distance_function_effect_on_w_sf", [False])
 @pytest.mark.parametrize("use_aggregated_w_sf", [False, True])
 @pytest.mark.parametrize("amortised", [False, True])
 @pytest.mark.parametrize("amortised_sliding_window_size", [0, 4])
 @pytest.mark.parametrize("n_tiles", [1, 2])
-@pytest.mark.parametrize("sliding_window_size_list", [None, [0, 4, 8, 16, 32]])
+@pytest.mark.parametrize("sliding_window_size_list", [None, [0, 4, 8]])
+@pytest.mark.parametrize("use_weigted_cnn_weights", [False])
 def test_cell2location_with_aggregation(
     sliding_window_size,
-    use_distance_function_prior_on_w_sf,
-    use_distance_function_effect_on_w_sf,
     use_aggregated_w_sf,
     amortised,
     amortised_sliding_window_size,
     n_tiles,
     sliding_window_size_list,
+    use_weigted_cnn_weights,
 ):
     save_path = "./cell2location_model_test"
     if torch.cuda.is_available():
@@ -378,7 +390,6 @@ def test_cell2location_with_aggregation(
         inf_aver = dataset.var[[f"means_per_cluster_mu_fg_{i}" for i in dataset.uns["mod"]["factor_names"]]].copy()
     inf_aver.columns = dataset.uns["mod"]["factor_names"]
     ### test cell2location model with convolutions ###
-    use_distance_fun = use_distance_function_prior_on_w_sf or use_distance_function_effect_on_w_sf
     use_tiles = (sliding_window_size > 0) or (amortised_sliding_window_size > 0)
     tiles = []
     for i in range(n_tiles):
@@ -387,7 +398,7 @@ def test_cell2location_with_aggregation(
     Cell2location.setup_anndata(
         dataset,
         batch_key="batch",
-        position_key=None if not use_distance_fun else "X_spatial",
+        position_key=None,
         tiles_key="tiles" if use_tiles else None,
     )
     ##  full data  ##
@@ -399,11 +410,13 @@ def test_cell2location_with_aggregation(
         average_distance_prior=5.0,
         sliding_window_size=sliding_window_size,
         amortised_sliding_window_size=amortised_sliding_window_size,
-        sliding_window_size_list=sliding_window_size_list,
+        sliding_window_size_list=sliding_window_size_list
+        if (sliding_window_size > 0) or (amortised_sliding_window_size > 0)
+        else None,
         image_size=[20, 20],
-        use_distance_function_prior_on_w_sf=use_distance_function_prior_on_w_sf,
-        use_distance_function_effect_on_w_sf=use_distance_function_effect_on_w_sf,
         use_aggregated_w_sf=use_aggregated_w_sf,
+        use_weigted_cnn_weights=use_weigted_cnn_weights,
+        use_independent_prior_on_w_sf=True,
         amortised=amortised,
         encoder_mode="multiple",
         encoder_kwargs={
@@ -435,28 +448,156 @@ def test_cell2location_with_aggregation(
         batch_size=batch_size,
         # datasplitter_kwargs={"shuffle": shuffle, "shuffle_set_split": shuffle},
     )
-    st_model.module.model.n_tiles = 1
+    if (sliding_window_size > 0) or (amortised_sliding_window_size > 0):
+        st_model.module.model.n_tiles = 1
     # test save/load
     st_model.save(save_path, overwrite=True, save_anndata=True)
     st_model = Cell2location.load(save_path)
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
-    if not use_distance_fun:
-        if (sliding_window_size > 0) or (amortised_sliding_window_size > 0):
-            dataset = st_model.export_posterior(
-                dataset,
-                sample_kwargs={
-                    "batch_size": 1,
-                    "use_median": True,
-                },
-                add_to_obsm=["q50"],
-                use_quantiles=True,
-            )
-        else:
-            dataset = st_model.export_posterior(
-                dataset,
-                sample_kwargs={
-                    "num_samples": 10,
-                    "batch_size": 100,
-                },
-            )
+    if (sliding_window_size > 0) or (amortised_sliding_window_size > 0):
+        dataset = st_model.export_posterior(
+            dataset,
+            sample_kwargs={
+                "batch_size": 1,
+                "use_median": True,
+            },
+            add_to_obsm=["q50"],
+            use_quantiles=True,
+        )
+    else:
+        dataset = st_model.export_posterior(
+            dataset,
+            sample_kwargs={
+                "num_samples": 10,
+                "batch_size": 100,
+            },
+        )
+
+
+@pytest.mark.parametrize("use_cell_comm_prior_on_w_sf", [False, True])
+@pytest.mark.parametrize("use_cell_comm_likelihood_w_sf", [False, True])
+@pytest.mark.parametrize("amortised", [False, True])
+def test_cell2location_with_aggregation_cell_comm(
+    use_cell_comm_prior_on_w_sf,
+    use_cell_comm_likelihood_w_sf,
+    amortised,
+):
+    if (use_cell_comm_prior_on_w_sf and use_cell_comm_likelihood_w_sf) or (
+        not use_cell_comm_prior_on_w_sf and not use_cell_comm_likelihood_w_sf
+    ):
+        return None
+    save_path = "./cell2location_model_test"
+    if torch.cuda.is_available():
+        accelerator = "gpu"
+    else:
+        accelerator = "cpu"
+    data_size = 200
+    dataset = synthetic_iid(batch_size=data_size, n_labels=5)
+    dataset.obsm["X_spatial"] = np.random.normal(0, 1, [dataset.n_obs, 2])
+    RegressionModel.setup_anndata(dataset, labels_key="labels", batch_key="batch")
+
+    # train regression model to get signatures of cell types
+    sc_model = RegressionModel(dataset)
+    # test minibatch training
+    sc_model.train(max_epochs=1, batch_size=100, accelerator=accelerator)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    dataset = sc_model.export_posterior(dataset, sample_kwargs={"num_samples": 10})
+    # test quantile export
+    export_posterior_sc(sc_model, dataset)
+    sc_model.plot_QC(summary_name="q05")
+    # export estimated expression in each cluster
+    if "means_per_cluster_mu_fg" in dataset.varm.keys():
+        inf_aver = dataset.varm["means_per_cluster_mu_fg"][
+            [f"means_per_cluster_mu_fg_{i}" for i in dataset.uns["mod"]["factor_names"]]
+        ].copy()
+    else:
+        inf_aver = dataset.var[[f"means_per_cluster_mu_fg_{i}" for i in dataset.uns["mod"]["factor_names"]]].copy()
+    inf_aver.columns = dataset.uns["mod"]["factor_names"]
+    ### test cell2location model with cell comm terms ###
+    use_distance_fun = use_cell_comm_prior_on_w_sf | use_cell_comm_likelihood_w_sf
+    Cell2location.setup_anndata(
+        dataset,
+        batch_key="batch",
+        position_key=None if not use_distance_fun else "X_spatial",
+    )
+
+    signal_bool = np.random.choice([True, False], dataset.n_vars)
+    receptor_bool = np.random.choice([True, False], dataset.n_vars)
+    signal_receptor_mask = np.random.choice([True, False], [signal_bool.sum(), receptor_bool.sum()])
+    receptor_tf_mask = None
+    distances = np.random.uniform(0, 100, [dataset.n_obs, dataset.n_obs]) * np.random.choice(
+        [True, False], [dataset.n_obs, dataset.n_obs]
+    )
+    from scipy.sparse import coo_matrix
+
+    distances = coo_matrix(distances)
+
+    ##  full data  ##
+    st_model = Cell2location(
+        dataset,
+        cell_state_df=inf_aver,
+        N_cells_per_location=30,
+        detection_alpha=200,
+        signal_bool=signal_bool,
+        receptor_bool=receptor_bool,
+        signal_receptor_mask=signal_receptor_mask,
+        receptor_tf_mask=receptor_tf_mask,
+        distances=distances,
+        average_distance_prior=5.0,
+        use_cell_comm_prior_on_w_sf=use_cell_comm_prior_on_w_sf,
+        use_cell_comm_likelihood_w_sf=use_cell_comm_likelihood_w_sf,
+        use_independent_prior_on_w_sf=True,
+        amortised=amortised,
+        encoder_mode="multiple",
+        encoder_kwargs={
+            "dropout_rate": 0.1,
+            "n_hidden": {
+                "multiple": 256,
+                "single": 256,
+                "n_s_cells_per_location": 10,
+                "b_s_groups_per_location": 10,
+                "a_s_factors_per_location": 10,
+                "z_sr_groups_factors": 64,
+                "w_sf": 256,
+                "prior_w_sf": 256,
+                "detection_y_s": 10,
+            },
+            "use_batch_norm": False,
+            "use_layer_norm": True,
+            "n_layers": 1,
+            "activation_fn": torch.nn.ELU,
+        },
+    )
+    shuffle = True
+    batch_size = None
+    # test full data training
+    st_model.train(
+        max_epochs=1,
+        accelerator=accelerator,
+        shuffle_set_split=shuffle,
+        batch_size=batch_size,
+        # datasplitter_kwargs={"shuffle": shuffle, "shuffle_set_split": shuffle},
+    )
+    # test save/load
+    st_model.save(save_path, overwrite=True, save_anndata=True)
+    st_model = Cell2location.load(save_path)
+    # export the estimated cell abundance (summary of the posterior distribution)
+    # full data
+    batch_size = dataset.n_obs
+    dataset = st_model.export_posterior(
+        dataset,
+        sample_kwargs={
+            "batch_size": batch_size,
+            "use_median": True,
+        },
+        add_to_obsm=["q50"],
+        use_quantiles=True,
+    )
+    dataset = st_model.export_posterior(
+        dataset,
+        sample_kwargs={
+            "num_samples": 10,
+            "batch_size": batch_size,
+        },
+    )

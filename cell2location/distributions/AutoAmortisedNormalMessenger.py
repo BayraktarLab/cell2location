@@ -1,7 +1,8 @@
 from copy import deepcopy
-from typing import Callable, Literal, Optional, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import numpy as np
+import pyro
 import pyro.distributions as dist
 import torch
 from pyro.distributions.distribution import Distribution
@@ -590,3 +591,56 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         log_qz = log_sum_exp(log_density, dim=1) - torch.log(x_batch)
 
         return (neg_entropy - log_qz.mean(-1)).item()
+
+
+class AutoNormalMessenger(pyro.infer.autoguide.AutoNormalMessenger):
+    def __init__(
+        self,
+        model: Callable,
+        *,
+        init_loc_fn: Callable = init_to_mean(fallback=init_to_feasible),
+        init_scale: float = 0.1,
+        amortized_plates: Tuple[str, ...] = (),
+    ):
+        if not isinstance(init_scale, float) or not (init_scale > 0):
+            raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
+        super().__init__(model, amortized_plates=amortized_plates)
+        self.init_loc_fn = init_loc_fn
+        self._init_scale = init_scale
+        self._computing_median = False
+        self._computing_quantiles = False
+
+    def get_posterior(
+        self,
+        name: str,
+        prior: Distribution,
+    ) -> Union[Distribution, torch.Tensor]:
+        if self._computing_quantiles:
+            return self._get_posterior_quantiles(name, prior)
+        if self._computing_median:
+            return self._get_posterior_median(name, prior)
+
+        with helpful_support_errors({"name": name, "fn": prior}):
+            transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        posterior = dist.TransformedDistribution(
+            dist.Normal(loc, scale).to_event(transform.domain.event_dim),
+            transform.with_cache(),
+        )
+        return posterior
+
+    def quantiles(self, quantiles, *args, **kwargs):
+        self._computing_quantiles = True
+        self._quantile_values = quantiles
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_quantiles = False
+
+    @torch.no_grad()
+    def _get_posterior_quantiles(self, name, prior):
+        transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        site_quantiles = torch.tensor(self._quantile_values, dtype=loc.dtype, device=loc.device)
+        site_quantiles_values = dist.Normal(loc, scale).icdf(site_quantiles)
+        return transform(site_quantiles_values)

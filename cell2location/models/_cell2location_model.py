@@ -21,8 +21,6 @@ from scvi.data.fields import (
 )
 from scvi.dataloaders import DeviceBackedDataSplitter
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
-
-# from scvi.model.base._pyromixin import PyroJitGuideWarmup
 from scvi.train import PyroTrainingPlan, TrainRunner
 from scvi.utils import setup_anndata_dsp
 
@@ -67,6 +65,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         model_class: Optional[PyroModule] = None,
         detection_mean_per_sample: bool = False,
         detection_mean_correction: float = 1.0,
+        on_load_batch_size: Optional[int] = None,
         **model_kwargs,
     ):
         # in case any other model was created before that shares the same parameter names.
@@ -113,9 +112,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
                 ).astype("float32")
-        on_load_batch_size = None
-        if model_kwargs.get("amortised", False):
-            on_load_batch_size = 128
         if (model_kwargs.get("amortised_sliding_window_size", 0) > 0) or (
             model_kwargs.get("sliding_window_size", 0) > 0
         ):
@@ -192,7 +188,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         train_size: float = 1,
         lr: float = 0.002,
         num_particles: int = 1,
-        scale_elbo: float = 1.0,
+        scale_elbo: float = "auto",
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         validation_size: Optional[float] = None,
@@ -254,7 +250,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         else:
             plan_kwargs["loss_fn"] = Trace_ELBO(num_particles=num_particles)
         if scale_elbo != 1.0:
-            if scale_elbo is None:
+            if scale_elbo == "auto":
                 scale_elbo = 1.0 / (self.summary_stats["n_cells"] * self.summary_stats["n_vars"])
             plan_kwargs["scale_elbo"] = scale_elbo
 
@@ -286,7 +282,8 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         if "callbacks" not in trainer_kwargs.keys():
             trainer_kwargs["callbacks"] = []
-        # trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
+
+        # Initialise pyro model with data
         from copy import copy
 
         dl = copy(data_splitter)
@@ -427,7 +424,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
 
         if "callbacks" not in trainer_kwargs.keys():
             trainer_kwargs["callbacks"] = []
-        # trainer_kwargs["callbacks"].append(PyroJitGuideWarmup())
         trainer_kwargs["callbacks"].append(PyroAggressiveConvergence())
 
         from copy import copy
@@ -489,6 +485,9 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         """
 
         sample_kwargs = sample_kwargs if isinstance(sample_kwargs, dict) else dict()
+        # if "exclude_vars" not in sample_kwargs.keys():
+        #    sample_kwargs["exclude_vars"] = list()
+        # sample_kwargs["exclude_vars"] = sample_kwargs["exclude_vars"] + ["data_target"]
 
         # get posterior distribution summary
         if use_quantiles:

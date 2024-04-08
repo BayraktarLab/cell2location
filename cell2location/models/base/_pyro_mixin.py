@@ -25,6 +25,7 @@ from scvi.utils import track
 
 from ...distributions.AutoAmortisedNormalMessenger import (
     AutoAmortisedHierarchicalNormalMessenger,
+    AutoNormalMessenger,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ class AutoGuideMixinModule:
     """
     This mixin class provides methods for:
 
-    - initialising standard AutoNormal guides
+    - initialising standard AutoNormalMessenger guides
     - initialising amortised guides (AutoNormalEncoder)
     - initialising amortised guides with special additional inputs
 
@@ -158,7 +159,7 @@ class AutoGuideMixinModule:
         init_loc_fn=init_to_mean(fallback=init_to_feasible),
         n_cat_list: list = [],
         encoder_instance=None,
-        guide_class=AutoNormal,
+        guide_class=AutoNormalMessenger,
         guide_kwargs: Optional[dict] = None,
     ):
         if guide_kwargs is None:
@@ -323,7 +324,7 @@ class QuantileMixin:
         train_dl = train_dl.train_dataloader()
         return train_dl
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def _posterior_quantile_minibatch(
         self,
         q: float = 0.5,
@@ -331,7 +332,7 @@ class QuantileMixin:
         accelerator: str = "auto",
         device: Union[int, str] = "auto",
         use_median: bool = True,
-        return_observed: bool = True,
+        return_observed: bool = False,
         exclude_vars: list = None,
         data_loader_indices=None,
         show_progress: bool = True,
@@ -437,7 +438,12 @@ class QuantileMixin:
                         return means_
 
                     means = try_quantiles(args, kwargs)
-                means = {k: means[k].detach().cpu().numpy() for k in means.keys() if k not in exclude_vars}
+                valid_sites = self._get_valid_sites(args, kwargs, return_observed=return_observed)
+                means = {
+                    k: means[k].detach().cpu().numpy()
+                    for k in means.keys()
+                    if (k not in exclude_vars) and (k in valid_sites)
+                }
                 means_global = means.copy()
                 for plate in plate_dict.keys():
                     # create full sized tensors according to plate size
@@ -448,7 +454,8 @@ class QuantileMixin:
                                 plate_size[plate],
                                 plate_dim[plate]
                                 if not (
-                                    (k in self.module.model.named_dims.keys()) and (k in obs_plate_sites[plate].keys())
+                                    (k in getattr(self.module.model, "named_dims", dict()).keys())
+                                    and (k in obs_plate_sites[plate].keys())
                                 )
                                 else self.module.model.named_dims[k],
                             )
@@ -465,7 +472,7 @@ class QuantileMixin:
                     obs_plate_sites=obs_plate_sites,
                     plate_indices=plate_indices,
                     plate_dim=plate_dim,
-                    named_dims=self.module.model.named_dims,
+                    named_dims=getattr(self.module.model, "named_dims", dict()),
                 )
                 if np.all([len(v) == 0 for v in obs_plate_sites.values()]):
                     # if no local variables - don't sample further - return results now
@@ -493,7 +500,12 @@ class QuantileMixin:
                         return means_
 
                     means = try_quantiles(args, kwargs)
-                means = {k: means[k].detach().cpu().numpy() for k in means.keys() if k not in exclude_vars}
+                valid_sites = self._get_valid_sites(args, kwargs, return_observed=return_observed)
+                means = {
+                    k: means[k].detach().cpu().numpy()
+                    for k in means.keys()
+                    if (k not in exclude_vars) and (k in valid_sites)
+                }
                 # find plate indices & dim
                 plates = self.module.model.create_plates(*args, **kwargs)
                 if not isinstance(plates, list):
@@ -517,73 +529,13 @@ class QuantileMixin:
                     obs_plate_sites=obs_plate_sites,
                     plate_indices=plate_indices,
                     plate_dim=plate_dim,
-                    named_dims=self.module.model.named_dims,
+                    named_dims=getattr(self.module.model, "named_dims", dict()),
                 )
             i += 1
 
         self.module.to(device)
 
         return means_global
-
-    @torch.no_grad()
-    def _posterior_quantile(
-        self,
-        q: float = 0.5,
-        batch_size: int = None,
-        accelerator: str = "auto",
-        device: Union[int, str] = "auto",
-        use_median: bool = True,
-        exclude_vars: list = None,
-        data_loader_indices=None,
-    ):
-        """
-        Compute median of the posterior distribution of each parameter pyro models trained without amortised inference.
-
-        Parameters
-        ----------
-        q
-            Quantile to compute
-        use_gpu
-            Bool, use gpu?
-        use_median
-            Bool, when q=0.5 use median rather than quantile method of the guide
-
-        Returns
-        -------
-        dictionary {variable_name: posterior quantile}
-
-        """
-
-        self.module.eval()
-        _, _, device = parse_device_args(
-            accelerator=accelerator,
-            devices=device,
-            return_device="torch",
-            validate_single_device=True,
-        )
-        if batch_size is None:
-            batch_size = self.adata_manager.adata.n_obs
-        train_dl = AnnDataLoader(self.adata_manager, shuffle=False, batch_size=batch_size, indices=data_loader_indices)
-        # sample global parameters
-        tensor_dict = next(iter(train_dl))
-        args, kwargs = self.module._get_fn_args_from_batch(tensor_dict)
-        args = [a.to(device) for a in args]
-        kwargs = {k: v.to(device) for k, v in kwargs.items()}
-        self.to_device(device)
-
-        if use_median and q == 0.5:
-            means = self.module.guide.median(*args, **kwargs)
-        else:
-            means = self.module.guide.quantiles([q], *args, **kwargs)
-        means = {k: means[k].cpu().detach().numpy() for k in means.keys() if k not in exclude_vars}
-
-        # quantile returns tensors with 0th dimension = 1
-        if not (use_median and q == 0.5) and (
-            not isinstance(self.module.guide, AutoAmortisedHierarchicalNormalMessenger)
-        ):
-            means = {k: means[k].squeeze(0) for k in means.keys()}
-
-        return means
 
     def posterior_quantile(self, exclude_vars: list = None, batch_size: int = None, **kwargs):
         """
@@ -611,10 +563,9 @@ class QuantileMixin:
             # median/quantiles in AutoNormal does not require minibatches
             batch_size = None
 
-        if batch_size is not None:
-            return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
-        else:
-            return self._posterior_quantile(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
+        if batch_size is None:
+            batch_size = self.adata_manager.adata.n_obs
+        return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
 
 
 class PltExportMixin:
