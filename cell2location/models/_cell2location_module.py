@@ -114,6 +114,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         use_cell_comm_likelihood_w_sf: bool = False,
         signal_bool: Optional[np.ndarray] = None,
         receptor_bool: Optional[np.ndarray] = None,
+        receptor_bool_b: Optional[np.ndarray] = None,
         signal_receptor_mask: Optional[np.ndarray] = None,
         receptor_tf_mask: Optional[np.ndarray] = None,
         use_learnable_mean_var_ratio: bool = False,
@@ -156,9 +157,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.use_cell_comm_prior_on_w_sf = use_cell_comm_prior_on_w_sf
         self.use_cell_comm_likelihood_w_sf = use_cell_comm_likelihood_w_sf
         if signal_bool is not None:
-            self.register_buffer("signal_bool", torch.tensor(signal_bool))
+            self.register_buffer("signal_bool", torch.tensor(signal_bool.astype("int32")))
         if receptor_bool is not None:
-            self.register_buffer("receptor_bool", torch.tensor(receptor_bool))
+            self.register_buffer("receptor_bool", torch.tensor(receptor_bool.astype("int32")))
+            if receptor_bool_b is None:
+                raise ValueError("receptor_bool_b must be provided if receptor_bool is provided")
+            self.register_buffer("receptor_bool_b", torch.tensor(receptor_bool_b.astype("int32")))
         self.signal_receptor_mask = signal_receptor_mask
         self.receptor_tf_mask = receptor_tf_mask
 
@@ -632,8 +636,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     mode="signal_receptor_tf_effect_spatial",
                     output_transform=output_transform,
                     n_tfs=self.n_factors,
-                    n_signals=self.signal_bool.sum(),
-                    n_receptors=self.receptor_bool.sum(),
+                    n_signals=len(self.signal_bool),
+                    n_receptors=len(self.receptor_bool),
                     n_out=n_out,
                     n_pathways=self.n_pathways,
                     signal_receptor_mask=self.signal_receptor_mask,  # tells which receptors can bind which ligands
@@ -652,7 +656,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     def get_lr_abundance(self, d_sg, m_g, y_s):
         # get lr abundance
         signal_abundance = d_sg[:, self.signal_bool] / y_s
-        receptor_abundance = (self.cell_state * m_g)[:, self.receptor_bool]
+        receptor_abundance = torch.minimum(
+            (self.cell_state * m_g)[:, self.receptor_bool], (self.cell_state * m_g)[:, self.receptor_bool_b]
+        )
 
         return signal_abundance.detach(), receptor_abundance.detach()
 
@@ -899,9 +905,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             with obs_plate:
                 k = "w_sf"
                 pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
-                k = "w_sf_obs"
+                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
                 w_sf = pyro.sample(
-                    k,
+                    f"{k}_obs",
                     dist.Gamma(
                         w_sf_mu_cell_comm * w_sf_mean_var_ratio,
                         w_sf_mean_var_ratio,
@@ -937,9 +943,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )  # (self.n_batch, self.n_vars)
             w_sf_mean_var_ratio = self.ones / w_sf_mean_var_ratio
             with obs_plate:
-                k = "w_sf_obs"
-                w_sf = pyro.sample(
-                    k,
+                k = "w_sf"
+                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
+                pyro.sample(
+                    f"{k}_obs",
                     dist.Gamma(
                         w_sf_mu_cell_comm * w_sf_mean_var_ratio,
                         w_sf_mean_var_ratio,

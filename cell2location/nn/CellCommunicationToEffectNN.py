@@ -515,7 +515,7 @@ class CellCommunicationToTfActivityNN(
         # print("effect_on_tf_abundance min", effect_on_tf_abundance.min())
         # print("effect_on_tf_abundance max", effect_on_tf_abundance.max())
         if use_cell_abundance_model:
-            effect_on_tf_abundance = effect_on_tf_abundance / torch.tensor(100.0, device=effect_on_tf_abundance.device)
+            effect_on_tf_abundance = effect_on_tf_abundance / torch.tensor(20.0, device=effect_on_tf_abundance.device)
         if self.output_transform == "softplus":
             # apply softplus to ensure positive values
             effect_on_tf_abundance = nn.functional.softplus(
@@ -832,7 +832,7 @@ class CellCommunicationToTfActivityNN(
             name="signal_distance_spatial_",
         ).T
         target2row = one_hot(
-            torch.tensor(indices1, device=signal_abundance.device).long().unsqueeze(-1),
+            torch.as_tensor(indices1, device=signal_abundance.device).long().unsqueeze(-1),
             distances.shape[1],
         ).T
         signal_abundance = torch.mm(

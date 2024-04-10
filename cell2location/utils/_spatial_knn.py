@@ -1,8 +1,33 @@
 import numpy as np
+import pandas as pd
+import scanpy as sc
 from scipy.sparse import coo_matrix
 from scipy.spatial import cKDTree
 from sklearn.neighbors import KDTree
 from umap.umap_ import fuzzy_simplicial_set
+
+
+def make_spatial_neighbours(
+    adata_vis,
+    batch_key: str = "sample",
+    spatial_key: str = "spatial",
+    n_neighbors: int = 200,
+):
+    # compute KNN using the coordinates stored in adata.obsm
+    sc.pp.neighbors(adata_vis, use_rep=spatial_key, metric="euclidean", n_neighbors=n_neighbors)
+
+    from scipy.sparse import csr_matrix
+
+    batch_id = csr_matrix(pd.get_dummies(adata_vis.obs[batch_key]))
+    batch_id = batch_id @ batch_id.T
+
+    adata_vis.obsp["distances"] = csr_matrix(
+        adata_vis.obsp["distances"].astype("float32").multiply(batch_id.astype("float32"))
+    )
+    adata_vis.obsp["connectivities"] = csr_matrix(
+        adata_vis.obsp["connectivities"].astype("float32").multiply(batch_id.astype("float32"))
+    )
+    return adata_vis
 
 
 def get_sparse_matrix_from_indices_distances_umap(knn_indices, knn_dists, n_obs, n_neighbors):
