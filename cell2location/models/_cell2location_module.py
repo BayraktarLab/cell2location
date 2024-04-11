@@ -281,7 +281,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         if "positions" in tensor_dict.keys():
             kwargs["positions"] = tensor_dict["positions"]
         if "tiles" in tensor_dict.keys():
-            kwargs["tiles"] = tensor_dict["tiles"].long().squeeze()
+            kwargs["tiles"] = tensor_dict["tiles"]
+        if "tiles_unexpanded" in tensor_dict.keys():
+            kwargs["tiles_unexpanded"] = tensor_dict["tiles_unexpanded"]
         if "in_tissue" in tensor_dict.keys():
             kwargs["in_tissue"] = tensor_dict["in_tissue"].bool()
         return (x_data, ind_x, batch_index), kwargs
@@ -292,6 +294,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         idx,
         batch_index,
         tiles: torch.Tensor = None,
+        tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
     ):
@@ -768,19 +771,27 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         idx,
         batch_index,
         tiles: torch.Tensor = None,
+        tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
     ):
+        if tiles_unexpanded is not None:
+            tiles_in_use = tiles.sum(0).bool()
+            obs_in_use = tiles_unexpanded[:, tiles_in_use].sum(1).bool()
+            idx = idx[obs_in_use]
+            batch_index = batch_index[obs_in_use]
+            if positions is not None:
+                positions = positions[obs_in_use]
         # if self.sliding_window_size > 0:
         #    # remove observations that will not be included after convolution with padding='valid'
         #    idx = self.crop_according_to_valid_padding(idx.unsqueeze(-1)).squeeze(-1)
         #    batch_index = self.crop_according_to_valid_padding(batch_index)
         #    if positions is not None:
         #        positions = self.crop_according_to_valid_padding(positions)
-        obs2sample = one_hot(batch_index, self.n_batch)
-        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, positions, in_tissue)
+        obs2sample = one_hot(batch_index, self.n_batch).float()
+        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, tiles_unexpanded, positions, in_tissue)
         if tiles is not None:
-            n_tiles = torch.unique(tiles).shape[0]
+            n_tiles = tiles.shape[1]
         else:
             n_tiles = 1
         if in_tissue is None:
@@ -795,7 +806,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 .pow(2)
                 .sum(-1)
                 .sqrt()
-            )
+            ) + torch.tensor(25.0, device=positions.device)
 
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
@@ -860,7 +871,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             if self.use_learnable_mean_var_ratio:
                 w_sf_mean_var_ratio_hyp = pyro.sample(
                     "w_sf_mean_var_ratio_hyp",
-                    dist.Gamma(torch.tensor(5.0, device=x_data.device).expand([1, 1]), self.ones).to_event(2),
+                    dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
                 )
                 w_sf_mean_var_ratio = pyro.sample(
                     "w_sf_mean_var_ratio",
@@ -895,13 +906,18 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )
             w_sf_mean_var_ratio_hyp = pyro.sample(
                 "w_sf_mean_var_ratio_hyp",
-                dist.Gamma(torch.tensor(5.0, device=x_data.device).expand([1, 1]), self.ones).to_event(2),
+                dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
             )
             w_sf_mean_var_ratio = pyro.sample(
                 "w_sf_mean_var_ratio",
                 dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
             )  # (self.n_batch, self.n_vars)
-            w_sf_mean_var_ratio = self.ones / w_sf_mean_var_ratio
+            w_sf_mean_var_ratio = self.ones / (
+                w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
+            )
+            if tiles_unexpanded is not None:
+                x_data = x_data[obs_in_use]
+                w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
             with obs_plate:
                 k = "w_sf"
                 pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
@@ -935,13 +951,18 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             )
             w_sf_mean_var_ratio_hyp = pyro.sample(
                 "w_sf_mean_var_ratio_hyp_lik",
-                dist.Gamma(torch.tensor(5.0, device=x_data.device).expand([1, 1]), self.ones).to_event(2),
+                dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
             )
             w_sf_mean_var_ratio = pyro.sample(
                 "w_sf_mean_var_ratio_lik",
                 dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
             )  # (self.n_batch, self.n_vars)
-            w_sf_mean_var_ratio = self.ones / w_sf_mean_var_ratio
+            w_sf_mean_var_ratio = self.ones / (
+                w_sf_mean_var_ratio + torch.tensor(1 / 20, device=w_sf_mean_var_ratio.device)
+            )
+            if tiles_unexpanded is not None:
+                x_data = x_data[obs_in_use]
+                w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
             with obs_plate:
                 k = "w_sf"
                 pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)

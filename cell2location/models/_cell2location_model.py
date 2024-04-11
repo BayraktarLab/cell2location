@@ -112,8 +112,10 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
                 model_kwargs["detection_alpha"] = self.detection_alpha_.values.reshape(
                     (self.summary_stats["n_batch"], 1)
                 ).astype("float32")
-        if (model_kwargs.get("amortised_sliding_window_size", 0) > 0) or (
-            model_kwargs.get("sliding_window_size", 0) > 0
+        if (
+            (model_kwargs.get("amortised_sliding_window_size", 0) > 0)
+            or (model_kwargs.get("sliding_window_size", 0) > 0)
+            or ("tiles" in self.adata_manager.data_registry)
         ):
             on_load_batch_size = 1
             self._data_splitter_cls = SpatialGridDataSplitter
@@ -144,6 +146,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         labels_key: Optional[str] = None,
         position_key: Optional[str] = None,
         tiles_key: Optional[str] = None,
+        tiles_unexpanded_key: Optional[str] = None,
         in_tissue_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
         continuous_covariate_keys: Optional[List[str]] = None,
@@ -173,9 +176,11 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         if position_key is not None:
             anndata_fields.append(ObsmField("positions", position_key))
         if tiles_key is not None:
-            anndata_fields.append(CategoricalObsField("tiles", tiles_key))
+            anndata_fields.append(ObsmField("tiles", tiles_key))
+        if tiles_unexpanded_key is not None:
+            anndata_fields.append(ObsmField("tiles_unexpanded", tiles_unexpanded_key))
         if in_tissue_key is not None:
-            anndata_fields.append(NumericalObsField("in_tissue", tiles_key))
+            anndata_fields.append(NumericalObsField("in_tissue", in_tissue_key))
 
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
@@ -485,9 +490,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         """
 
         sample_kwargs = sample_kwargs if isinstance(sample_kwargs, dict) else dict()
-        # if "exclude_vars" not in sample_kwargs.keys():
-        #    sample_kwargs["exclude_vars"] = list()
-        # sample_kwargs["exclude_vars"] = sample_kwargs["exclude_vars"] + ["data_target"]
 
         # get posterior distribution summary
         if use_quantiles:
