@@ -371,6 +371,9 @@ class QuantileMixin:
 
         self.module.eval()
 
+        if batch_size == self.adata_manager.adata.n_obs:
+            raise NotImplementedError("Please use batch_size < self.adata_manager.adata.n_obs")
+
         train_dl = self._get_dataloader(
             batch_size=batch_size,
             data_loader_indices=data_loader_indices,
@@ -403,7 +406,7 @@ class QuantileMixin:
                 plate_size = {name: plate.size for name, plate in plate_dict.items()}
                 if data_loader_indices is not None:
                     # set total plate size to the number of indices in DL not total number of observations
-                    # this option is not really used
+                    # `data_loader_indices=not` None option is not really used
                     plate_size = {
                         name: len(train_dl.indices)
                         for name, plate in plate_dict.items()
@@ -452,12 +455,9 @@ class QuantileMixin:
                             expand_zeros_along_dim(
                                 means_global[k],
                                 plate_size[plate],
-                                plate_dim[plate]
-                                if not (
-                                    (k in getattr(self.module.model, "named_dims", dict()).keys())
-                                    and (k in obs_plate_sites[plate].keys())
-                                )
-                                else self.module.model.named_dims[k],
+                                self.module.model.named_dims[k]
+                                if (k in getattr(self.module.model, "named_dims", dict()).keys())
+                                else plate_dim[plate],
                             )
                             if k in obs_plate_sites[plate].keys()
                             else means_global[k]
@@ -564,7 +564,9 @@ class QuantileMixin:
             batch_size = None
 
         if batch_size is None:
-            batch_size = self.adata_manager.adata.n_obs
+            from scvi import settings
+
+            batch_size = settings.batch_size
         return self._posterior_quantile_minibatch(exclude_vars=exclude_vars, batch_size=batch_size, **kwargs)
 
 
