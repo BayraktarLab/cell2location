@@ -12,6 +12,7 @@ import pandas as pd
 import scvi
 import torch
 import torch.distributed as dist
+from scipy.sparse import csc_matrix
 from scvi.data import AnnDataManager
 from scvi.dataloaders import AnnTorchDataset
 from scvi.dataloaders._data_splitting import validate_data_split
@@ -75,7 +76,41 @@ def assign_tiles_to_locations(
             + pd.Series(ind_y, index=adata.obs_names).astype(str)
         )
     sorting_index = adata.obs.sort_values(by=["tiles", f"{spatial_key}_x", f"{spatial_key}_y"]).index
-    return adata[sorting_index, :].copy()
+    adata = adata[sorting_index, :].copy()
+    adata.obsm["tiles"] = csc_matrix(pd.get_dummies(adata.obs["tiles"], sparse=True).values.astype("uint32"))
+    adata.uns["tiles_names"] = np.array(pd.get_dummies(adata.obs["tiles"], sparse=True).columns.values.astype("str"))
+    return adata
+
+
+def expand_tiles(
+    adata_vis,
+    tile_key: str = "leiden",
+    distance: float = 2000.0,
+    distance_step: float = 100.0,
+    threshold: float = 0.001,
+    overlap: float = 2.0,
+    distances_key: str = "distances",
+):
+    current_overlap = 0.0
+    while current_overlap < overlap:
+        from scipy.sparse import csr_matrix
+
+        distances = adata_vis.obsp[distances_key].copy()
+        distances.data[distances.data >= distance] = 0
+        expanded = distances.astype("float32") @ csr_matrix(pd.get_dummies(adata_vis.obs[tile_key]).values).astype(
+            "float32"
+        )
+        expanded = pd.DataFrame(
+            expanded.toarray(),
+            index=adata_vis.obs_names,
+            columns=pd.get_dummies(adata_vis.obs[tile_key]).columns,
+        )
+        expanded = expanded > threshold
+        if current_overlap == expanded.sum(1).mean():
+            break
+        current_overlap = expanded.sum(1).mean()
+        distance = distance + distance_step
+    return expanded, pd.get_dummies(adata_vis.obs[tile_key])
 
 
 class SpatialGridBatchSampler(torch.utils.data.sampler.BatchSampler):
@@ -99,7 +134,7 @@ class SpatialGridBatchSampler(torch.utils.data.sampler.BatchSampler):
         self,
         batch_size: int = 1,
         indices: np.ndarray = None,
-        tiles: np.ndarray = None,
+        tiles: csc_matrix = None,
         shuffle: bool = True,
         drop_last: Union[bool, int] = False,
     ):
@@ -108,9 +143,9 @@ class SpatialGridBatchSampler(torch.utils.data.sampler.BatchSampler):
         self.indices = indices
         self.n_obs = int(len(indices))
 
-        self.tiles = tiles
-        self.tiles_index = np.unique(tiles)
-        self.n_tiles = int(len(self.tiles_index))
+        self.tiles = tiles.astype("bool")
+        self.tiles_index = np.arange(tiles.shape[1]).astype("uint32")
+        self.n_tiles = int(tiles.shape[1])
 
         self.shuffle = shuffle
 
@@ -160,7 +195,10 @@ class SpatialGridBatchSampler(torch.utils.data.sampler.BatchSampler):
 
         """
         obs_batches = np.empty(len(tile_batches), dtype=object)
-        obs_batches[:] = [np.array(self.indices[np.isin(self.tiles, tiles)], dtype="int64") for tiles in tile_batches]
+        obs_batches[:] = [
+            np.array(self.indices[np.asarray(self.tiles[:, tiles].sum(1)).flatten().astype("bool")], dtype="int64")
+            for tiles in tile_batches
+        ]
         return obs_batches
 
     @staticmethod
@@ -398,7 +436,7 @@ class SpatialGridAnnDataLoader(DataLoader):
         # print(self.dataset[[[100, 53, 1], [0, 5, 6]]])
 
         sampler_kwargs = {
-            "tiles": adata_manager.get_from_registry("tiles").flatten(),
+            "tiles": adata_manager.get_from_registry("tiles"),
             "batch_size": batch_size,
             "shuffle": shuffle,
             "drop_last": drop_last,
@@ -495,8 +533,8 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
         # if self.data_loader_kwargs.get("tiles", None) is None:
         #    raise ValueError("tiles must be specified in data_loader_kwargs")
         # tiles = self.data_loader_kwargs.get("tiles", None)
-        tiles = self.adata_manager.get_from_registry("tiles").flatten()
-        n_tiles = len(np.unique(tiles))
+        tiles = self.adata_manager.get_from_registry("tiles")
+        n_tiles = tiles.shape[1]
         self.n_train_["n_tiles"], self.n_val_["n_tiles"] = validate_data_split(
             n_tiles,
             self.train_size,
@@ -509,10 +547,10 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
         n_val = self.n_val_["n_tiles"]
         random_state = np.random.RandomState(seed=scvi.settings.seed)
 
-        tiles = self.adata_manager.get_from_registry("tiles").flatten()
+        tiles = self.adata_manager.get_from_registry("tiles")
         # tiles = self.data_loader_kwargs.get("tiles", None)
-        tiles_index = np.unique(tiles)
-        n_tiles = len(tiles_index)
+        tiles_index = np.arange(tiles.shape[1])
+        n_tiles = int(tiles.shape[1])
 
         tile_idx = np.arange(n_tiles)
         if self.shuffle_set_split:
@@ -524,9 +562,9 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
 
         obs_idx = np.arange(self.adata_manager.adata.n_obs)
 
-        self.val_idx = obs_idx[np.isin(tiles, self.tile_idx_val_idx)]
-        self.train_idx = obs_idx[np.isin(tiles, self.tile_idx_train_idx)]
-        self.test_idx = obs_idx[np.isin(tiles, self.tile_idx_test_idx)]
+        self.val_idx = obs_idx[np.asarray(tiles[:, self.tile_idx_val_idx].sum(1)).ravel().astype("bool")]
+        self.train_idx = obs_idx[np.asarray(tiles[:, self.tile_idx_train_idx].sum(1)).ravel().astype("bool")]
+        self.test_idx = obs_idx[np.asarray(tiles[:, self.tile_idx_test_idx].sum(1)).ravel().astype("bool")]
 
         self.pin_memory = True if (self.pin_memory and self.accelerator == "gpu") else False
 
