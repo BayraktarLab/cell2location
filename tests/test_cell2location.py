@@ -109,6 +109,53 @@ def test_cell2location():
     assert "u_sf_mRNA_factors" in dataset.uns["mod"]["post_sample_q001"].keys()
     assert dataset.uns["mod"]["post_sample_q50"]["w_sf"].shape == (dataset.n_obs, dataset.obs["labels"].nunique())
     st_model.plot_QC(summary_name="q05")
+    # test correct indexing
+    dataset = st_model.export_posterior(
+        dataset,
+        sample_kwargs={
+            "num_samples": 10,  # "batch_size": st_model.adata.n_obs,
+            "return_observed": True,
+        },
+    )
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_means"]["data_target"])
+    dataset = st_model.export_posterior(
+        dataset,
+        use_quantiles=True,
+        add_to_obsm=["q50", "q05", "q001"],
+        sample_kwargs={
+            # "batch_size": st_model.adata.n_obs,
+            "return_observed": True,
+        },
+    )
+    # u_sf_mRNA_factors_full = dataset.uns["mod"]["post_sample_q50"]["u_sf_mRNA_factors"]
+    # u_sf_mRNA_factors_full_q05 = dataset.uns["mod"]["post_sample_q05"]["u_sf_mRNA_factors"]
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_q50"]["data_target"])
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_q05"]["data_target"])
+    dataset = st_model.export_posterior(
+        dataset,
+        sample_kwargs={
+            "num_samples": 10,
+            "batch_size": 50,
+            "return_observed": True,
+        },
+    )
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_means"]["data_target"])
+    dataset = st_model.export_posterior(
+        dataset,
+        use_quantiles=True,
+        add_to_obsm=["q50", "q05", "q001"],
+        sample_kwargs={
+            "batch_size": 50,
+            "return_observed": True,
+        },
+    )
+    # u_sf_mRNA_factors_batch = dataset.uns["mod"]["post_sample_q50"]["u_sf_mRNA_factors"]
+    # u_sf_mRNA_factors_batch_q05 = dataset.uns["mod"]["post_sample_q05"]["u_sf_mRNA_factors"]
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_q50"]["data_target"])
+    assert np.allclose(dataset.X.astype("float32"), dataset.uns["mod"]["post_sample_q05"]["data_target"])
+    # TODO uncomment the test after fixing "batch_size": st_model.adata.n_obs bug
+    # assert np.allclose(u_sf_mRNA_factors_batch, u_sf_mRNA_factors_full)
+    # assert np.allclose(u_sf_mRNA_factors_batch_q05, u_sf_mRNA_factors_full_q05)
     ##  minibatches of locations  ##
     Cell2location.setup_anndata(dataset, batch_key="batch")
     st_model = Cell2location(dataset, cell_state_df=inf_aver, N_cells_per_location=30, detection_alpha=200)

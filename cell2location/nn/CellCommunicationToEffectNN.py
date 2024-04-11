@@ -4,8 +4,8 @@ import torch
 from einops import rearrange
 from pyro.infer.autoguide.utils import deep_getattr, deep_setattr
 from pyro.nn import PyroModule
-from scvi.nn import one_hot
 from torch import nn as nn
+from torch.nn.functional import one_hot
 
 from ._mixins import CreateParameterMixin
 
@@ -295,9 +295,29 @@ class CellCommunicationToTfActivityNN(
         return tf_sig_rec_tf_effect
 
     def inverse_sigmoid_lm(self, x, weight, bias):
-        return self.ones - torch.sigmoid(x * weight.unsqueeze(-1) + bias.unsqueeze(-1))
+        # expand shapes correctly
+        if x.dim() == 2:
+            weight = weight.unsqueeze(-1)
+            bias = bias.unsqueeze(-1)
+        elif x.dim() == 3:
+            weight = weight.unsqueeze(-1).unsqueeze(-1)
+            bias = bias.unsqueeze(-1).unsqueeze(-1)
+        # compute sigmoid function
+        return self.ones - torch.sigmoid(x * weight + bias)
 
     def gamma_pdf(self, x, concentration, rate, scaling=None):
+        # expand shapes correctly
+        if x.dim() == 2:
+            concentration = concentration.unsqueeze(-1)
+            rate = rate.unsqueeze(-1)
+            if scaling is not None:
+                scaling = scaling.unsqueeze(-1)
+        elif x.dim() == 3:
+            concentration = concentration.unsqueeze(-1).unsqueeze(-1)
+            rate = rate.unsqueeze(-1).unsqueeze(-1)
+            if scaling is not None:
+                scaling = scaling.unsqueeze(-1).unsqueeze(-1)
+        # compute gamma function
         if scaling is None:
             return (
                 pyro.distributions.Gamma(
@@ -384,8 +404,8 @@ class CellCommunicationToTfActivityNN(
         gamma_distance = gamma_distance / torch.tensor(average_distance_prior, device=distances.device)
         gamma_distance_function = self.gamma_pdf(
             distances,
-            concentration=gamma_concentration.unsqueeze(-1),
-            rate=gamma_distance.unsqueeze(-1),
+            concentration=gamma_concentration,
+            rate=gamma_distance,
             scaling=None,
         )
 
@@ -405,8 +425,12 @@ class CellCommunicationToTfActivityNN(
         if average_distance_prior is None:
             average_distance_prior = self.average_distance_prior
         # returns weights for [n_signals, n_distance_bins]
+        if distances.dim() == 1:
+            distances = distances.unsqueeze(-2)
+        elif distances.dim() == 2:
+            distances = distances.unsqueeze(-3)
         return self.inverse_sigmoid_distance_function(
-            distances.unsqueeze(-2),
+            distances,
             layer,
             weights_shape=weights_shape,
             name=name,
@@ -814,30 +838,40 @@ class CellCommunicationToTfActivityNN(
         n_receptors = receptor_abundance.shape[-1]
         n_cell_types = receptor_abundance.shape[-2]
 
-        # with obs_plate as ind:
-        #    pass
-        # indices0 = distances.coalesce().indices()[0, :]
-        indices1 = distances.coalesce().indices()[1, :]
-        distances_ = distances.coalesce().values()
-        # indices = torch.logical_or(torch.isin(indices0, ind), torch.isin(indices1, ind))
-        # indices0 = indices0[indices]
-        # use 1d tensor with propper indices mapping here to make sure that the indices are correct
-        # indices1 = indices1[indices]
-        # distances_ = distances_[indices]
+        if distances.is_sparse:
+            # with obs_plate as ind:
+            #    pass
+            # indices0 = distances.coalesce().indices()[0, :]
+            indices1 = distances.coalesce().indices()[1, :]
+            distances_ = distances.coalesce().values()
+            # indices = torch.logical_or(torch.isin(indices0, ind), torch.isin(indices1, ind))
+            # indices0 = indices0[indices]
+            # use 1d tensor with propper indices mapping here to make sure that the indices are correct
+            # indices1 = indices1[indices]
+            # distances_ = distances_[indices]
 
-        # 1. Signal RNA -> signal protein conversion using distance function ============
-        signal_distance_effect_ss_b = self.inverse_sigmoid_signal_distance_function(
-            distances_,
-            layer="0",
-            name="signal_distance_spatial_",
-        ).T
-        target2row = one_hot(
-            torch.as_tensor(indices1, device=signal_abundance.device).long().unsqueeze(-1),
-            distances.shape[1],
-        ).T
-        signal_abundance = torch.mm(
-            target2row, signal_distance_effect_ss_b * signal_abundance[indices1, :]  # target s to row  # row to signal
-        )
+            # 1. Signal RNA -> signal protein conversion using distance function ============
+            signal_distance_effect_ss_b = self.inverse_sigmoid_signal_distance_function(
+                distances_,
+                layer="0",
+                name="signal_distance_spatial_",
+            ).T
+            target2row = one_hot(
+                torch.as_tensor(indices1, device=signal_abundance.device).long().unsqueeze(-1),
+                distances.shape[1],
+            ).T
+            signal_abundance = torch.mm(
+                target2row,
+                signal_distance_effect_ss_b * signal_abundance[indices1, :],  # target s to row  # row to signal
+            )
+        else:
+            # 1. Signal RNA -> signal protein conversion using distance function ============
+            signal_distance_effect_ss_b = self.inverse_sigmoid_signal_distance_function(
+                distances,
+                layer="0",
+                name="signal_distance_spatial_",
+            )
+            signal_abundance = torch.einsum("ps,sop->os", signal_abundance, signal_distance_effect_ss_b)
 
         # 2. Computing bound receptor concentrations using learnable a_{r,s} affinity ============
         # first reshape inputs to be locations * cell type specific
