@@ -958,7 +958,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
             )  # (self.n_batch, self.n_vars)
             w_sf_mean_var_ratio = self.ones / (
-                w_sf_mean_var_ratio + torch.tensor(1 / 20, device=w_sf_mean_var_ratio.device)
+                w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
             )
             if tiles_unexpanded is not None:
                 x_data = x_data[obs_in_use]

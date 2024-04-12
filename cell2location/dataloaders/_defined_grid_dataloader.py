@@ -141,11 +141,11 @@ class SpatialGridBatchSampler(torch.utils.data.sampler.BatchSampler):
         self.batch_size = batch_size
 
         self.indices = indices
-        self.n_obs = int(len(indices))
+        self.n_obs = len(indices)
 
         self.tiles = tiles.astype("bool")
         self.tiles_index = np.arange(tiles.shape[1]).astype("uint32")
-        self.n_tiles = int(tiles.shape[1])
+        self.n_tiles = tiles.shape[1]
 
         self.shuffle = shuffle
 
@@ -550,14 +550,14 @@ class SpatialGridDataSplitter(pl.LightningDataModule):
         tiles = self.adata_manager.get_from_registry("tiles")
         # tiles = self.data_loader_kwargs.get("tiles", None)
         tiles_index = np.arange(tiles.shape[1])
-        n_tiles = int(tiles.shape[1])
+        n_tiles = tiles.shape[1]
 
         tile_idx = np.arange(n_tiles)
         if self.shuffle_set_split:
             tile_idx = random_state.permutation(tile_idx)
 
-        self.tile_idx_val_idx = tiles_index[tile_idx[:n_val]]
-        self.tile_idx_train_idx = tiles_index[tile_idx[n_val : (n_val + n_train)]]
+        self.tile_idx_train_idx = tiles_index[tile_idx[:n_train]]
+        self.tile_idx_val_idx = tiles_index[tile_idx[n_train : (n_val + n_train)]]
         self.tile_idx_test_idx = tiles_index[tile_idx[(n_val + n_train) :]]
 
         obs_idx = np.arange(self.adata_manager.adata.n_obs)
