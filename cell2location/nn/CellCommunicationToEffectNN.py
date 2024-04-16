@@ -80,6 +80,7 @@ class CellCommunicationToTfActivityNN(
         use_unbound_concentration: bool = False,
         use_pathway_interaction_effect: bool = True,
         average_distance_prior: float = 50.0,
+        use_non_negative_weights: bool = False,
     ):
         super().__init__()
 
@@ -106,6 +107,8 @@ class CellCommunicationToTfActivityNN(
         self.use_pathway_interaction_effect = use_pathway_interaction_effect
 
         self.average_distance_prior = average_distance_prior
+
+        self.use_non_negative_weights = use_non_negative_weights
 
         self.weights = PyroModule()
 
@@ -261,9 +264,13 @@ class CellCommunicationToTfActivityNN(
         layer,
         weights_shape,
         name="signal_receptor_tf_effect",
+        use_non_negative_weights=None,
     ):
         # [n_tf, n_signals, n_receptors]
         weights_name = f"{self.name}_{name}_layer_{layer}_protein2effect"
+
+        if use_non_negative_weights is None:
+            use_non_negative_weights = self.use_non_negative_weights
 
         tf_sig_rec_tf_effect = self.get_param(
             x=x,
@@ -274,7 +281,7 @@ class CellCommunicationToTfActivityNN(
             random_init_scale=1 / np.sqrt(len(self.signal_receptor_mask_scipy.data)),
             bayesian=True,
             # sample positive weights
-            use_non_negative_weights=False,
+            use_non_negative_weights=use_non_negative_weights,
         )
 
         if self.receptor_tf_mask is not None:
@@ -659,6 +666,7 @@ class CellCommunicationToTfActivityNN(
             if self.n_out == 1
             else [self.n_tfs, self.n_pathways * self.n_out],
             remove_diagonal=False,
+            non_negative=self.use_non_negative_weights,
         )
         if use_cell_abundance_model:
             effect_on_pathway_activity = rearrange(
@@ -688,6 +696,7 @@ class CellCommunicationToTfActivityNN(
                 if self.n_out == 1
                 else [self.n_tfs, self.n_pathways * self.n_pathways * self.n_out],
                 remove_diagonal=False,
+                non_negative=self.use_non_negative_weights,
             )
             if self.n_out == 1:
                 pathway_tf_weights = rearrange(

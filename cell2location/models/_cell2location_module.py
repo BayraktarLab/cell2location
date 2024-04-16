@@ -83,6 +83,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     n_pathways = 8
     use_pathway_interaction_effect = True
     dropout_rate = 0.0
+    use_non_negative_weights = False
 
     def __init__(
         self,
@@ -651,6 +652,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     weights_prior_tau=0.1,
                     use_pathway_interaction_effect=self.use_pathway_interaction_effect,
                     average_distance_prior=average_distance_prior,
+                    use_non_negative_weights=self.use_non_negative_weights,
                 ),
             )
         # get module
@@ -877,7 +879,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     "w_sf_mean_var_ratio",
                     dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
                 )  # (self.n_batch, self.n_vars)
-                w_sf_mean_var_ratio = self.ones / w_sf_mean_var_ratio
+                w_sf_mean_var_ratio = self.ones / (
+                    w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
+                )
             else:
                 w_sf_mean_var_ratio = self.w_sf_mean_var_ratio_tensor
             with obs_plate:
