@@ -81,6 +81,8 @@ class CellCommunicationToTfActivityNN(
         use_pathway_interaction_effect: bool = True,
         average_distance_prior: float = 50.0,
         use_non_negative_weights: bool = False,
+        use_global_cell_abundance_model: bool = False,
+        r_l_affinity_alpha_prior: float = 10.0,
     ):
         super().__init__()
 
@@ -109,6 +111,9 @@ class CellCommunicationToTfActivityNN(
         self.average_distance_prior = average_distance_prior
 
         self.use_non_negative_weights = use_non_negative_weights
+        self.use_global_cell_abundance_model = use_global_cell_abundance_model
+
+        self.r_l_affinity_alpha_prior = r_l_affinity_alpha_prior
 
         self.weights = PyroModule()
 
@@ -226,6 +231,47 @@ class CellCommunicationToTfActivityNN(
 
         return sig_distance_effect
 
+    def get_dist_prior(
+        self,
+        layer,
+        name,
+        weights_shape,
+        prior_alpha=None,
+        prior_beta=None,
+        prior_fun=pyro.distributions.Gamma,
+    ):
+        # [n_out, n_in]
+        weights_name = f"{self.name}_{name}_layer_{layer}_protein2effect"
+
+        if prior_alpha is None:
+            prior_alpha = 1.0
+        if getattr(self, f"{name}prior_alpha", None) is None:
+            self.register_buffer(f"{name}prior_alpha", torch.tensor(float(prior_alpha)))
+        if prior_beta is None:
+            prior_beta = 1.0
+        if getattr(self, f"{name}prior_beta", None) is None:
+            self.register_buffer(f"{name}prior_beta", torch.tensor(float(prior_beta)))
+        # Weights
+        if getattr(self.weights, weights_name, None) is None:
+            deep_setattr(
+                self.weights,
+                weights_name,
+                pyro.nn.PyroSample(
+                    lambda prior: prior_fun(
+                        getattr(self, f"{name}prior_alpha"),
+                        getattr(self, f"{name}prior_beta"),
+                    )
+                    .expand(weights_shape)
+                    .to_event(len(weights_shape)),
+                ),
+            )
+
+        sig_distance_effect = deep_getattr(self.weights, weights_name)
+        if not self.training:
+            pyro.deterministic(f"{weights_name}_total_effect", sig_distance_effect)
+
+        return sig_distance_effect
+
     def get_signal_receptor_effect(
         self,
         x,
@@ -247,8 +293,8 @@ class CellCommunicationToTfActivityNN(
             bias_shape=[1],
             random_init_scale=1 / np.sqrt(self.n_signals),
             bayesian=True,
-            weights_prior_shape=torch.tensor(0.2, device=x.device),
-            weights_prior_rate=torch.tensor(1.0, device=x.device),
+            weights_prior_shape=torch.tensor(self.r_l_affinity_alpha_prior, device=x.device),
+            weights_prior_rate=torch.tensor(self.r_l_affinity_alpha_prior, device=x.device),
             # sample positive weights
             use_non_negative_weights=True,
         )
@@ -301,16 +347,24 @@ class CellCommunicationToTfActivityNN(
 
         return tf_sig_rec_tf_effect
 
-    def inverse_sigmoid_lm(self, x, weight, bias):
+    def inverse_sigmoid_lm(self, x, weight, bias, scaling):
         # expand shapes correctly
         if x.dim() == 2:
             weight = weight.unsqueeze(-1)
             bias = bias.unsqueeze(-1)
+            if scaling is not None:
+                scaling = scaling.unsqueeze(-1)
         elif x.dim() == 3:
             weight = weight.unsqueeze(-1).unsqueeze(-1)
             bias = bias.unsqueeze(-1).unsqueeze(-1)
-        # compute sigmoid function
-        return self.ones - torch.sigmoid(x * weight + bias)
+            if scaling is not None:
+                scaling = scaling.unsqueeze(-1).unsqueeze(-1)
+        if scaling is None:
+            # compute sigmoid function
+            return self.ones - torch.sigmoid(x * weight + bias)
+        else:
+            # compute sigmoid function
+            return (self.ones - torch.sigmoid(x * weight + bias)) * scaling
 
     def gamma_pdf(self, x, concentration, rate, scaling=None):
         # expand shapes correctly
@@ -344,7 +398,7 @@ class CellCommunicationToTfActivityNN(
             * scaling
         )
 
-    def inverse_sigmoid_distance_function(
+    def inverse_sigmoid_distance_function_protein_features(
         self,
         distances,
         layer,
@@ -355,6 +409,15 @@ class CellCommunicationToTfActivityNN(
     ):
         if average_distance_prior is None:
             average_distance_prior = self.average_distance_prior
+
+        name_ = f"{name}DistanceFunctionScaling"
+        scaling = self.get_signal_distance_effect(
+            x=distances,
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+        )
+        scaling = torch.sigmoid(scaling / torch.tensor(5.0, device=distances.device))
 
         # sigmoid function =================
         name_ = f"{name}DistanceWeights"  # strictly positive
@@ -379,7 +442,7 @@ class CellCommunicationToTfActivityNN(
         ) - (
             self.ones + self.ones
         )  # prior of -2
-        sigmoid_distance_function = self.inverse_sigmoid_lm(distances, weight, bias)
+        sigmoid_distance_function = self.inverse_sigmoid_lm(distances, weight, bias, scaling)
 
         # gamma function =================
         name_ = f"{name}DistanceGammaConcentration"  # strictly positive
@@ -392,9 +455,9 @@ class CellCommunicationToTfActivityNN(
         # strictly positive
         gamma_concentration = (
             nn.functional.softplus(gamma_concentration)
-            # prior of ~1/50 (= 1 / (softplus(0) / 35))
+            # 1 * 5 = (softplus(0) / 0.7) * 5 = 5
             / torch.tensor(0.7, device=distances.device)
-        )
+        ) * torch.tensor(5.0, device=distances.device)
         name_ = f"{name}DistanceGammaDistance"  # strictly positive
         gamma_distance = self.get_signal_distance_effect(
             x=distances,
@@ -405,15 +468,86 @@ class CellCommunicationToTfActivityNN(
         # strictly positive
         gamma_distance = (
             nn.functional.softplus(gamma_distance)
-            # prior of ~1/50 (= 1 / (softplus(0) / 35))
+            # 1 * average_distance_prior = (softplus(0) / 0.7) * average_distance_prior = average_distance_prior
             / torch.tensor(0.7, device=distances.device)
         )
-        gamma_distance = gamma_distance / torch.tensor(average_distance_prior, device=distances.device)
+        gamma_distance = gamma_distance * torch.tensor(average_distance_prior, device=distances.device)
         gamma_distance_function = self.gamma_pdf(
             distances,
             concentration=gamma_concentration,
-            rate=gamma_distance,
-            scaling=None,
+            rate=gamma_concentration / gamma_distance,
+            scaling=torch.ones(1, device=distances.device) - scaling,
+        )
+
+        return sigmoid_distance_function + gamma_distance_function
+
+    def inverse_sigmoid_distance_function(
+        self,
+        distances,
+        layer,
+        weights_shape,
+        name,
+        mode,
+        average_distance_prior=None,
+    ):
+        if average_distance_prior is None:
+            average_distance_prior = self.average_distance_prior
+
+        name_ = f"{name}DistanceFunctionScaling"
+        scaling = self.get_dist_prior(
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+            prior_alpha=1.0,
+            prior_beta=1.0,
+            prior_fun=pyro.distributions.Beta,
+        )
+
+        # sigmoid function =================
+        name_ = f"{name}DistanceWeights"  # strictly positive
+        weight = self.get_dist_prior(
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+            prior_alpha=2.0,
+            prior_beta=2.0 / average_distance_prior,
+            prior_fun=pyro.distributions.Gamma,
+        )
+        name_ = f"{name}DistanceBias"
+        bias = self.get_dist_prior(
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+            prior_alpha=-2.0,
+            prior_beta=1.0,
+            prior_fun=pyro.distributions.Normal,
+        )
+        sigmoid_distance_function = self.inverse_sigmoid_lm(distances, weight, bias, scaling)
+
+        # gamma function =================
+        name_ = f"{name}DistanceGammaConcentration"  # strictly positive
+        gamma_concentration = self.get_dist_prior(
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+            prior_alpha=5.0,
+            prior_beta=5.0 / 5.0,
+            prior_fun=pyro.distributions.Gamma,
+        )
+        name_ = f"{name}DistanceGammaDistance"  # strictly positive
+        gamma_distance = self.get_dist_prior(
+            layer=layer,
+            name=name_,
+            weights_shape=weights_shape,
+            prior_alpha=2.0,
+            prior_beta=2.0 / average_distance_prior,
+            prior_fun=pyro.distributions.Gamma,
+        )
+        gamma_distance_function = self.gamma_pdf(
+            distances,
+            concentration=gamma_concentration,
+            rate=gamma_concentration / gamma_distance,
+            scaling=torch.tensor(1.0, device=distances.device) - scaling,
         )
 
         return sigmoid_distance_function + gamma_distance_function
@@ -479,14 +613,24 @@ class CellCommunicationToTfActivityNN(
             remove_diagonal=False,
         )
         # Signal-receptor complex effect on TF active concentration ==========
-        tf_sig_rec_effect_hsr = self.get_signal_receptor_tf_effect(
-            x=bound_receptor_abundance_src,
-            layer=layer,
-            weights_shape=[self.n_tfs, len(self.signal_receptor_mask_scipy.data)]
-            if self.n_out == 1
-            else [self.n_tfs, len(self.signal_receptor_mask_scipy.data), self.n_out],
-            name="signal_receptor_tf_effect",
-        )
+        if not (use_cell_abundance_model and self.use_global_cell_abundance_model):
+            tf_sig_rec_effect_hsr = self.get_signal_receptor_tf_effect(
+                x=bound_receptor_abundance_src,
+                layer=layer,
+                weights_shape=[self.n_tfs, len(self.signal_receptor_mask_scipy.data)]
+                if self.n_out == 1
+                else [self.n_tfs, len(self.signal_receptor_mask_scipy.data), self.n_out],
+                name="signal_receptor_tf_effect",
+            )
+        else:
+            tf_sig_rec_effect_hsr = self.get_signal_receptor_tf_effect(
+                x=bound_receptor_abundance_src,
+                layer=layer,
+                weights_shape=[len(self.signal_receptor_mask_scipy.data)]
+                if self.n_out == 1
+                else [len(self.signal_receptor_mask_scipy.data), self.n_out],
+                name="signal_receptor_tf_effect",
+            )
 
         # print("tf_sig_rec_effect_hsr mean", tf_sig_rec_effect_hsr.mean())
         # print("tf_sig_rec_effect_hsr min", tf_sig_rec_effect_hsr.min())
@@ -501,7 +645,10 @@ class CellCommunicationToTfActivityNN(
                     "r (c h) -> c h r",
                     h=self.n_tfs,
                 )
-                effect = torch.einsum("chr,hr->ch", bound_rs, tf_sig_rec_effect_hsr)
+                if self.use_global_cell_abundance_model:
+                    effect = torch.einsum("chr,r->ch", bound_rs, tf_sig_rec_effect_hsr)
+                else:
+                    effect = torch.einsum("chr,hr->ch", bound_rs, tf_sig_rec_effect_hsr)
             else:
                 effect = torch.einsum(
                     "cr,hr->ch",
@@ -521,7 +668,10 @@ class CellCommunicationToTfActivityNN(
                     "r (c h) -> c h r",
                     h=self.n_tfs,
                 )
-                effect = torch.einsum("chr,hrf->fch", bound_rs, tf_sig_rec_effect_hsr)
+                if self.use_global_cell_abundance_model:
+                    effect = torch.einsum("chr,rf->fch", bound_rs, tf_sig_rec_effect_hsr)
+                else:
+                    effect = torch.einsum("chr,hrf->fch", bound_rs, tf_sig_rec_effect_hsr)
             else:
                 effect = torch.einsum(
                     "cr,hrf->fch",
@@ -546,7 +696,7 @@ class CellCommunicationToTfActivityNN(
         # print("effect_on_tf_abundance min", effect_on_tf_abundance.min())
         # print("effect_on_tf_abundance max", effect_on_tf_abundance.max())
         if use_cell_abundance_model:
-            effect_on_tf_abundance = effect_on_tf_abundance / torch.tensor(100.0, device=effect_on_tf_abundance.device)
+            effect_on_tf_abundance = effect_on_tf_abundance / torch.tensor(10.0, device=effect_on_tf_abundance.device)
         if self.output_transform == "softplus":
             # apply softplus to ensure positive values
             effect_on_tf_abundance = nn.functional.softplus(
@@ -658,16 +808,26 @@ class CellCommunicationToTfActivityNN(
 
         # compute pathway effects on TFs
         name = "pathway_tf_weights"
-        pathway_tf_weights = self.get_tf_effect(
-            x=bound_receptor_abundance_src,
-            name=name,
-            layer=layer,
-            weights_shape=[self.n_tfs, self.n_pathways]
-            if self.n_out == 1
-            else [self.n_tfs, self.n_pathways * self.n_out],
-            remove_diagonal=False,
-            non_negative=self.use_non_negative_weights,
-        )
+        if not (use_cell_abundance_model and self.use_global_cell_abundance_model):
+            pathway_tf_weights = self.get_tf_effect(
+                x=bound_receptor_abundance_src,
+                name=name,
+                layer=layer,
+                weights_shape=[self.n_tfs, self.n_pathways]
+                if self.n_out == 1
+                else [self.n_tfs, self.n_pathways * self.n_out],
+                remove_diagonal=False,
+                non_negative=self.use_non_negative_weights,
+            )
+        else:
+            pathway_tf_weights = self.get_tf_effect(
+                x=bound_receptor_abundance_src,
+                name=name,
+                layer=layer,
+                weights_shape=[self.n_pathways] if self.n_out == 1 else [self.n_pathways * self.n_out],
+                remove_diagonal=False,
+                non_negative=self.use_non_negative_weights,
+            )
         if use_cell_abundance_model:
             effect_on_pathway_activity = rearrange(
                 effect_on_pathway_activity,
@@ -676,42 +836,79 @@ class CellCommunicationToTfActivityNN(
             )
         if self.n_out == 1:
             if use_cell_abundance_model:
-                effect_on_tf_activity = torch.einsum("chp,hp->ch", effect_on_pathway_activity, pathway_tf_weights)
+                if self.use_global_cell_abundance_model:
+                    effect_on_tf_activity = torch.einsum("chp,p->ch", effect_on_pathway_activity, pathway_tf_weights)
+                else:
+                    effect_on_tf_activity = torch.einsum("chp,hp->ch", effect_on_pathway_activity, pathway_tf_weights)
             else:
                 effect_on_tf_activity = torch.einsum("cp,hp->ch", effect_on_pathway_activity, pathway_tf_weights)
         else:
-            pathway_tf_weights = rearrange(pathway_tf_weights, "h (p f) -> h p f", p=self.n_pathways, f=self.n_out)
+            if self.use_global_cell_abundance_model:
+                pathway_tf_weights = rearrange(pathway_tf_weights, "(p f) -> p f", p=self.n_pathways, f=self.n_out)
+            else:
+                pathway_tf_weights = rearrange(pathway_tf_weights, "h (p f) -> h p f", p=self.n_pathways, f=self.n_out)
             if use_cell_abundance_model:
-                effect_on_tf_activity = torch.einsum("chp,hpf->fch", effect_on_pathway_activity, pathway_tf_weights)
+                if self.use_global_cell_abundance_model:
+                    effect_on_tf_activity = torch.einsum("chp,pf->fch", effect_on_pathway_activity, pathway_tf_weights)
+                else:
+                    effect_on_tf_activity = torch.einsum("chp,hpf->fch", effect_on_pathway_activity, pathway_tf_weights)
             else:
                 effect_on_tf_activity = torch.einsum("cp,hpf->fch", effect_on_pathway_activity, pathway_tf_weights)
         # including pathway interactions
         if self.use_pathway_interaction_effect:
             name = "pathway_interaction_tf_weights"
-            pathway_tf_weights = self.get_tf_effect(
-                x=bound_receptor_abundance_src,
-                name=name,
-                layer=layer,
-                weights_shape=[self.n_tfs, self.n_pathways * self.n_pathways]
-                if self.n_out == 1
-                else [self.n_tfs, self.n_pathways * self.n_pathways * self.n_out],
-                remove_diagonal=False,
-                non_negative=self.use_non_negative_weights,
-            )
-            if self.n_out == 1:
-                pathway_tf_weights = rearrange(
-                    pathway_tf_weights,
-                    "h (o p) -> h o p",
-                    p=self.n_pathways,
-                    o=self.n_pathways,
+            if not (use_cell_abundance_model and self.use_global_cell_abundance_model):
+                pathway_tf_weights = self.get_tf_effect(
+                    x=bound_receptor_abundance_src,
+                    name=name,
+                    layer=layer,
+                    weights_shape=[self.n_tfs, self.n_pathways * self.n_pathways]
+                    if self.n_out == 1
+                    else [self.n_tfs, self.n_pathways * self.n_pathways * self.n_out],
+                    remove_diagonal=False,
+                    non_negative=self.use_non_negative_weights,
                 )
-                if use_cell_abundance_model:
-                    effect_on_tf_activity = effect_on_tf_activity + torch.einsum(
-                        "chp,hop,cho->ch",
-                        effect_on_pathway_activity,
+            else:
+                pathway_tf_weights = self.get_tf_effect(
+                    x=bound_receptor_abundance_src,
+                    name=name,
+                    layer=layer,
+                    weights_shape=[self.n_pathways * self.n_pathways]
+                    if self.n_out == 1
+                    else [self.n_pathways * self.n_pathways * self.n_out],
+                    remove_diagonal=False,
+                    non_negative=self.use_non_negative_weights,
+                )
+            if self.n_out == 1:
+                if self.use_global_cell_abundance_model:
+                    pathway_tf_weights = rearrange(
                         pathway_tf_weights,
-                        effect_on_pathway_activity,
+                        "(o p) -> o p",
+                        p=self.n_pathways,
+                        o=self.n_pathways,
                     )
+                else:
+                    pathway_tf_weights = rearrange(
+                        pathway_tf_weights,
+                        "h (o p) -> h o p",
+                        p=self.n_pathways,
+                        o=self.n_pathways,
+                    )
+                if use_cell_abundance_model:
+                    if self.use_global_cell_abundance_model:
+                        effect_on_tf_activity = effect_on_tf_activity + torch.einsum(
+                            "chp,op,cho->ch",
+                            effect_on_pathway_activity,
+                            pathway_tf_weights,
+                            effect_on_pathway_activity,
+                        )
+                    else:
+                        effect_on_tf_activity = effect_on_tf_activity + torch.einsum(
+                            "chp,hop,cho->ch",
+                            effect_on_pathway_activity,
+                            pathway_tf_weights,
+                            effect_on_pathway_activity,
+                        )
                 else:
                     effect_on_tf_activity = effect_on_tf_activity + torch.einsum(
                         "cp,hop,co->ch",
@@ -720,20 +917,37 @@ class CellCommunicationToTfActivityNN(
                         effect_on_pathway_activity,
                     )
             else:
-                pathway_tf_weights = rearrange(
-                    pathway_tf_weights,
-                    "h (o p f) -> h o p f",
-                    p=self.n_pathways,
-                    o=self.n_pathways,
-                    f=self.n_out,
-                )
-                if use_cell_abundance_model:
-                    effect_on_tf_activity = torch.einsum(
-                        "chp,hopf,cho->fch",
-                        effect_on_pathway_activity,
+                if self.use_global_cell_abundance_model:
+                    pathway_tf_weights = rearrange(
                         pathway_tf_weights,
-                        effect_on_pathway_activity,
+                        "(o p f) -> o p f",
+                        p=self.n_pathways,
+                        o=self.n_pathways,
+                        f=self.n_out,
                     )
+                else:
+                    pathway_tf_weights = rearrange(
+                        pathway_tf_weights,
+                        "h (o p f) -> h o p f",
+                        p=self.n_pathways,
+                        o=self.n_pathways,
+                        f=self.n_out,
+                    )
+                if use_cell_abundance_model:
+                    if self.use_global_cell_abundance_model:
+                        effect_on_tf_activity = torch.einsum(
+                            "chp,opf,cho->fch",
+                            effect_on_pathway_activity,
+                            pathway_tf_weights,
+                            effect_on_pathway_activity,
+                        )
+                    else:
+                        effect_on_tf_activity = torch.einsum(
+                            "chp,hopf,cho->fch",
+                            effect_on_pathway_activity,
+                            pathway_tf_weights,
+                            effect_on_pathway_activity,
+                        )
                 else:
                     effect_on_tf_activity = torch.einsum(
                         "cp,hopf,co->fch",
@@ -840,6 +1054,7 @@ class CellCommunicationToTfActivityNN(
         signal_abundance: torch.Tensor,
         receptor_abundance: torch.Tensor,
         distances: torch.Tensor = None,
+        tiles: torch.Tensor = None,
         obs_plate=None,
     ):
         n_locations = signal_abundance.shape[-2]
@@ -848,11 +1063,13 @@ class CellCommunicationToTfActivityNN(
         n_cell_types = receptor_abundance.shape[-2]
 
         if distances.is_sparse:
+            if tiles is not None:
+                raise ValueError("tiles should be None when using sparse distances")
             # with obs_plate as ind:
             #    pass
             # indices0 = distances.coalesce().indices()[0, :]
             indices1 = distances.coalesce().indices()[1, :]
-            distances_ = distances.coalesce().values()
+            distances_ = distances.coalesce().values().float()
             # indices = torch.logical_or(torch.isin(indices0, ind), torch.isin(indices1, ind))
             # indices0 = indices0[indices]
             # use 1d tensor with propper indices mapping here to make sure that the indices are correct
@@ -868,7 +1085,7 @@ class CellCommunicationToTfActivityNN(
             target2row = one_hot(
                 torch.as_tensor(indices1, device=signal_abundance.device).long().unsqueeze(-1),
                 distances.shape[1],
-            ).T
+            ).T.float()
             signal_abundance = torch.mm(
                 target2row,
                 signal_distance_effect_ss_b * signal_abundance[indices1, :],  # target s to row  # row to signal
@@ -880,7 +1097,14 @@ class CellCommunicationToTfActivityNN(
                 layer="0",
                 name="signal_distance_spatial_",
             )
-            signal_abundance = torch.einsum("ps,sop->os", signal_abundance, signal_distance_effect_ss_b)
+            if tiles is not None:
+                tiles_mask = tiles @ tiles.T
+                signal_distance_effect_ss_b = torch.einsum("sop,op->sop", signal_distance_effect_ss_b, tiles_mask)
+            signal_abundance = torch.einsum(
+                "ps,sop->os",
+                signal_abundance,
+                signal_distance_effect_ss_b,
+            )
 
         # 2. Computing bound receptor concentrations using learnable a_{r,s} affinity ============
         # first reshape inputs to be locations * cell type specific
@@ -897,6 +1121,13 @@ class CellCommunicationToTfActivityNN(
             distances=distances,
             skip_distance_effect=True,
         )
+        if not self.training:
+            with obs_plate:
+                pyro.deterministic(
+                    "bound_receptor_abundance_sr_c_f",
+                    # {sr pair, location * cell type} -> {sr pair, location, cell type}
+                    rearrange(bound_receptor_abundance_src, "r (c f) -> r c f", f=n_cell_types),
+                )
         return bound_receptor_abundance_src
 
     def signal_receptor_tf_effect_spatial(

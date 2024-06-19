@@ -7,6 +7,63 @@ from sklearn.neighbors import KDTree
 from umap.umap_ import fuzzy_simplicial_set
 
 
+def from_c2l_get_lr_abundance(
+    adata_vis,
+    cell_state,
+    signal_bool,
+    receptor_bool,
+    receptor_bool_b,
+    signal_receptor_mask,
+    top_n=20,
+    scale_receptor_abundance_by_m_g=False,
+):
+    obs_names = np.intersect1d(adata_vis.obs_names, adata_vis.uns["mod"]["obs_names"])
+    assert np.all(adata_vis.var_names.values.astype("str") == adata_vis.uns["mod"]["var_names"].astype("str"))
+    var_names = adata_vis.uns["mod"]["var_names"]
+    obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
+    adata_vis = adata_vis[obs_names]
+    adata_vis = adata_vis[:, var_names]
+    cell_state = cell_state.loc[var_names, :]
+    adata_vis.obsm["w_sf"] = adata_vis.uns["mod"]["post_sample_q05"]["w_sf"][obs_bool, :]
+    adata_vis.obsm["signal_abundance"] = (
+        adata_vis.X[:, signal_bool].toarray() / adata_vis.uns["mod"]["post_sample_q05"]["detection_y_s"][obs_bool, :]
+    )
+    # normalise signal abundance
+    for i in range(adata_vis.obsm["signal_abundance"].shape[1]):
+        top_n_vals = np.sort(adata_vis.obsm["signal_abundance"][:, i])[::-1][:top_n]
+        adata_vis.obsm["signal_abundance"][:, i] = adata_vis.obsm["signal_abundance"][:, i] / top_n_vals.mean()
+        adata_vis.obsm["signal_abundance"][np.isnan(adata_vis.obsm["signal_abundance"])] = 0.0
+    adata_vis.obsm["signal_abundance"] = pd.DataFrame(
+        adata_vis.obsm["signal_abundance"],
+        index=adata_vis.obs_names,
+        columns=signal_receptor_mask.index,
+    )
+    if scale_receptor_abundance_by_m_g:
+        m_g = adata_vis.uns["mod"]["post_sample_q05"]["m_g"].T
+        cell_state = cell_state * m_g
+    # get minimum of the two receptor subunits
+    receptor_abundance = np.minimum(
+        (cell_state).iloc[receptor_bool, :].values, (cell_state).iloc[receptor_bool_b, :].values
+    )
+    receptor_abundance = pd.DataFrame(
+        receptor_abundance,
+        index=signal_receptor_mask.columns,
+        columns=adata_vis.uns["mod"]["factor_names"],
+    )
+    # normalise receptor abundance
+    if not scale_receptor_abundance_by_m_g:
+        receptor_abundance = (receptor_abundance.T / receptor_abundance.max(1)).T
+    return adata_vis, receptor_abundance
+
+
+def get_lr_abundance(cell_state, d_sg, m_g, y_s, signal_bool, receptor_bool, receptor_bool_b):
+    # get lr abundance
+    signal_abundance = d_sg[:, signal_bool] / y_s
+    receptor_abundance = np.minimum((cell_state * m_g)[:, receptor_bool], (cell_state * m_g)[:, receptor_bool_b])
+
+    return signal_abundance, receptor_abundance
+
+
 def make_spatial_neighbours(
     adata_vis,
     batch_key: str = "sample",

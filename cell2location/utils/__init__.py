@@ -2,7 +2,12 @@ import sys
 
 import numpy as np
 
-from ._spatial_knn import make_spatial_neighbours, spatial_neighbours, sum_neighbours
+from ._spatial_knn import (
+    from_c2l_get_lr_abundance,
+    make_spatial_neighbours,
+    spatial_neighbours,
+    sum_neighbours,
+)
 from .filtering import filter_genes
 
 
@@ -51,4 +56,5 @@ __all__ = [
     "sum_neighbours",
     "list_imported_modules",
     "make_spatial_neighbours",
+    "from_c2l_get_lr_abundance",
 ]

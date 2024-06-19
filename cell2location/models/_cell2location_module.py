@@ -125,6 +125,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         sliding_window_size: Optional[int] = 0,
         amortised_sliding_window_size: Optional[int] = 0,
         sliding_window_size_list: Optional[list] = None,
+        use_normalising_factor_y_s: bool = False,
         image_size: Optional[tuple] = None,
         use_aggregated_w_sf: bool = False,
         use_aggregated_detection_y_s: bool = False,
@@ -187,6 +188,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.amortised_sliding_window_size = amortised_sliding_window_size
         self.sliding_window_size_list_exist = sliding_window_size_list is not None
         self.sliding_window_size_list = np.array(sliding_window_size_list)
+        self.use_normalising_factor_y_s = use_normalising_factor_y_s
         self.image_size = image_size
         self.use_aggregated_w_sf = use_aggregated_w_sf
         self.use_aggregated_detection_y_s = use_aggregated_detection_y_s
@@ -287,6 +289,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             kwargs["tiles_unexpanded"] = tensor_dict["tiles_unexpanded"]
         if "in_tissue" in tensor_dict.keys():
             kwargs["in_tissue"] = tensor_dict["in_tissue"].bool()
+        if "normalising_factor_y_s" in tensor_dict.keys():
+            kwargs["normalising_factor_y_s"] = tensor_dict["normalising_factor_y_s"]
+        if "x_data_normalised" in tensor_dict.keys():
+            kwargs["x_data_normalised"] = tensor_dict["x_data_normalised"]
         return (x_data, ind_x, batch_index), kwargs
 
     def create_plates(
@@ -298,6 +304,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
+        normalising_factor_y_s: Optional[torch.Tensor] = None,
+        x_data_normalised: Optional[torch.Tensor] = None,
     ):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
@@ -357,10 +365,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 n_in = self.n_vars + self.n_hidden
             else:
                 n_in = self.n_hidden
-
+        input = [0, 2]  # expression data + (optional) batch index
+        if self.use_normalising_factor_y_s:
+            input = ["x_data_normalised", 2]
         return {
             "name": "obs_plate",
-            "input": [0, 2],  # expression data + (optional) batch index
+            "input": input,  # expression data + (optional) batch index
             "n_in": n_in,
             "input_transform": [
                 input_transform,
@@ -776,6 +786,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
+        normalising_factor_y_s: Optional[torch.Tensor] = None,
+        x_data_normalised: Optional[torch.Tensor] = None,
     ):
         if tiles_unexpanded is not None:
             tiles_in_use = tiles.sum(0).bool()
@@ -791,7 +803,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         #    if positions is not None:
         #        positions = self.crop_according_to_valid_padding(positions)
         obs2sample = one_hot(batch_index, self.n_batch).float()
-        obs_plate = self.create_plates(x_data, idx, batch_index, tiles, tiles_unexpanded, positions, in_tissue)
+        obs_plate = self.create_plates(
+            x_data,
+            idx,
+            batch_index,
+            tiles,
+            tiles_unexpanded,
+            positions,
+            in_tissue,
+            normalising_factor_y_s,
+            x_data_normalised,
+        )
         if tiles is not None:
             n_tiles = tiles.shape[1]
         else:
@@ -856,6 +878,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 k,
                 dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
             )  # (self.n_obs, 1)
+
+        if normalising_factor_y_s is not None:
+            detection_y_s = detection_y_s * normalising_factor_y_s
+            pyro.deterministic("total_detection_y_s", detection_y_s)
 
         # if (self.sliding_window_size > 0) and self.use_aggregated_detection_y_s:
         #    detection_y_s = self.aggregate_conv2d(
