@@ -592,7 +592,7 @@ class CellCommunicationToTfActivityNN(
     ):
         layer = 0
         # optionally apply dropout ==========
-        if self.dropout_rate > 0:
+        if self.dropout_rate > 0.0:
             if getattr(self.weights, f"{self.name}_layer_{layer}_dropout", None) is None:
                 deep_setattr(
                     self.weights,
@@ -971,7 +971,7 @@ class CellCommunicationToTfActivityNN(
     ):
         layer = 0
         # optionally apply dropout ==========
-        if self.dropout_rate > 0:
+        if self.dropout_rate > 0.0:
             if getattr(self.weights, f"{self.name}_layer_{layer}_dropout", None) is None:
                 deep_setattr(
                     self.weights,
@@ -1068,6 +1068,14 @@ class CellCommunicationToTfActivityNN(
             # with obs_plate as ind:
             #    pass
             # indices0 = distances.coalesce().indices()[0, :]
+            if not self.training:
+                # make sure that the indices are correct
+                with obs_plate as ind:
+                    assert torch.allclose(
+                        ind, torch.arange(n_locations, device=ind.device)
+                    ), "indices in obs_plate do not match the unshuffled order of locations"
+                    # assert torch.allclose(distances.coalesce()[ind, ind], distances), \
+                    #     'indices in obs_plate do not match the unshuffled order of locations'
             indices1 = distances.coalesce().indices()[1, :]
             distances_ = distances.coalesce().values().float()
             # indices = torch.logical_or(torch.isin(indices0, ind), torch.isin(indices1, ind))
@@ -1121,13 +1129,6 @@ class CellCommunicationToTfActivityNN(
             distances=distances,
             skip_distance_effect=True,
         )
-        if not self.training:
-            with obs_plate:
-                pyro.deterministic(
-                    "bound_receptor_abundance_sr_c_f",
-                    # {sr pair, location * cell type} -> {sr pair, location, cell type}
-                    rearrange(bound_receptor_abundance_src, "r (c f) -> r c f", f=n_cell_types),
-                )
         return bound_receptor_abundance_src
 
     def signal_receptor_tf_effect_spatial(

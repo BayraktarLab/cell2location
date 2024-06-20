@@ -4,6 +4,7 @@ import numpy as np
 import pyro
 import pyro.distributions as dist
 import torch
+from einops import rearrange
 from pyro.infer.autoguide.utils import deep_getattr, deep_setattr
 from pyro.nn import PyroModule
 from scipy.sparse import coo_matrix
@@ -31,6 +32,8 @@ class CellCommModule(PyroModule):
     use_non_negative_weights = False
     min_distance = 25.0
     r_l_affinity_alpha_prior = 10.0
+    use_global_cell_abundance_model = False
+    record_sr_occupancy = False
 
     def __init__(
         self,
@@ -56,6 +59,7 @@ class CellCommModule(PyroModule):
         n_hidden: int = 256,
         use_cell_abundance_normalisation: bool = True,
         use_alpha_likelihood: bool = True,
+        use_normal_likelihood: bool = False,
     ):
         super().__init__()
 
@@ -97,6 +101,7 @@ class CellCommModule(PyroModule):
             )
         self.use_cell_abundance_normalisation = use_cell_abundance_normalisation
         self.use_alpha_likelihood = use_alpha_likelihood
+        self.use_normal_likelihood = use_normal_likelihood
 
         self.weights = PyroModule()
 
@@ -239,6 +244,7 @@ class CellCommModule(PyroModule):
                     average_distance_prior=average_distance_prior,
                     use_non_negative_weights=self.use_non_negative_weights,
                     r_l_affinity_alpha_prior=self.r_l_affinity_alpha_prior,
+                    use_global_cell_abundance_model=self.use_global_cell_abundance_model,
                 ),
             )
         # get module
@@ -272,7 +278,7 @@ class CellCommModule(PyroModule):
         w_sf_mu = module.signal_receptor_tf_effect_spatial(
             bound_receptor_abundance_src,
         )
-        return w_sf_mu
+        return w_sf_mu, bound_receptor_abundance_src
 
     def forward(
         self,
@@ -316,7 +322,7 @@ class CellCommModule(PyroModule):
             ) + torch.tensor(self.min_distance, device=positions.device)
 
         # =====================Cell abundances w_sf======================= #
-        w_sf_mu_cell_comm = self.cell_comm_effect(
+        w_sf_mu_cell_comm, bound_receptor_abundance_src = self.cell_comm_effect(
             signal_abundance=signal_abundance,
             receptor_abundance=self.receptor_abundance.T,
             distances=distances,
@@ -324,17 +330,31 @@ class CellCommModule(PyroModule):
             average_distance_prior=self.average_distance_prior,
             obs_plate=obs_plate,
         )
+        if not self.training and self.record_sr_occupancy:
+            with obs_plate:
+                pyro.deterministic(
+                    "bound_receptor_abundance_sr_c_f",
+                    # {sr pair, location * cell type} -> {sr pair, location, cell type}
+                    rearrange(
+                        bound_receptor_abundance_src,
+                        "r (c f) -> r c f",
+                        f=self.receptor_abundance.shape[-1],
+                    ),
+                )
         w_sf_mean_var_ratio_hyp = pyro.sample(
             "w_sf_mean_var_ratio_hyp_lik",
             dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
-        )
+        )  # prior mean 5.0
         w_sf_mean_var_ratio = pyro.sample(
             "w_sf_mean_var_ratio_lik",
             dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
-        )  # (self.n_batch, self.n_vars)
-        w_sf_mean_var_ratio = self.ones / (
-            w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
-        )
+        )  # (self.n_batch, self.n_vars) prior mean 0.2
+        if self.use_normal_likelihood:
+            w_sf_mean_var_ratio = w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
+        else:
+            w_sf_mean_var_ratio = self.ones / (
+                w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
+            ) + torch.tensor(5.0, device=w_sf_mean_var_ratio.device)
         if tiles_unexpanded is not None:
             w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
         if self.use_cell_abundance_normalisation:
@@ -362,11 +382,11 @@ class CellCommModule(PyroModule):
                     dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
                 )  # (self.n_obs, 1)
             w_sf_mu_cell_comm = w_sf_mu_cell_comm * detection_y_s
-
+        with obs_plate:
+            k = "w_sf"
+            pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
         if self.use_alpha_likelihood:
             with obs_plate:
-                k = "w_sf"
-                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
                 pyro.sample(
                     f"{k}_obs",
                     dist.Gamma(
@@ -375,10 +395,18 @@ class CellCommModule(PyroModule):
                     ),
                     obs=w_sf,
                 )  # (self.n_obs, self.n_factors)
+        elif self.use_normal_likelihood:
+            with obs_plate:
+                pyro.sample(
+                    f"{k}_obs",
+                    dist.Normal(
+                        w_sf_mu_cell_comm,
+                        w_sf_mean_var_ratio,
+                    ),
+                    obs=w_sf,
+                )  # (self.n_obs, self.n_factors)
         else:
             with obs_plate:
-                k = "w_sf"
-                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
                 pyro.sample(
                     f"{k}_obs",
                     dist.Gamma(
