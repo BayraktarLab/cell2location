@@ -101,6 +101,7 @@ class CellCommModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         layer: Optional[str] = None,
         signal_abundance_key: Optional[str] = None,
         cell_abundance_key: Optional[str] = None,
+        cell_abundance_lvl2_key: Optional[str] = None,
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
         position_key: Optional[str] = None,
@@ -136,6 +137,8 @@ class CellCommModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             anndata_fields.append(ObsmField("signal_abundance", signal_abundance_key))
         if cell_abundance_key is not None:
             anndata_fields.append(ObsmField("w_sf", cell_abundance_key))
+        if cell_abundance_lvl2_key is not None:
+            anndata_fields.append(ObsmField("w_sf_lvl2", cell_abundance_lvl2_key))
         if position_key is not None:
             anndata_fields.append(ObsmField("positions", position_key))
         if tiles_key is not None:

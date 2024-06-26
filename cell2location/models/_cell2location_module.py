@@ -231,6 +231,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.cell_state_mat = cell_state_mat
         self.register_buffer("cell_state", torch.tensor(cell_state_mat.T))
 
+        if isinstance(N_cells_per_location, np.array):
+            assert (
+                N_cells_per_location.shape[0] == self.n_obs
+            ), "N_cells_per_location must have shape (n_obs, 1) or be a scalar"
         self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
         self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
