@@ -90,7 +90,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             sc_total = cell_state_df.sum(0).mean()
             sp_total = self.adata_manager.get_from_registry(REGISTRY_KEYS.X_KEY).sum(1).mean()
             N_cells_per_location = model_kwargs.get("N_cells_per_location", 1.0)
-            if isinstance(N_cells_per_location, np.array):
+            if isinstance(N_cells_per_location, np.ndarray):
                 N_cells_per_location = N_cells_per_location.mean()
             self.detection_mean_ = (sp_total / N_cells_per_location) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction
@@ -102,7 +102,7 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             batch = self.adata_manager.get_from_registry(REGISTRY_KEYS.BATCH_KEY).flatten()
             sp_total = np.array([sp_total[batch == b].mean() for b in range(self.summary_stats["n_batch"])])
             N_cells_per_location = model_kwargs.get("N_cells_per_location", 1.0)
-            if isinstance(N_cells_per_location, np.array):
+            if isinstance(N_cells_per_location, np.ndarray):
                 N_cells_per_location = N_cells_per_location.mean()
             self.detection_mean_ = (sp_total / N_cells_per_location) / sc_total
             self.detection_mean_ = self.detection_mean_ * detection_mean_correction

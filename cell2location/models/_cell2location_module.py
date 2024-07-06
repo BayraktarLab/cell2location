@@ -54,6 +54,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
     however, the model is robust to a range of similar values.
     In settings where suitable histology images are not available, the size of capture regions relative to
     the expected size of cells can be used to estimate `N_cells_per_location`.
+    `N_cells_per_location` has to be a scalar or an array of shape (n_obs, 1).
 
     The prior on detection efficiency per location :math:`y_s` is selected to discourage over-normalisation, such that
     unless data has evidence of strong technical effect, the effect is assumed to be small and close to
@@ -96,10 +97,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         detection_mean=1 / 2,
         detection_alpha=20.0,
         m_g_gene_level_prior={"mean": 1, "mean_var_ratio": 1.0, "alpha_mean": 3.0},
-        N_cells_per_location=8.0,
-        A_factors_per_location=7.0,
-        B_groups_per_location=7.0,
-        N_cells_mean_var_ratio=1.0,
+        N_cells_per_location: float = 8.0,  # float or array
+        A_factors_per_location: float = 7.0,
+        B_groups_per_location: float = 7.0,
+        N_cells_mean_var_ratio: float = 1.0,
+        N_cells_per_location_alpha_prior: float = None,
         alpha_g_phi_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_alpha_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_mean_hyp_prior={
@@ -107,6 +109,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             "beta": 100.0,
         },
         detection_hyp_prior={"mean_alpha": 10.0},
+        detection_cell_type_prior_alpha=10.0,
+        use_per_cell_type_normalisation: bool = False,
         w_sf_mean_var_ratio=5.0,
         init_vals: Optional[dict] = None,
         init_alpha: float = 20.0,
@@ -218,6 +222,12 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             "detection_mean_hyp_prior_beta",
             torch.tensor(self.detection_hyp_prior["mean_alpha"] / self.detection_hyp_prior["mean"]),
         )
+        if use_per_cell_type_normalisation:
+            self.register_buffer(
+                "detection_cell_type_prior_alpha",
+                torch.tensor(detection_cell_type_prior_alpha),
+            )
+        self.use_per_cell_type_normalisation = use_per_cell_type_normalisation
 
         # compute hyperparameters from mean and sd
         self.register_buffer("m_g_mu_hyp", torch.tensor(self.m_g_gene_level_prior["mean"]))
@@ -231,7 +241,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.cell_state_mat = cell_state_mat
         self.register_buffer("cell_state", torch.tensor(cell_state_mat.T))
 
-        if isinstance(N_cells_per_location, np.array):
+        if isinstance(N_cells_per_location, np.ndarray):
             assert (
                 N_cells_per_location.shape[0] == self.n_obs
             ), "N_cells_per_location must have shape (n_obs, 1) or be a scalar"
@@ -239,7 +249,15 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
         self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
-        self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
+        assert (N_cells_per_location_alpha_prior is None) or (
+            N_cells_mean_var_ratio is None
+        ), "N_cells_per_location_alpha_prior and N_cells_mean_var_ratio cannot be provided at the same time"
+        if N_cells_per_location_alpha_prior is not None:
+            self.register_buffer("N_cells_per_location_alpha_prior", torch.tensor(N_cells_per_location_alpha_prior))
+            self.N_cells_mean_var_ratio = None
+        else:
+            self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
+            self.N_cells_per_location_alpha_prior = None
 
         self.register_buffer(
             "alpha_g_phi_hyp_prior_alpha",
@@ -709,18 +727,42 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         )
         return w_sf_mu
 
+    def n_cells_per_location_prior(self, obs_plate):
+        if self.N_cells_per_location_alpha_prior is not None:
+            n_s_cells_per_location_prior = pyro.sample(  # 1/2
+                "n_s_cells_per_location_prior",
+                dist.Exponential(
+                    self.N_cells_per_location_alpha_prior * self.ones,  # 2
+                )
+                .expand([1, 1])
+                .to_event(2),
+            )
+            n_s_cells_per_location_prior = self.ones / n_s_cells_per_location_prior.pow(2)  # 4
+            with obs_plate:
+                n_s_cells_per_location = pyro.sample(
+                    "n_s_cells_per_location",
+                    dist.Gamma(
+                        n_s_cells_per_location_prior,
+                        n_s_cells_per_location_prior / self.N_cells_per_location,
+                    ),
+                )
+        else:
+            with obs_plate:
+                # prior on number of cells per location
+                n_s_cells_per_location = pyro.sample(
+                    "n_s_cells_per_location",
+                    dist.Gamma(
+                        self.N_cells_per_location * self.N_cells_mean_var_ratio,
+                        self.N_cells_mean_var_ratio,
+                    ),
+                )
+        return n_s_cells_per_location
+
     def factorisation_prior_on_w_sf(self, obs_plate):
         # factorisation prior on w_sf models similarity in locations
         # across cell types f and reflects the absolute scale of w_sf
+        n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
         with obs_plate:
-            k = "n_s_cells_per_location"
-            n_s_cells_per_location = pyro.sample(
-                k,
-                dist.Gamma(
-                    self.N_cells_per_location * self.N_cells_mean_var_ratio,
-                    self.N_cells_mean_var_ratio,
-                ),
-            )
             k = "b_s_groups_per_location"
             b_s_groups_per_location = pyro.sample(
                 k,
@@ -754,14 +796,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return w_sf_mu
 
     def independent_prior_on_w_sf(self, obs_plate):
+        n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
         with obs_plate:
-            n_s_cells_per_location = pyro.sample(
-                "n_s_cells_per_location",
-                dist.Gamma(
-                    self.N_cells_per_location * self.N_cells_mean_var_ratio,
-                    self.N_cells_mean_var_ratio,
-                ),
-            )
             a_s_factors_per_location = pyro.sample(
                 "a_s_factors_per_location",
                 dist.Gamma(self.A_factors_per_location, self.ones),
@@ -945,7 +981,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             w_sf_mean_var_ratio = pyro.sample(
                 "w_sf_mean_var_ratio",
                 dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
-            )  # (self.n_batch, self.n_vars)
+            )  # (1, self.n_vars)
             w_sf_mean_var_ratio = self.ones / (
                 w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
             )
@@ -1027,6 +1063,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 )
                 w_sf = rearrange(w_sf, "s (f k) -> f s k", f=self.n_factors, k=self.n_cell_compartments)
                 pyro.deterministic("aggregated_w_fsk", w_sf)
+            if self.use_per_cell_type_normalisation:
+                per_cell_type_normalisation_f = pyro.sample(
+                    "per_cell_type_normalisation_f",
+                    dist.Gamma(self.detection_cell_type_prior_alpha, self.detection_cell_type_prior_alpha)
+                    .expand([self.n_factors, 1, self.n_cell_compartments])
+                    .to_event(3),
+                )  # [self.n_factors, 1, self.n_cell_compartments]
+                w_sf = w_sf * per_cell_type_normalisation_f
         else:
             if (self.sliding_window_size > 0) and self.use_aggregated_w_sf:
                 w_sf = self.redistribute_conv2d(
@@ -1036,6 +1080,14 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                     n_tiles=n_tiles,
                 )
                 pyro.deterministic("aggregated_w_sf", w_sf)
+            if self.use_per_cell_type_normalisation:
+                per_cell_type_normalisation_f = pyro.sample(
+                    "per_cell_type_normalisation_f",
+                    dist.Gamma(self.detection_cell_type_prior_alpha, self.detection_cell_type_prior_alpha)
+                    .expand([1, self.n_factors])
+                    .to_event(2),
+                )  # (1, self.n_factors)
+                w_sf = w_sf * per_cell_type_normalisation_f
 
         # =====================Gene-specific additive component ======================= #
         # per gene molecule contribution that cannot be explained by
