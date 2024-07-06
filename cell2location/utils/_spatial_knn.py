@@ -14,32 +14,45 @@ def from_c2l_get_lr_abundance(
     receptor_bool,
     receptor_bool_b,
     signal_receptor_mask,
-    top_n=20,
-    scale_receptor_abundance_by_m_g=False,
+    top_n: int = 20,
+    scale_receptor_abundance_by_m_g: bool = False,
+    post_sample_name: str = "post_sample_q05",
+    use_normalisation_by_y_s: bool = False,
+    use_normalisation_by_total: bool = False,
+    use_normalisation_per_signal: bool = False,
+    use_normalisation_per_receptor: bool = False,
 ):
     obs_names = np.intersect1d(adata_vis.obs_names, adata_vis.uns["mod"]["obs_names"])
+    obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
+    # obs_names = adata_vis.uns["mod"]["obs_names"][obs_bool]
+    assert np.all(adata_vis.uns["mod"]["obs_names"][obs_bool] == obs_names)
     assert np.all(adata_vis.var_names.values.astype("str") == adata_vis.uns["mod"]["var_names"].astype("str"))
     var_names = adata_vis.uns["mod"]["var_names"]
-    obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
     adata_vis = adata_vis[obs_names]
     adata_vis = adata_vis[:, var_names]
     cell_state = cell_state.loc[var_names, :]
-    adata_vis.obsm["w_sf"] = adata_vis.uns["mod"]["post_sample_q05"]["w_sf"][obs_bool, :]
-    adata_vis.obsm["signal_abundance"] = (
-        adata_vis.X[:, signal_bool].toarray() / adata_vis.uns["mod"]["post_sample_q05"]["detection_y_s"][obs_bool, :]
-    )
+    adata_vis.obsm["w_sf"] = adata_vis.uns["mod"][post_sample_name]["w_sf"][obs_bool, :]
+    # normalisation
+    if use_normalisation_by_y_s:
+        normalisation = adata_vis.uns["mod"][post_sample_name]["detection_y_s"][obs_bool, :]
+    elif use_normalisation_by_total:
+        normalisation = np.asarray(adata_vis.X.sum(1)) / 10000.0
+    else:
+        normalisation = 1.0
+    adata_vis.obsm["signal_abundance"] = adata_vis.X[:, signal_bool].toarray() / normalisation
     # normalise signal abundance
-    for i in range(adata_vis.obsm["signal_abundance"].shape[1]):
-        top_n_vals = np.sort(adata_vis.obsm["signal_abundance"][:, i])[::-1][:top_n]
-        adata_vis.obsm["signal_abundance"][:, i] = adata_vis.obsm["signal_abundance"][:, i] / top_n_vals.mean()
-        adata_vis.obsm["signal_abundance"][np.isnan(adata_vis.obsm["signal_abundance"])] = 0.0
+    if use_normalisation_per_signal:
+        for i in range(adata_vis.obsm["signal_abundance"].shape[1]):
+            top_n_vals = np.sort(adata_vis.obsm["signal_abundance"][:, i])[::-1][:top_n]
+            adata_vis.obsm["signal_abundance"][:, i] = adata_vis.obsm["signal_abundance"][:, i] / top_n_vals.mean()
+            adata_vis.obsm["signal_abundance"][np.isnan(adata_vis.obsm["signal_abundance"])] = 0.0
     adata_vis.obsm["signal_abundance"] = pd.DataFrame(
         adata_vis.obsm["signal_abundance"],
         index=adata_vis.obs_names,
         columns=signal_receptor_mask.index,
     )
     if scale_receptor_abundance_by_m_g:
-        m_g = adata_vis.uns["mod"]["post_sample_q05"]["m_g"].T
+        m_g = adata_vis.uns["mod"][post_sample_name]["m_g"].T
         cell_state = cell_state * m_g
     # get minimum of the two receptor subunits
     receptor_abundance = np.minimum(
@@ -51,7 +64,7 @@ def from_c2l_get_lr_abundance(
         columns=adata_vis.uns["mod"]["factor_names"],
     )
     # normalise receptor abundance
-    if not scale_receptor_abundance_by_m_g:
+    if not scale_receptor_abundance_by_m_g and use_normalisation_per_receptor:
         receptor_abundance = (receptor_abundance.T / receptor_abundance.max(1)).T
     return adata_vis, receptor_abundance
 
