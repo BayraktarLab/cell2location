@@ -179,7 +179,7 @@ class CellCommunicationToTfActivityNN(
             layer=layer,
             weights_shape=weights_shape,
             bias_shape=[1],
-            random_init_scale=1 / np.sqrt(weights_shape[0]),
+            random_init_scale=1.0,
             bayesian=True,
             use_non_negative_weights=non_negative,
             weights_prior_tau=weights_prior_tau,
@@ -187,7 +187,7 @@ class CellCommunicationToTfActivityNN(
         )
         if upper_triangle:
             if len(weights.shape) > 2:
-                weights = torch.triu(torch.ones((weights.shape[0], weights[1]))).unsqueeze(-1) * weights
+                weights = torch.triu(torch.ones((weights.shape[0], weights.shape[1]))).unsqueeze(-1) * weights
             else:
                 weights = torch.triu(weights)
 
@@ -291,7 +291,7 @@ class CellCommunicationToTfActivityNN(
             layer=layer,
             weights_shape=weights_shape,
             bias_shape=[1],
-            random_init_scale=1 / np.sqrt(self.n_signals),
+            # random_init_scale=1 / np.sqrt(self.n_signals),
             bayesian=True,
             weights_prior_shape=torch.tensor(self.r_l_affinity_alpha_prior, device=x.device),
             weights_prior_rate=torch.tensor(self.r_l_affinity_alpha_prior, device=x.device),
@@ -324,10 +324,11 @@ class CellCommunicationToTfActivityNN(
             layer=layer,
             weights_shape=weights_shape,
             bias_shape=[1],
-            random_init_scale=1 / np.sqrt(len(self.signal_receptor_mask_scipy.data)),
+            random_init_scale=1.0,
             bayesian=True,
             # sample positive weights
             use_non_negative_weights=use_non_negative_weights,
+            use_horseshoe_prior=True,
         )
 
         if self.receptor_tf_mask is not None:
@@ -631,6 +632,13 @@ class CellCommunicationToTfActivityNN(
                 else [len(self.signal_receptor_mask_scipy.data), self.n_out],
                 name="signal_receptor_tf_effect",
             )
+        # normalise by sqrt of the number of predictors
+        tf_sig_rec_effect_hsr = tf_sig_rec_effect_hsr / torch.sqrt(
+            torch.tensor(
+                float(len(self.signal_receptor_mask_scipy.data)),
+                device=tf_sig_rec_effect_hsr.device,
+            )
+        )
 
         # print("tf_sig_rec_effect_hsr mean", tf_sig_rec_effect_hsr.mean())
         # print("tf_sig_rec_effect_hsr min", tf_sig_rec_effect_hsr.min())
@@ -731,6 +739,30 @@ class CellCommunicationToTfActivityNN(
 
         return effect_on_tf_abundance
 
+    def apply_upper_triangle_diag(self, weights, name, n_out=1):
+        if (len(weights.shape) == 3) and (n_out == 1):
+            shape = (weights.shape[1], weights.shape[2])
+            triu = torch.triu(torch.ones(shape)).unsqueeze(-1)
+            weights = weights * triu
+            zero_diag = torch.ones(shape, device=weights.device)
+            zero_diag = zero_diag.fill_diagonal_(0.0)
+            zero_diag = zero_diag.unsqueeze(-1)
+            weights = weights * zero_diag
+        elif (len(weights.shape) == 4) and (n_out > 1):
+            raise NotImplementedError
+        elif (len(weights.shape) == 3) and (n_out > 1):
+            raise NotImplementedError
+        elif (len(weights.shape) == 2) and (n_out == 1):
+            shape = (weights.shape[0], weights.shape[1])
+            triu = torch.triu(torch.ones(shape))
+            weights = weights * triu
+            zero_diag = torch.ones(shape, device=weights.device)
+            zero_diag = zero_diag.fill_diagonal_(0.0)
+            weights = weights * zero_diag
+        if not self.training:
+            pyro.deterministic(f"{name}_2_total_effect", weights)
+        return weights, zero_diag, triu
+
     def signal_receptor_pathway_tf_effect(
         self,
         bound_receptor_abundance_src: torch.Tensor,
@@ -760,11 +792,11 @@ class CellCommunicationToTfActivityNN(
             ],
             name="signal_receptor_pathway_effect",
         )
-        # normalised by sqrt of the number of predictors
+        # normalise by sqrt of the number of predictors
         pathway_sig_rec_effect_hsr = pathway_sig_rec_effect_hsr / torch.sqrt(
             torch.tensor(
                 float(len(self.signal_receptor_mask_scipy.data)),
-                device=bound_receptor_abundance_src.device,
+                device=pathway_sig_rec_effect_hsr.device,
             )
         )
 
@@ -818,6 +850,7 @@ class CellCommunicationToTfActivityNN(
                 else [self.n_tfs, self.n_pathways * self.n_out],
                 remove_diagonal=False,
                 non_negative=self.use_non_negative_weights,
+                use_horseshoe_prior=True,
             )
         else:
             pathway_tf_weights = self.get_tf_effect(
@@ -827,7 +860,15 @@ class CellCommunicationToTfActivityNN(
                 weights_shape=[self.n_pathways] if self.n_out == 1 else [self.n_pathways * self.n_out],
                 remove_diagonal=False,
                 non_negative=self.use_non_negative_weights,
+                use_horseshoe_prior=True,
             )
+        # normalise by sqrt of the number of predictors
+        pathway_tf_weights = pathway_tf_weights / torch.sqrt(
+            torch.tensor(
+                float(self.n_pathways),
+                device=pathway_tf_weights.device,
+            )
+        )
         if use_cell_abundance_model:
             effect_on_pathway_activity = rearrange(
                 effect_on_pathway_activity,
@@ -867,6 +908,7 @@ class CellCommunicationToTfActivityNN(
                     else [self.n_tfs, self.n_pathways * self.n_pathways * self.n_out],
                     remove_diagonal=False,
                     non_negative=self.use_non_negative_weights,
+                    use_horseshoe_prior=True,
                 )
             else:
                 pathway_tf_weights = self.get_tf_effect(
@@ -878,6 +920,7 @@ class CellCommunicationToTfActivityNN(
                     else [self.n_pathways * self.n_pathways * self.n_out],
                     remove_diagonal=False,
                     non_negative=self.use_non_negative_weights,
+                    use_horseshoe_prior=True,
                 )
             if self.n_out == 1:
                 if self.use_global_cell_abundance_model:
@@ -887,6 +930,7 @@ class CellCommunicationToTfActivityNN(
                         p=self.n_pathways,
                         o=self.n_pathways,
                     )
+                    pathway_tf_weights, zero_diag, triu = self.apply_upper_triangle_diag(pathway_tf_weights, name)
                 else:
                     pathway_tf_weights = rearrange(
                         pathway_tf_weights,
@@ -894,6 +938,9 @@ class CellCommunicationToTfActivityNN(
                         p=self.n_pathways,
                         o=self.n_pathways,
                     )
+                    pathway_tf_weights, zero_diag, triu = self.apply_upper_triangle_diag(pathway_tf_weights, name)
+                # normalise by sqrt of the number of predictors
+                pathway_tf_weights = pathway_tf_weights / torch.sqrt((zero_diag * triu).sum())
                 if use_cell_abundance_model:
                     if self.use_global_cell_abundance_model:
                         effect_on_tf_activity = effect_on_tf_activity + torch.einsum(
@@ -925,6 +972,11 @@ class CellCommunicationToTfActivityNN(
                         o=self.n_pathways,
                         f=self.n_out,
                     )
+                    pathway_tf_weights, zero_diag, triu = self.apply_upper_triangle_diag(
+                        pathway_tf_weights,
+                        name,
+                        n_out=self.n_out,
+                    )
                 else:
                     pathway_tf_weights = rearrange(
                         pathway_tf_weights,
@@ -933,6 +985,13 @@ class CellCommunicationToTfActivityNN(
                         o=self.n_pathways,
                         f=self.n_out,
                     )
+                    pathway_tf_weights, zero_diag, triu = self.apply_upper_triangle_diag(
+                        pathway_tf_weights,
+                        name,
+                        n_out=self.n_out,
+                    )
+                # normalise by sqrt of the number of predictors
+                pathway_tf_weights = pathway_tf_weights / torch.sqrt((zero_diag * triu).sum())
                 if use_cell_abundance_model:
                     if self.use_global_cell_abundance_model:
                         effect_on_tf_activity = torch.einsum(

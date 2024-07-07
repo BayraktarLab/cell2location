@@ -26,7 +26,7 @@ class CellCommModule(PyroModule):
     Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`, which can be interpreted as the expected number of cells at location :math:`s` that express reference signature :math:`f`;
     :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`, `cell_state_df` input ;
     """
-    n_pathways = 16
+    n_pathways = 150
     use_pathway_interaction_effect = True
     dropout_rate = 0.0
     use_non_negative_weights = False
@@ -60,6 +60,7 @@ class CellCommModule(PyroModule):
         use_cell_abundance_normalisation: bool = True,
         use_alpha_likelihood: bool = True,
         use_normal_likelihood: bool = False,
+        fixed_w_sf_mean_var_ratio: Optional[float] = None,
     ):
         super().__init__()
 
@@ -102,6 +103,7 @@ class CellCommModule(PyroModule):
         self.use_cell_abundance_normalisation = use_cell_abundance_normalisation
         self.use_alpha_likelihood = use_alpha_likelihood
         self.use_normal_likelihood = use_normal_likelihood
+        self.fixed_w_sf_mean_var_ratio = fixed_w_sf_mean_var_ratio
 
         self.weights = PyroModule()
 
@@ -167,6 +169,8 @@ class CellCommModule(PyroModule):
             kwargs["tiles_unexpanded"] = tensor_dict["tiles_unexpanded"]
         if "in_tissue" in tensor_dict.keys():
             kwargs["in_tissue"] = tensor_dict["in_tissue"].bool()
+        if "w_sf_lvl2" in tensor_dict.keys():
+            kwargs["w_sf_lvl2"] = tensor_dict["w_sf_lvl2"]
         return (signal_abundance, w_sf, ind_x, batch_index), kwargs
 
     def create_plates(
@@ -179,7 +183,12 @@ class CellCommModule(PyroModule):
         tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
+        w_sf_lvl2: torch.Tensor = None,
     ):
+        if tiles_unexpanded is not None:
+            tiles_in_use = (tiles.mean(0) > torch.tensor(0.99, device=tiles.device)).bool()
+            obs_in_use = (tiles_unexpanded[:, tiles_in_use].sum(1) > torch.tensor(0.0, device=tiles.device)).bool()
+            idx = idx[obs_in_use]
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
     def list_obs_plate_vars(self):
@@ -290,15 +299,8 @@ class CellCommModule(PyroModule):
         tiles_unexpanded: torch.Tensor = None,
         positions: torch.Tensor = None,
         in_tissue: torch.Tensor = None,
+        w_sf_lvl2: torch.Tensor = None,
     ):
-        if tiles_unexpanded is not None:
-            tiles_in_use = tiles.sum(0).bool()
-            obs_in_use = tiles_unexpanded[:, tiles_in_use].sum(1).bool()
-            idx = idx[obs_in_use]
-            batch_index = batch_index[obs_in_use]
-            if positions is not None:
-                positions = positions[obs_in_use]
-        obs2sample = one_hot(batch_index, self.n_batch).float()
         obs_plate = self.create_plates(
             signal_abundance=signal_abundance,
             w_sf=w_sf,
@@ -309,6 +311,11 @@ class CellCommModule(PyroModule):
             positions=positions,
             in_tissue=in_tissue,
         )
+        if tiles_unexpanded is not None:
+            tiles_in_use = (tiles.mean(0) > torch.tensor(0.99, device=tiles.device)).bool()
+            obs_in_use = (tiles_unexpanded[:, tiles_in_use].sum(1) > torch.tensor(0.0, device=tiles.device)).bool()
+            batch_index = batch_index[obs_in_use]
+        obs2sample = one_hot(batch_index, self.n_batch).float()
 
         if getattr(self, "distances", None) is not None:
             distances = self.distances
@@ -332,31 +339,38 @@ class CellCommModule(PyroModule):
         )
         if not self.training and self.record_sr_occupancy:
             with obs_plate:
+                # {sr pair, location * cell type} -> {sr pair, location, cell type}
+                bound_receptor_abundance_src = rearrange(
+                    bound_receptor_abundance_src,
+                    "r (c f) -> r c f",
+                    f=self.receptor_abundance.shape[-1],
+                )
+                if tiles_unexpanded is not None:
+                    bound_receptor_abundance_src = bound_receptor_abundance_src[:, obs_in_use, :]
                 pyro.deterministic(
                     "bound_receptor_abundance_sr_c_f",
-                    # {sr pair, location * cell type} -> {sr pair, location, cell type}
-                    rearrange(
-                        bound_receptor_abundance_src,
-                        "r (c f) -> r c f",
-                        f=self.receptor_abundance.shape[-1],
-                    ),
+                    bound_receptor_abundance_src,
                 )
-        w_sf_mean_var_ratio_hyp = pyro.sample(
-            "w_sf_mean_var_ratio_hyp_lik",
-            dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
-        )  # prior mean 5.0
-        w_sf_mean_var_ratio = pyro.sample(
-            "w_sf_mean_var_ratio_lik",
-            dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
-        )  # (self.n_batch, self.n_vars) prior mean 0.2
-        if self.use_normal_likelihood:
-            w_sf_mean_var_ratio = w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
+        if self.fixed_w_sf_mean_var_ratio is not None:
+            w_sf_mean_var_ratio = torch.tensor(self.fixed_w_sf_mean_var_ratio, device=w_sf_mu_cell_comm.device)
         else:
-            w_sf_mean_var_ratio = self.ones / (
-                w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
-            ) + torch.tensor(5.0, device=w_sf_mean_var_ratio.device)
+            w_sf_mean_var_ratio_hyp = pyro.sample(
+                "w_sf_mean_var_ratio_hyp_lik",
+                dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
+            )  # prior mean 5.0
+            w_sf_mean_var_ratio = pyro.sample(
+                "w_sf_mean_var_ratio_lik",
+                dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
+            )  # (self.n_batch, self.n_vars) prior mean 0.2
+            if self.use_normal_likelihood:
+                w_sf_mean_var_ratio = w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
+            else:
+                w_sf_mean_var_ratio = self.ones / (
+                    w_sf_mean_var_ratio + torch.tensor(1.0 / 50.0, device=w_sf_mean_var_ratio.device)
+                ) + torch.tensor(5.0, device=w_sf_mean_var_ratio.device)
         if tiles_unexpanded is not None:
             w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
+            w_sf = w_sf[obs_in_use]
         if self.use_cell_abundance_normalisation:
             # =====================Location-specific detection efficiency ======================= #
             # y_s with hierarchical mean prior
@@ -382,9 +396,16 @@ class CellCommModule(PyroModule):
                     dist.Gamma(obs2sample @ detection_hyp_prior_alpha, beta),
                 )  # (self.n_obs, 1)
             w_sf_mu_cell_comm = w_sf_mu_cell_comm * detection_y_s
+
+        if w_sf_lvl2 is not None:
+            with obs_plate:
+                pyro.deterministic("w_sf_wo_lvl2_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
+            w_sf_mu_cell_comm = w_sf_mu_cell_comm * w_sf_lvl2
+
         with obs_plate:
             k = "w_sf"
             pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
+
         if self.use_alpha_likelihood:
             with obs_plate:
                 pyro.sample(
