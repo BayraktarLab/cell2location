@@ -742,11 +742,11 @@ class CellCommunicationToTfActivityNN(
     def apply_upper_triangle_diag(self, weights, name, n_out=1):
         if (len(weights.shape) == 3) and (n_out == 1):
             shape = (weights.shape[1], weights.shape[2])
-            triu = torch.triu(torch.ones(shape)).unsqueeze(-1)
+            triu = torch.triu(torch.ones(shape, device=weights.device)).unsqueeze(-3)
             weights = weights * triu
             zero_diag = torch.ones(shape, device=weights.device)
             zero_diag = zero_diag.fill_diagonal_(0.0)
-            zero_diag = zero_diag.unsqueeze(-1)
+            zero_diag = zero_diag.unsqueeze(-3)
             weights = weights * zero_diag
         elif (len(weights.shape) == 4) and (n_out > 1):
             raise NotImplementedError
@@ -754,7 +754,7 @@ class CellCommunicationToTfActivityNN(
             raise NotImplementedError
         elif (len(weights.shape) == 2) and (n_out == 1):
             shape = (weights.shape[0], weights.shape[1])
-            triu = torch.triu(torch.ones(shape))
+            triu = torch.triu(torch.ones(shape, device=weights.device))
             weights = weights * triu
             zero_diag = torch.ones(shape, device=weights.device)
             zero_diag = zero_diag.fill_diagonal_(0.0)
