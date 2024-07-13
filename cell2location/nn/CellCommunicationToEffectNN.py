@@ -1060,14 +1060,14 @@ class CellCommunicationToTfActivityNN(
         )
 
         # x_{c,r,s} = w_{c,s} * a_{r,s}
-        row2signal = one_hot(
+        pair2signal = one_hot(
             torch.tensor(self.signal_receptor_mask_scipy.col, device=signal_abundance.device).long().unsqueeze(-1),
             self.signal_receptor_mask_scipy.shape[1],
         )
         affinity_to_receptor_src = signal_abundance.T[
             self.signal_receptor_mask_scipy.row, :
         ] * sig_rec_affinity_rs.unsqueeze(-1)
-        affinity_to_receptor_rc_sum = torch.mm(row2signal.T, affinity_to_receptor_src)
+        affinity_to_receptor_rc_sum = torch.mm(pair2signal.T, affinity_to_receptor_src)  # ps,pc -> sc
         # affinity_to_receptor_crs = torch.einsum(
         #    "cs,rs->crs", signal_abundance, sig_rec_affinity_rs
         # )
@@ -1088,7 +1088,8 @@ class CellCommunicationToTfActivityNN(
         if not self.use_unbound_concentration:
             proportion_of_signal_with_affinity_src = affinity_to_receptor_src / (
                 affinity_to_receptor_rc_sum[self.signal_receptor_mask_scipy.col, :]
-                + unbound_r[self.signal_receptor_mask_scipy.col].unsqueeze(-1)
+                # + unbound_r[self.signal_receptor_mask_scipy.col].unsqueeze(-1)
+                + torch.tensor(1.0, device=signal_abundance.device)
             )
         else:
             proportion_of_signal_with_affinity_src = affinity_to_receptor_src / (
@@ -1179,7 +1180,8 @@ class CellCommunicationToTfActivityNN(
         signal_abundance = signal_abundance.unsqueeze(-2).expand([n_locations, n_cell_types, n_signals])
         signal_abundance = rearrange(signal_abundance, "c f s -> (c f) s", f=n_cell_types)
         # g_{f,r} -> g_{c,f,r}
-        receptor_abundance = receptor_abundance.unsqueeze(-3).expand([n_locations, n_cell_types, n_receptors])
+        if receptor_abundance.dim() == 2:
+            receptor_abundance = receptor_abundance.unsqueeze(-3).expand([n_locations, n_cell_types, n_receptors])
         receptor_abundance = rearrange(receptor_abundance, "c f r -> (c f) r", f=n_cell_types)
 
         bound_receptor_abundance_src = self.signal_receptor_occupancy(

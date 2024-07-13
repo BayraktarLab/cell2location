@@ -66,7 +66,15 @@ def from_c2l_get_lr_abundance(
     # normalise receptor abundance
     if not scale_receptor_abundance_by_m_g and use_normalisation_per_receptor:
         receptor_abundance = (receptor_abundance.T / receptor_abundance.max(1)).T
-    return adata_vis, receptor_abundance
+
+    per_cell_type_normalisation = (
+        1.0
+        / np.array(
+            [np.sort(adata_vis.obsm["w_sf"][:, i])[::-1][:top_n].mean() for i in range(adata_vis.obsm["w_sf"].shape[1])]
+        )
+    ).astype("float32")
+
+    return adata_vis, receptor_abundance, per_cell_type_normalisation
 
 
 def get_lr_abundance(cell_state, d_sg, m_g, y_s, signal_bool, receptor_bool, receptor_bool_b):

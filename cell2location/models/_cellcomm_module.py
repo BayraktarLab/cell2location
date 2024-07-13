@@ -34,6 +34,7 @@ class CellCommModule(PyroModule):
     r_l_affinity_alpha_prior = 10.0
     use_global_cell_abundance_model = False
     record_sr_occupancy = False
+    use_spatial_receptor_info_remove_sp_signal = True
 
     def __init__(
         self,
@@ -51,6 +52,8 @@ class CellCommModule(PyroModule):
         init_alpha: float = 20.0,
         dropout_p: float = 0.0,
         receptor_abundance: Optional[np.ndarray] = None,
+        use_spatial_receptor_info: bool = False,
+        per_cell_type_normalisation: Optional[np.ndarray] = None,
         signal_receptor_mask: Optional[np.ndarray] = None,
         receptor_tf_mask: Optional[np.ndarray] = None,
         use_learnable_mean_var_ratio: bool = False,
@@ -83,7 +86,12 @@ class CellCommModule(PyroModule):
             self.dropout = torch.nn.Dropout(p=self.dropout_p)
 
         if receptor_abundance is not None:
-            self.register_buffer("receptor_abundance", torch.tensor(receptor_abundance.astype("int32")))
+            self.register_buffer("receptor_abundance", torch.tensor(receptor_abundance.astype("float32")))
+        self.use_spatial_receptor_info = use_spatial_receptor_info
+        if per_cell_type_normalisation is not None:
+            self.register_buffer(
+                "per_cell_type_normalisation", torch.tensor(per_cell_type_normalisation.astype("float32"))
+            )
         self.signal_receptor_mask = signal_receptor_mask
         self.receptor_tf_mask = receptor_tf_mask
 
@@ -329,9 +337,36 @@ class CellCommModule(PyroModule):
             ) + torch.tensor(self.min_distance, device=positions.device)
 
         # =====================Cell abundances w_sf======================= #
+        if self.use_spatial_receptor_info:
+            if self.use_spatial_receptor_info_remove_sp_signal:
+                receptor_abundance_ = torch.einsum(
+                    "fr,cf,f -> cr",
+                    self.receptor_abundance.T,
+                    w_sf,
+                    self.per_cell_type_normalisation,
+                )
+                receptor_abundance_norm = torch.einsum(
+                    "fr,r -> fr",
+                    self.receptor_abundance.T,
+                    self.receptor_abundance.sum(-1),
+                )
+                receptor_abundance = torch.einsum(
+                    "fr,cr -> cfr",
+                    receptor_abundance_norm,
+                    receptor_abundance_,
+                )
+            else:
+                receptor_abundance = torch.einsum(
+                    "fr,cf,f -> cfr",
+                    self.receptor_abundance.T,
+                    w_sf,
+                    self.per_cell_type_normalisation,
+                )
+        else:
+            receptor_abundance = self.receptor_abundance.T
         w_sf_mu_cell_comm, bound_receptor_abundance_src = self.cell_comm_effect(
             signal_abundance=signal_abundance,
-            receptor_abundance=self.receptor_abundance.T,
+            receptor_abundance=receptor_abundance,
             distances=distances,
             tiles=tiles,
             average_distance_prior=self.average_distance_prior,
@@ -371,6 +406,8 @@ class CellCommModule(PyroModule):
         if tiles_unexpanded is not None:
             w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
             w_sf = w_sf[obs_in_use]
+            if w_sf_lvl2 is not None:
+                w_sf_lvl2 = w_sf_lvl2[obs_in_use]
         if self.use_cell_abundance_normalisation:
             # =====================Location-specific detection efficiency ======================= #
             # y_s with hierarchical mean prior
