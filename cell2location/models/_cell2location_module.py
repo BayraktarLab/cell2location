@@ -102,6 +102,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         B_groups_per_location: float = 7.0,
         N_cells_mean_var_ratio: float = 1.0,
         N_cells_per_location_alpha_prior: float = None,
+        A_B_per_location_alpha_prior: float = None,
         alpha_g_phi_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_alpha_hyp_prior={"alpha": 9.0, "beta": 3.0},
         gene_add_mean_hyp_prior={
@@ -124,6 +125,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         receptor_tf_mask: Optional[np.ndarray] = None,
         use_learnable_mean_var_ratio: bool = False,
         use_independent_prior_on_w_sf: bool = False,
+        use_proportion_factorisation_prior_on_w_sf: bool = False,
         average_distance_prior: float = 50.0,
         distances: Optional[coo_matrix] = None,
         sliding_window_size: Optional[int] = 0,
@@ -174,6 +176,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         self.use_learnable_mean_var_ratio = use_learnable_mean_var_ratio
         self.use_independent_prior_on_w_sf = use_independent_prior_on_w_sf
+        self.use_proportion_factorisation_prior_on_w_sf = use_proportion_factorisation_prior_on_w_sf
         self.average_distance_prior = average_distance_prior
         if distances is not None:
             distances = coo_matrix(distances)
@@ -253,11 +256,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             N_cells_mean_var_ratio is None
         ), "N_cells_per_location_alpha_prior and N_cells_mean_var_ratio cannot be provided at the same time"
         if N_cells_per_location_alpha_prior is not None:
-            self.register_buffer("N_cells_per_location_alpha_prior", torch.tensor(N_cells_per_location_alpha_prior))
+            self.register_buffer(
+                "N_cells_per_location_alpha_prior", torch.tensor(float(N_cells_per_location_alpha_prior))
+            )
             self.N_cells_mean_var_ratio = None
         else:
-            self.register_buffer("N_cells_mean_var_ratio", torch.tensor(N_cells_mean_var_ratio))
+            self.register_buffer("N_cells_mean_var_ratio", torch.tensor(float(N_cells_mean_var_ratio)))
             self.N_cells_per_location_alpha_prior = None
+        if A_B_per_location_alpha_prior is not None:
+            self.register_buffer("A_B_per_location_alpha_prior", torch.tensor(float(A_B_per_location_alpha_prior)))
+        else:
+            self.A_B_per_location_alpha_prior = None
 
         self.register_buffer(
             "alpha_g_phi_hyp_prior_alpha",
@@ -758,16 +767,73 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 )
         return n_s_cells_per_location
 
+    def a_s_factors_per_location_prior(self, obs_plate):
+        if self.A_B_per_location_alpha_prior is not None:
+            a_s_factors_per_location_prior = pyro.sample(  # 1/2
+                "a_s_factors_per_location_prior",
+                dist.Exponential(
+                    self.A_B_per_location_alpha_prior * self.ones,  # 2
+                )
+                .expand([1, 1])
+                .to_event(2),
+            )
+            a_s_factors_per_location_prior = self.ones / a_s_factors_per_location_prior.pow(2)  # 4
+            with obs_plate:
+                a_s_factors_per_location = pyro.sample(
+                    "a_s_factors_per_location",
+                    dist.Gamma(
+                        a_s_factors_per_location_prior,
+                        a_s_factors_per_location_prior / self.A_factors_per_location,
+                    ),
+                )
+        else:
+            with obs_plate:
+                # prior on number of cells per location
+                a_s_factors_per_location = pyro.sample(
+                    "a_s_factors_per_location",
+                    dist.Gamma(
+                        self.A_factors_per_location * self.ones,
+                        self.ones,
+                    ),
+                )
+        return a_s_factors_per_location
+
+    def b_s_groups_per_location_prior(self, obs_plate):
+        if self.A_B_per_location_alpha_prior is not None:
+            b_s_groups_per_location_prior = pyro.sample(  # 1/2
+                "b_s_groups_per_location_prior",
+                dist.Exponential(
+                    self.A_B_per_location_alpha_prior * self.ones,  # 2
+                )
+                .expand([1, 1])
+                .to_event(2),
+            )
+            b_s_groups_per_location_prior = self.ones / b_s_groups_per_location_prior.pow(2)  # 4
+            with obs_plate:
+                b_s_groups_per_location = pyro.sample(
+                    "b_s_groups_per_location",
+                    dist.Gamma(
+                        b_s_groups_per_location_prior,
+                        b_s_groups_per_location_prior / self.B_groups_per_location,
+                    ),
+                )
+        else:
+            with obs_plate:
+                # prior on number of cells per location
+                b_s_groups_per_location = pyro.sample(
+                    "b_s_groups_per_location",
+                    dist.Gamma(
+                        self.B_groups_per_location * self.ones,
+                        self.ones,
+                    ),
+                )
+        return b_s_groups_per_location
+
     def factorisation_prior_on_w_sf(self, obs_plate):
         # factorisation prior on w_sf models similarity in locations
         # across cell types f and reflects the absolute scale of w_sf
         n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
-        with obs_plate:
-            k = "b_s_groups_per_location"
-            b_s_groups_per_location = pyro.sample(
-                k,
-                dist.Gamma(self.B_groups_per_location, self.ones),
-            )
+        b_s_groups_per_location = self.b_s_groups_per_location_prior(obs_plate)
 
         # cell group loadings
         shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
@@ -795,13 +861,87 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         return w_sf_mu
 
+    def proportion_factorisation_prior_on_w_sf_v1(self, obs_plate):
+        # factorisation prior on w_sf models similarity in locations
+        # across cell types f and reflects the absolute scale of w_sf
+        n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
+        b_s_groups_per_location = self.b_s_groups_per_location_prior(obs_plate)
+
+        # cell group loadings
+        shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
+        rate = self.ones_1_n_groups
+        with obs_plate:
+            k = "z_sr_groups_factors"
+            z_sr_groups_factors = pyro.sample(
+                k,
+                dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
+            )  # (n_obs, n_groups)
+
+        c2f_shape = self.factors_per_groups / self.n_factors_tensor
+
+        x_fr_lambdas_group2fact = pyro.sample(
+            "x_fr_lambdas_group2fact",
+            dist.Gamma(c2f_shape, self.ones_1_n_groups.T).expand([self.n_groups, self.n_factors]).to_event(2),
+        )  # (self.n_groups, self.n_factors)
+        x_fr_weights_group2fact = pyro.sample(
+            "x_fr_weights_group2fact",
+            dist.Normal(self.zeros, self.ones_1_n_groups.T).expand([self.n_groups, self.n_factors]).to_event(2),
+        )  # (self.n_groups, self.n_factors)
+
+        w_sf_mu = z_sr_groups_factors @ (x_fr_lambdas_group2fact * x_fr_weights_group2fact)
+        w_sf_mu = w_sf_mu * torch.tensor(100.0, device=w_sf_mu.device)
+        # print("w_sf_mu 1 mean", w_sf_mu.mean().item(), "w_sf_mu 1 std", w_sf_mu.std().item())
+        # print("w_sf_mu 1 min", w_sf_mu.min().item(), "w_sf_mu 1 max", w_sf_mu.max().item())
+
+        w_sf_mu = torch.softmax(w_sf_mu, dim=-1)
+        # print("w_sf_mu sum dim -2", w_sf_mu.sum(dim=-2).shape, w_sf_mu.sum(dim=-2))
+        # print("w_sf_mu sum dim -1", w_sf_mu.sum(dim=-1).shape, w_sf_mu.sum(dim=-1))
+        # print("w_sf_mu mean", w_sf_mu.mean().item(), "w_sf_mu std", w_sf_mu.std().item())
+        # print("w_sf_mu min", w_sf_mu.min().item(), "w_sf_mu max", w_sf_mu.max().item())
+        w_sf_mu = w_sf_mu * n_s_cells_per_location
+
+        return w_sf_mu
+
+    def proportion_factorisation_prior_on_w_sf(self, obs_plate):
+        # factorisation prior on w_sf models similarity in locations
+        # across cell types f and reflects the absolute scale of w_sf
+        n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
+        b_s_groups_per_location = self.b_s_groups_per_location_prior(obs_plate)
+
+        # cell group loadings
+        shape = self.ones_1_n_groups * b_s_groups_per_location / self.n_groups_tensor
+        rate = self.ones_1_n_groups
+        with obs_plate:
+            k = "z_sr_groups_factors"
+            z_sr_groups_factors = pyro.sample(
+                k,
+                dist.Gamma(shape, rate),  # .to_event(1)#.expand([self.n_groups]).to_event(1)
+            )  # (n_obs, n_groups)
+
+        c2f_shape = self.factors_per_groups / self.n_factors_tensor
+
+        x_fr_lambdas_group2fact = pyro.sample(
+            "x_fr_lambdas_group2fact",
+            dist.Gamma(c2f_shape, self.ones_1_n_groups.T).expand([self.n_groups, self.n_factors]).to_event(2),
+        )  # (self.n_groups, self.n_factors)
+
+        w_sf_mu = z_sr_groups_factors @ x_fr_lambdas_group2fact
+        w_sf_mu = w_sf_mu * torch.tensor(100.0, device=w_sf_mu.device)
+        # print("w_sf_mu 1 mean", w_sf_mu.mean().item(), "w_sf_mu 1 std", w_sf_mu.std().item())
+        # print("w_sf_mu 1 min", w_sf_mu.min().item(), "w_sf_mu 1 max", w_sf_mu.max().item())
+
+        w_sf_mu = w_sf_mu / w_sf_mu.sum(dim=-1, keepdim=True)
+        # print("w_sf_mu sum dim -2", w_sf_mu.sum(dim=-2).shape, w_sf_mu.sum(dim=-2))
+        # print("w_sf_mu sum dim -1", w_sf_mu.sum(dim=-1).shape, w_sf_mu.sum(dim=-1))
+        # print("w_sf_mu mean", w_sf_mu.mean().item(), "w_sf_mu std", w_sf_mu.std().item())
+        # print("w_sf_mu min", w_sf_mu.min().item(), "w_sf_mu max", w_sf_mu.max().item())
+        w_sf_mu = w_sf_mu * n_s_cells_per_location
+
+        return w_sf_mu
+
     def independent_prior_on_w_sf(self, obs_plate):
         n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
-        with obs_plate:
-            a_s_factors_per_location = pyro.sample(
-                "a_s_factors_per_location",
-                dist.Gamma(self.A_factors_per_location, self.ones),
-            )
+        a_s_factors_per_location = self.a_s_factors_per_location_prior(obs_plate)
 
         # cell group loadings
         shape = self.ones_1_n_factors * a_s_factors_per_location / self.n_factors_tensor
@@ -935,7 +1075,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         # =====================Cell abundances w_sf======================= #
         if not (self.use_cell_comm_prior_on_w_sf or self.use_independent_prior_on_w_sf):
-            w_sf_mu = self.factorisation_prior_on_w_sf(obs_plate)
+            if self.use_proportion_factorisation_prior_on_w_sf:
+                w_sf_mu = self.proportion_factorisation_prior_on_w_sf(obs_plate)
+            else:
+                w_sf_mu = self.factorisation_prior_on_w_sf(obs_plate)
             if self.use_learnable_mean_var_ratio:
                 w_sf_mean_var_ratio_hyp = pyro.sample(
                     "w_sf_mean_var_ratio_hyp",
