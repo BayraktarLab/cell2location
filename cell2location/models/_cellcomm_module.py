@@ -26,10 +26,8 @@ class CellCommModule(PyroModule):
     Here, :math:`w_{s,f}` denotes regression weight of each reference signature :math:`f` at location :math:`s`, which can be interpreted as the expected number of cells at location :math:`s` that express reference signature :math:`f`;
     :math:`g_{f,g}` denotes the reference signatures of cell types :math:`f` of each gene :math:`g`, `cell_state_df` input ;
     """
-    n_pathways = 150
     use_pathway_interaction_effect = True
     dropout_rate = 0.0
-    use_non_negative_weights = False
     min_distance = 25.0
     r_l_affinity_alpha_prior = 10.0
     use_global_cell_abundance_model = False
@@ -64,6 +62,8 @@ class CellCommModule(PyroModule):
         use_alpha_likelihood: bool = True,
         use_normal_likelihood: bool = False,
         fixed_w_sf_mean_var_ratio: Optional[float] = None,
+        use_non_negative_weights: bool = False,
+        n_pathways: int = 20,
     ):
         super().__init__()
 
@@ -72,6 +72,7 @@ class CellCommModule(PyroModule):
         self.n_factors = n_factors
         self.n_batch = n_batch
         self.n_hidden = n_hidden
+        self.n_pathways = n_pathways
 
         self.m_g_gene_level_prior = m_g_gene_level_prior
 
@@ -112,6 +113,7 @@ class CellCommModule(PyroModule):
         self.use_alpha_likelihood = use_alpha_likelihood
         self.use_normal_likelihood = use_normal_likelihood
         self.fixed_w_sf_mean_var_ratio = fixed_w_sf_mean_var_ratio
+        self.use_non_negative_weights = use_non_negative_weights
 
         self.weights = PyroModule()
 
@@ -377,13 +379,13 @@ class CellCommModule(PyroModule):
                 # {sr pair, location * cell type} -> {sr pair, location, cell type}
                 bound_receptor_abundance_src = rearrange(
                     bound_receptor_abundance_src,
-                    "r (c f) -> r c f",
+                    "r (c f) -> f c r",
                     f=self.receptor_abundance.shape[-1],
-                )
+                ).sum(-3)
                 if tiles_unexpanded is not None:
-                    bound_receptor_abundance_src = bound_receptor_abundance_src[:, obs_in_use, :]
+                    bound_receptor_abundance_src = bound_receptor_abundance_src[obs_in_use, :]
                 pyro.deterministic(
-                    "bound_receptor_abundance_sr_c_f",
+                    "bound_receptor_abundance_sr_c",
                     bound_receptor_abundance_src,
                 )
         if self.fixed_w_sf_mean_var_ratio is not None:

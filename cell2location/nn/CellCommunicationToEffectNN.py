@@ -183,7 +183,7 @@ class CellCommunicationToTfActivityNN(
             bayesian=True,
             use_non_negative_weights=non_negative,
             weights_prior_tau=weights_prior_tau,
-            use_horseshoe_prior=use_horseshoe_prior,
+            use_horseshoe_prior=use_horseshoe_prior and not non_negative,
         )
         if upper_triangle:
             if len(weights.shape) > 2:
@@ -328,7 +328,7 @@ class CellCommunicationToTfActivityNN(
             bayesian=True,
             # sample positive weights
             use_non_negative_weights=use_non_negative_weights,
-            use_horseshoe_prior=True,
+            use_horseshoe_prior=not use_non_negative_weights,
         )
 
         if self.receptor_tf_mask is not None:
