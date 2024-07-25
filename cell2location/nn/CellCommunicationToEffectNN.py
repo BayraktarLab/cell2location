@@ -53,6 +53,7 @@ class CellCommunicationToTfActivityNN(
 
     promoter_distance_prior = 50
     use_footprinting_masked_tn5_index = -1
+    n_spatial_domains = 5
 
     use_cached_effects = False
     cached_effects = dict()
@@ -1109,6 +1110,45 @@ class CellCommunicationToTfActivityNN(
 
         return bound_receptor_abundance_src
 
+    def diffusion_domain_function(
+        self,
+        signal_abundance: torch.Tensor,
+        w_sf: torch.Tensor,
+    ):
+        # Low dimensional diffusion limiter - for every signal limit where it can diffuse.
+        # Maybe this can lead to more reasonable distributions
+        # without requiring suppressing effects to get rid of the signal.
+        n_signals = signal_abundance.shape[-1]
+        n_cell_types = w_sf.shape[-1]
+
+        name = "diffusion_domain_function"
+        # x_cs = sum_q y_cq * y_qs
+        # y_qs ~ Beta(100, 1)
+        # y_cq = y_cq / sum_q y_cq
+        # y_cq = sum_f w_cf * y_fq  # maybe w_cf is lvl3 but better lvl5
+        # y_fq ~ Gamma(1, 1)
+        y_fq = self.get_dist_prior(
+            layer="",
+            name=f"{name}_y_fq",
+            weights_shape=[n_cell_types, self.n_spatial_domains],
+            prior_alpha=1.0,
+            prior_beta=1.0,
+            prior_fun=pyro.distributions.Gamma,
+        )
+        y_cq = torch.einsum("cf,fq->cq", w_sf, y_fq)
+        y_cq = y_cq / y_cq.sum(dim=-1, keepdim=True)
+        y_qs = self.get_dist_prior(
+            layer="",
+            name=f"{name}_y_qs",
+            weights_shape=[self.n_spatial_domains, n_signals],
+            prior_alpha=100.0,
+            prior_beta=1.0,
+            prior_fun=pyro.distributions.Beta,
+        )
+        x_cs = torch.einsum("cq,qs->cs", y_cq, y_qs)
+        signal_abundance = signal_abundance * x_cs
+        return signal_abundance
+
     def signal_receptor_occupancy_spatial(
         self,
         signal_abundance: torch.Tensor,
@@ -1116,6 +1156,9 @@ class CellCommunicationToTfActivityNN(
         distances: torch.Tensor = None,
         tiles: torch.Tensor = None,
         obs_plate=None,
+        obs_in_use=None,
+        w_sf: torch.Tensor = None,
+        use_diffusion_domain: bool = False,
     ):
         n_locations = signal_abundance.shape[-2]
         n_signals = signal_abundance.shape[-1]
@@ -1173,6 +1216,25 @@ class CellCommunicationToTfActivityNN(
                 signal_abundance,
                 signal_distance_effect_ss_b,
             )
+
+        if use_diffusion_domain:
+            signal_abundance = self.diffusion_domain_function(
+                signal_abundance=signal_abundance,
+                w_sf=w_sf,
+            )
+
+        if not self.training:
+            with obs_plate:
+                if obs_in_use is not None:
+                    pyro.deterministic(
+                        "signal_abundance_local",
+                        signal_abundance[obs_in_use, :],
+                    )
+                else:
+                    pyro.deterministic(
+                        "signal_abundance_local",
+                        signal_abundance,
+                    )
 
         # 2. Computing bound receptor concentrations using learnable a_{r,s} affinity ============
         # first reshape inputs to be locations * cell type specific

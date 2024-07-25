@@ -30,7 +30,6 @@ class CellCommModule(PyroModule):
     dropout_rate = 0.0
     min_distance = 25.0
     r_l_affinity_alpha_prior = 10.0
-    use_global_cell_abundance_model = False
     record_sr_occupancy = False
     use_spatial_receptor_info_remove_sp_signal = True
 
@@ -64,6 +63,8 @@ class CellCommModule(PyroModule):
         fixed_w_sf_mean_var_ratio: Optional[float] = None,
         use_non_negative_weights: bool = False,
         n_pathways: int = 20,
+        use_diffusion_domain: bool = False,
+        use_global_cell_abundance_model: bool = True,
     ):
         super().__init__()
 
@@ -114,6 +115,8 @@ class CellCommModule(PyroModule):
         self.use_normal_likelihood = use_normal_likelihood
         self.fixed_w_sf_mean_var_ratio = fixed_w_sf_mean_var_ratio
         self.use_non_negative_weights = use_non_negative_weights
+        self.use_diffusion_domain = use_diffusion_domain
+        self.use_global_cell_abundance_model = use_global_cell_abundance_model
 
         self.weights = PyroModule()
 
@@ -277,6 +280,9 @@ class CellCommModule(PyroModule):
         tiles,
         obs_plate,
         average_distance_prior=50.0,
+        obs_in_use=None,
+        w_sf=None,
+        use_diffusion_domain=False,
     ):
         # get module
         module = self.get_cell_communication_module(
@@ -292,6 +298,9 @@ class CellCommModule(PyroModule):
             distances,
             tiles,
             obs_plate,
+            obs_in_use=obs_in_use,
+            w_sf=w_sf,
+            use_diffusion_domain=use_diffusion_domain,
         )
         # compute cell abundance prediction
         w_sf_mu = module.signal_receptor_tf_effect_spatial(
@@ -321,6 +330,7 @@ class CellCommModule(PyroModule):
             positions=positions,
             in_tissue=in_tissue,
         )
+        obs_in_use = None
         if tiles_unexpanded is not None:
             tiles_in_use = (tiles.mean(0) > torch.tensor(0.99, device=tiles.device)).bool()
             obs_in_use = (tiles_unexpanded[:, tiles_in_use].sum(1) > torch.tensor(0.0, device=tiles.device)).bool()
@@ -373,6 +383,9 @@ class CellCommModule(PyroModule):
             tiles=tiles,
             average_distance_prior=self.average_distance_prior,
             obs_plate=obs_plate,
+            obs_in_use=obs_in_use,
+            w_sf=w_sf,
+            use_diffusion_domain=self.use_diffusion_domain,
         )
         if not self.training and self.record_sr_occupancy:
             with obs_plate:
@@ -382,7 +395,7 @@ class CellCommModule(PyroModule):
                     "r (c f) -> f c r",
                     f=self.receptor_abundance.shape[-1],
                 ).sum(-3)
-                if tiles_unexpanded is not None:
+                if obs_in_use is not None:
                     bound_receptor_abundance_src = bound_receptor_abundance_src[obs_in_use, :]
                 pyro.deterministic(
                     "bound_receptor_abundance_sr_c",
