@@ -126,6 +126,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         use_learnable_mean_var_ratio: bool = False,
         use_independent_prior_on_w_sf: bool = False,
         use_proportion_factorisation_prior_on_w_sf: bool = False,
+        use_n_s_cells_per_location_limit: bool = False,
         average_distance_prior: float = 50.0,
         distances: Optional[coo_matrix] = None,
         sliding_window_size: Optional[int] = 0,
@@ -177,6 +178,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.use_learnable_mean_var_ratio = use_learnable_mean_var_ratio
         self.use_independent_prior_on_w_sf = use_independent_prior_on_w_sf
         self.use_proportion_factorisation_prior_on_w_sf = use_proportion_factorisation_prior_on_w_sf
+        self.use_n_s_cells_per_location_limit = use_n_s_cells_per_location_limit
         self.average_distance_prior = average_distance_prior
         if distances is not None:
             distances = coo_matrix(distances)
@@ -417,6 +419,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 "a_s_factors_per_location": 1,
                 "z_sr_groups_factors": self.n_groups,
                 "w_sf": self.n_factors,
+                "w_sf_proportion": self.n_factors,
                 "prior_w_sf": self.n_factors,
                 "cell_compartment_w_sfk": (self.n_factors, int(self.n_cell_compartments - 1)),
                 "detection_y_s": 1,
@@ -945,7 +948,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # print("w_sf_mu min", w_sf_mu.min().item(), "w_sf_mu max", w_sf_mu.max().item())
         w_sf_mu = w_sf_mu * n_s_cells_per_location
 
-        return w_sf_mu
+        return w_sf_mu, n_s_cells_per_location
 
     def independent_prior_on_w_sf(self, obs_plate):
         n_s_cells_per_location = self.n_cells_per_location_prior(obs_plate)
@@ -1083,8 +1086,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         # =====================Cell abundances w_sf======================= #
         if not (self.use_cell_comm_prior_on_w_sf or self.use_independent_prior_on_w_sf):
+            n_s_cells_per_location = None
             if self.use_proportion_factorisation_prior_on_w_sf:
-                w_sf_mu = self.proportion_factorisation_prior_on_w_sf(obs_plate)
+                w_sf_mu, n_s_cells_per_location = self.proportion_factorisation_prior_on_w_sf(obs_plate)
             else:
                 w_sf_mu = self.factorisation_prior_on_w_sf(obs_plate)
             if self.use_learnable_mean_var_ratio:
@@ -1101,15 +1105,29 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 )
             else:
                 w_sf_mean_var_ratio = self.w_sf_mean_var_ratio_tensor
-            with obs_plate:
-                k = "w_sf"
-                w_sf = pyro.sample(
-                    k,
-                    dist.Gamma(
-                        w_sf_mu * w_sf_mean_var_ratio,
-                        w_sf_mean_var_ratio,
-                    ),
-                )  # (self.n_obs, self.n_factors)
+            if self.use_n_s_cells_per_location_limit:
+                with obs_plate:
+                    k = "w_sf_proportion"
+                    w_sf = pyro.sample(
+                        k,
+                        dist.Gamma(
+                            w_sf_mu * w_sf_mean_var_ratio,
+                            w_sf_mean_var_ratio,
+                        ),
+                    )  # (self.n_obs, self.n_factors)
+                    w_sf = w_sf / w_sf.sum(dim=-1, keepdim=True)
+                    w_sf = w_sf * n_s_cells_per_location
+                    pyro.deterministic("w_sf", w_sf)
+            else:
+                with obs_plate:
+                    k = "w_sf"
+                    w_sf = pyro.sample(
+                        k,
+                        dist.Gamma(
+                            w_sf_mu * w_sf_mean_var_ratio,
+                            w_sf_mean_var_ratio,
+                        ),
+                    )  # (self.n_obs, self.n_factors)
         elif self.use_cell_comm_prior_on_w_sf:
             w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
             # get lr abundance
