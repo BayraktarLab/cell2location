@@ -737,22 +737,30 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return w_sf_mu
 
     def n_cells_per_location_prior(self, obs_plate):
-        if self.N_cells_per_location_alpha_prior is not None:
-            n_s_cells_per_location_prior = pyro.sample(  # 1/2
-                "n_s_cells_per_location_prior",
-                dist.Exponential(
-                    self.N_cells_per_location_alpha_prior * self.ones,  # 2
+        if self.N_cells_per_location.shape[0] == self.n_obs:
+            with obs_plate as ind:
+                N_cells_per_location = self.N_cells_per_location[ind, :]
+            if self.N_cells_per_location_alpha_prior is not None:
+                n_s_cells_per_location_prior = self.N_cells_per_location_alpha_prior
+        else:
+            N_cells_per_location = self.N_cells_per_location
+            if self.N_cells_per_location_alpha_prior is not None:
+                n_s_cells_per_location_prior = pyro.sample(  # 1/2
+                    "n_s_cells_per_location_prior",
+                    dist.Exponential(
+                        self.N_cells_per_location_alpha_prior * self.ones,  # 2
+                    )
+                    .expand([1, 1])
+                    .to_event(2),
                 )
-                .expand([1, 1])
-                .to_event(2),
-            )
-            n_s_cells_per_location_prior = self.ones / n_s_cells_per_location_prior.pow(2)  # 4
+                n_s_cells_per_location_prior = self.ones / n_s_cells_per_location_prior.pow(2)  # 4
+        if self.N_cells_per_location_alpha_prior is not None:
             with obs_plate:
                 n_s_cells_per_location = pyro.sample(
                     "n_s_cells_per_location",
                     dist.Gamma(
                         n_s_cells_per_location_prior,
-                        n_s_cells_per_location_prior / self.N_cells_per_location,
+                        n_s_cells_per_location_prior / N_cells_per_location,
                     ),
                 )
         else:
@@ -761,7 +769,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                 n_s_cells_per_location = pyro.sample(
                     "n_s_cells_per_location",
                     dist.Gamma(
-                        self.N_cells_per_location * self.N_cells_mean_var_ratio,
+                        N_cells_per_location * self.N_cells_mean_var_ratio,
                         self.N_cells_mean_var_ratio,
                     ),
                 )
