@@ -64,7 +64,8 @@ class CellCommModule(PyroModule):
         use_non_negative_weights: bool = False,
         n_pathways: int = 20,
         use_diffusion_domain: bool = False,
-        use_global_cell_abundance_model: bool = True,
+        use_global_cell_abundance_model: bool = False,
+        use_max_distance_threshold: bool = False,
     ):
         super().__init__()
 
@@ -117,6 +118,7 @@ class CellCommModule(PyroModule):
         self.use_non_negative_weights = use_non_negative_weights
         self.use_diffusion_domain = use_diffusion_domain
         self.use_global_cell_abundance_model = use_global_cell_abundance_model
+        self.use_max_distance_threshold = use_max_distance_threshold
 
         self.weights = PyroModule()
 
@@ -292,6 +294,10 @@ class CellCommModule(PyroModule):
             average_distance_prior=average_distance_prior,
         )
         # compute LR occupancy
+        if self.use_max_distance_threshold:
+            max_distance_threshold = average_distance_prior * 10.0
+        else:
+            max_distance_threshold = None
         bound_receptor_abundance_src = module.signal_receptor_occupancy_spatial(
             signal_abundance,
             receptor_abundance,
@@ -301,6 +307,7 @@ class CellCommModule(PyroModule):
             obs_in_use=obs_in_use,
             w_sf=w_sf,
             use_diffusion_domain=use_diffusion_domain,
+            max_distance_threshold=max_distance_threshold,
         )
         # compute cell abundance prediction
         w_sf_mu = module.signal_receptor_tf_effect_spatial(

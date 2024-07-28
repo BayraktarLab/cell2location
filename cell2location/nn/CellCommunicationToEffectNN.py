@@ -532,8 +532,8 @@ class CellCommunicationToTfActivityNN(
             layer=layer,
             name=name_,
             weights_shape=weights_shape,
-            prior_alpha=5.0,
-            prior_beta=5.0 / 5.0,
+            prior_alpha=2.0,
+            prior_beta=2.0 / 1.0,
             prior_fun=pyro.distributions.Gamma,
         )
         name_ = f"{name}DistanceGammaDistance"  # strictly positive
@@ -1159,6 +1159,7 @@ class CellCommunicationToTfActivityNN(
         obs_in_use=None,
         w_sf: torch.Tensor = None,
         use_diffusion_domain: bool = False,
+        max_distance_threshold: float = None,
     ):
         n_locations = signal_abundance.shape[-2]
         n_signals = signal_abundance.shape[-1]
@@ -1211,6 +1212,12 @@ class CellCommunicationToTfActivityNN(
             if tiles is not None:
                 tiles_mask = tiles @ tiles.T
                 signal_distance_effect_ss_b = torch.einsum("sop,op->sop", signal_distance_effect_ss_b, tiles_mask)
+            if max_distance_threshold is not None:
+                signal_distance_effect_ss_b = torch.einsum(
+                    "sop,op->sop",
+                    signal_distance_effect_ss_b,
+                    (distances < torch.tensor(max_distance_threshold, device=distances.device)).float(),
+                )
             signal_abundance = torch.einsum(
                 "ps,sop->os",
                 signal_abundance,

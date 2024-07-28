@@ -19,6 +19,7 @@ def heatmap(
     title="",
     vmin=None,
     vmax=None,
+    vcenter=None,
 ):
     r"""Plot heatmap with row and column labels using plt.imshow
 
@@ -38,9 +39,13 @@ def heatmap(
 
     array = np.array(array)
     if log:
-        plt.imshow(array, interpolation="nearest", cmap=cmap, norm=matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax))
+        norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
     else:
-        plt.imshow(array, interpolation="nearest", cmap=cmap)
+        if vcenter is None:
+            norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+        else:
+            norm = matplotlib.colors.TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+    plt.imshow(array, interpolation="nearest", cmap=cmap, norm=norm)
 
     if cbar is True:
         plt.colorbar()
@@ -163,6 +168,7 @@ def clustermap(
     array_size=None,
     vmin=None,
     vmax=None,
+    vcenter=None,
 ):
     r"""Plot heatmap with hierarchically clustered rows and columns using `cell2location.plt.plot_heatmap.heatmap()`
     and `cell2location.plt.plot_heatmap.dotplot()`.
@@ -216,6 +222,7 @@ def clustermap(
             title=title,
             vmin=vmin,
             vmax=vmax,
+            vcenter=vcenter,
         )
     elif fun_type == "dotplot":
         # plot dotplot
