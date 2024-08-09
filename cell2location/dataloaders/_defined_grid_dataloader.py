@@ -64,8 +64,12 @@ def assign_tiles_to_locations(
         adata.obs["tiles"] = ""
     for batch in adata.obs[batch_key].unique():
         adata_batch = adata[adata.obs[batch_key] == batch, :].copy()
-        x_start_positions = np.arange(0, np.max(adata_batch.obsm[spatial_key][:, 0]), step=rows)
-        y_start_positions = np.arange(0, np.max(adata_batch.obsm[spatial_key][:, 1]), step=cols)
+        x_start_positions = np.arange(
+            np.min(adata_batch.obsm[spatial_key][:, 0]), np.max(adata_batch.obsm[spatial_key][:, 0]), step=rows
+        )
+        y_start_positions = np.arange(
+            np.min(adata_batch.obsm[spatial_key][:, 1]), np.max(adata_batch.obsm[spatial_key][:, 1]), step=cols
+        )
         ind_x = np.digitize(adata_batch.obsm[spatial_key][:, 0], x_start_positions)
         ind_y = np.digitize(adata_batch.obsm[spatial_key][:, 1], y_start_positions)
         adata.obs.loc[adata.obs[batch_key] == batch, "tiles"] = (

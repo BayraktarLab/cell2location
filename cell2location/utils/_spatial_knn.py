@@ -22,10 +22,13 @@ def from_c2l_get_lr_abundance(
     use_normalisation_per_signal: bool = False,
     use_normalisation_per_receptor: bool = False,
 ):
-    obs_names = np.intersect1d(adata_vis.obs_names, adata_vis.uns["mod"]["obs_names"])
-    obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
-    # obs_names = adata_vis.uns["mod"]["obs_names"][obs_bool]
-    assert np.all(adata_vis.uns["mod"]["obs_names"][obs_bool] == obs_names)
+    if np.all(adata_vis.obs_names == adata_vis.uns["mod"]["obs_names"]):
+        obs_bool = np.ones_like(adata_vis.obs_names, dtype=bool)
+        obs_names = adata_vis.obs_names
+    else:
+        obs_names = np.intersect1d(adata_vis.obs_names, adata_vis.uns["mod"]["obs_names"])
+        obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
+        assert np.all(adata_vis.uns["mod"]["obs_names"][obs_bool] == obs_names)
     assert np.all(adata_vis.var_names.values.astype("str") == adata_vis.uns["mod"]["var_names"].astype("str"))
     var_names = adata_vis.uns["mod"]["var_names"]
     adata_vis = adata_vis[obs_names]

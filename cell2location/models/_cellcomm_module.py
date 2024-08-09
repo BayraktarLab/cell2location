@@ -62,7 +62,7 @@ class CellCommModule(PyroModule):
         use_normal_likelihood: bool = False,
         fixed_w_sf_mean_var_ratio: Optional[float] = None,
         use_non_negative_weights: bool = False,
-        n_pathways: int = 20,
+        n_pathways: int = 50,
         use_diffusion_domain: bool = False,
         use_global_cell_abundance_model: bool = False,
         use_max_distance_threshold: bool = False,

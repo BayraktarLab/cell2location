@@ -250,7 +250,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             assert (
                 N_cells_per_location.shape[0] == self.n_obs
             ), "N_cells_per_location must have shape (n_obs, 1) or be a scalar"
-        self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
+        self.register_buffer("N_cells_per_location", torch.tensor(np.array([N_cells_per_location], dtype="float32")))
         self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
         self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
@@ -740,7 +740,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         return w_sf_mu
 
     def n_cells_per_location_prior(self, obs_plate):
-        if self.N_cells_per_location.shape[0] == self.n_obs:
+        if len(self.N_cells_per_location) == self.n_obs:
             with obs_plate as ind:
                 N_cells_per_location = self.N_cells_per_location[ind, :]
             if self.N_cells_per_location_alpha_prior is not None:
