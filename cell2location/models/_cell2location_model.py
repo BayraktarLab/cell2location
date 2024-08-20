@@ -85,6 +85,12 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         self.n_factors_ = cell_state_df.shape[1]
         self.factor_names_ = cell_state_df.columns.values
 
+        # annotations for extra categorical covariates
+        if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry:
+            self.extra_categoricals_ = self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY)
+            self.n_extra_categoricals_ = self.extra_categoricals_.n_cats_per_key
+            model_kwargs["n_extra_categoricals"] = self.n_extra_categoricals_
+
         if not detection_mean_per_sample:
             # compute expected change in sensitivity (m_g in V1 or y_s in V2)
             sc_total = cell_state_df.sum(0).mean()

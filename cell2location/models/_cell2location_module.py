@@ -93,6 +93,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         n_factors,
         n_batch,
         cell_state_mat,
+        n_extra_categoricals: int = None,
         n_groups: int = 50,
         detection_mean=1 / 2,
         detection_alpha=20.0,
@@ -110,6 +111,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             "beta": 100.0,
         },
         detection_hyp_prior={"mean_alpha": 10.0},
+        gene_tech_prior={"mean": 1, "alpha": 200},
         detection_cell_type_prior_alpha=10.0,
         use_per_cell_type_normalisation: bool = False,
         w_sf_mean_var_ratio=5.0,
@@ -146,6 +148,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.n_vars = n_vars
         self.n_factors = n_factors
         self.n_batch = n_batch
+        self.n_extra_categoricals = n_extra_categoricals
         self.n_groups = n_groups
         self.n_hidden = n_hidden
 
@@ -215,6 +218,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         factors_per_groups = A_factors_per_location / B_groups_per_location
 
+        if n_extra_categoricals is not None:
+            self.gene_tech_prior = gene_tech_prior
+            self.register_buffer(
+                "gene_tech_prior_alpha",
+                torch.tensor(self.gene_tech_prior["alpha"]),
+            )
+            self.register_buffer(
+                "gene_tech_prior_beta",
+                torch.tensor(self.gene_tech_prior["alpha"] / self.gene_tech_prior["mean"]),
+            )
+
         self.register_buffer(
             "detection_hyp_prior_alpha",
             torch.tensor(self.detection_hyp_prior["alpha"]),
@@ -250,7 +264,9 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             assert (
                 N_cells_per_location.shape[0] == self.n_obs
             ), "N_cells_per_location must have shape (n_obs, 1) or be a scalar"
-        self.register_buffer("N_cells_per_location", torch.tensor(np.array([N_cells_per_location], dtype="float32")))
+        if isinstance(N_cells_per_location, float) or isinstance(N_cells_per_location, int):
+            N_cells_per_location = np.array([N_cells_per_location], dtype="float32")
+        self.register_buffer("N_cells_per_location", torch.tensor(N_cells_per_location))
         self.register_buffer("A_factors_per_location", torch.tensor(A_factors_per_location))
         self.register_buffer("factors_per_groups", torch.tensor(factors_per_groups))
         self.register_buffer("B_groups_per_location", torch.tensor(B_groups_per_location))
@@ -326,6 +342,8 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             kwargs["normalising_factor_y_s"] = tensor_dict["normalising_factor_y_s"]
         if "x_data_normalised" in tensor_dict.keys():
             kwargs["x_data_normalised"] = tensor_dict["x_data_normalised"]
+        if REGISTRY_KEYS.CAT_COVS_KEY in tensor_dict.keys():
+            kwargs["extra_categoricals"] = tensor_dict[REGISTRY_KEYS.CAT_COVS_KEY]
         return (x_data, ind_x, batch_index), kwargs
 
     def create_plates(
@@ -339,6 +357,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         in_tissue: torch.Tensor = None,
         normalising_factor_y_s: Optional[torch.Tensor] = None,
         x_data_normalised: Optional[torch.Tensor] = None,
+        extra_categoricals: Optional[torch.Tensor] = None,
     ):
         return pyro.plate("obs_plate", size=self.n_obs, dim=-2, subsample=idx)
 
@@ -979,6 +998,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         in_tissue: torch.Tensor = None,
         normalising_factor_y_s: Optional[torch.Tensor] = None,
         x_data_normalised: Optional[torch.Tensor] = None,
+        extra_categoricals: Optional[torch.Tensor] = None,
     ):
         if tiles_unexpanded is not None:
             tiles_in_use = tiles.sum(0).bool()
@@ -994,6 +1014,17 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         #    if positions is not None:
         #        positions = self.crop_according_to_valid_padding(positions)
         obs2sample = one_hot(batch_index, self.n_batch).float()
+        if self.n_extra_categoricals is not None:
+            obs2extra_categoricals = torch.cat(
+                [
+                    one_hot(
+                        extra_categoricals[:, i].view((extra_categoricals.shape[0], 1)),
+                        n_cat,
+                    )
+                    for i, n_cat in enumerate(self.n_extra_categoricals)
+                ],
+                dim=1,
+            ).float()
         obs_plate = self.create_plates(
             x_data,
             idx,
@@ -1004,6 +1035,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             in_tissue,
             normalising_factor_y_s,
             x_data_normalised,
+            extra_categoricals,
         )
         if tiles is not None:
             n_tiles = tiles.shape[1]
@@ -1045,6 +1077,20 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             "m_g",
             dist.Gamma(m_g_alpha_e, m_g_alpha_e / m_g_mean).expand([1, self.n_vars]).to_event(2),  # self.m_g_mu_hyp)
         )  # (1, n_vars)
+
+        # =====================Gene-specific multiplicative component ======================= #
+        # `y_{t, g}` per gene multiplicative effect that explains the difference
+        # in sensitivity between genes in each technology or covariate effect
+        if self.n_extra_categoricals is not None:
+            detection_tech_gene_tg = pyro.sample(
+                "detection_tech_gene_tg",
+                dist.Gamma(
+                    self.ones * self.gene_tech_prior_alpha,
+                    self.ones * self.gene_tech_prior_beta,
+                )
+                .expand([np.sum(self.n_extra_categoricals), self.n_vars])
+                .to_event(2),
+            )
 
         # =====================Location-specific detection efficiency ======================= #
         # y_s with hierarchical mean prior
@@ -1321,6 +1367,10 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
             # total_count, logits = _convert_mean_disp_to_counts_logits(
             #    mu, alpha, eps=self.eps
             # )
+
+            if self.n_extra_categoricals is not None:
+                # gene-specific normalisation for covatiates
+                mu = mu * (obs2extra_categoricals @ detection_tech_gene_tg)
 
             # =====================DATA likelihood ======================= #
             # Likelihood (sampling distribution) of data_target & add overdispersion via NegativeBinomial
