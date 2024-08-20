@@ -8,11 +8,9 @@ import torch
 from einops import rearrange
 from pyro.infer.autoguide.utils import deep_getattr, deep_setattr
 from pyro.nn import PyroModule
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix
 from scvi import REGISTRY_KEYS
 from scvi.nn import one_hot
-
-from cell2location.nn.CellCommunicationToEffectNN import CellCommunicationToTfActivityNN
 
 
 class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel(PyroModule):
@@ -118,8 +116,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         init_vals: Optional[dict] = None,
         init_alpha: float = 20.0,
         dropout_p: float = 0.0,
-        use_cell_comm_prior_on_w_sf: bool = False,
-        use_cell_comm_likelihood_w_sf: bool = False,
         signal_bool: Optional[np.ndarray] = None,
         receptor_bool: Optional[np.ndarray] = None,
         receptor_bool_b: Optional[np.ndarray] = None,
@@ -129,8 +125,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         use_independent_prior_on_w_sf: bool = False,
         use_proportion_factorisation_prior_on_w_sf: bool = False,
         use_n_s_cells_per_location_limit: bool = False,
-        average_distance_prior: float = 50.0,
-        distances: Optional[coo_matrix] = None,
         sliding_window_size: Optional[int] = 0,
         amortised_sliding_window_size: Optional[int] = 0,
         sliding_window_size_list: Optional[list] = None,
@@ -166,8 +160,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         if self.dropout_p is not None:
             self.dropout = torch.nn.Dropout(p=self.dropout_p)
 
-        self.use_cell_comm_prior_on_w_sf = use_cell_comm_prior_on_w_sf
-        self.use_cell_comm_likelihood_w_sf = use_cell_comm_likelihood_w_sf
         if signal_bool is not None:
             self.register_buffer("signal_bool", torch.tensor(signal_bool.astype("int32")))
         if receptor_bool is not None:
@@ -182,18 +174,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         self.use_independent_prior_on_w_sf = use_independent_prior_on_w_sf
         self.use_proportion_factorisation_prior_on_w_sf = use_proportion_factorisation_prior_on_w_sf
         self.use_n_s_cells_per_location_limit = use_n_s_cells_per_location_limit
-        self.average_distance_prior = average_distance_prior
-        if distances is not None:
-            distances = coo_matrix(distances)
-            self.distances_scipy = distances
-            self.register_buffer(
-                "distances",
-                torch.sparse_coo_tensor(
-                    torch.tensor(np.array([distances.row, distances.col])),
-                    torch.tensor(distances.data.astype("float32")),
-                    distances.shape,
-                ),
-            )
         self.sliding_window_size = (
             sliding_window_size if sliding_window_size_list is None else max(sliding_window_size_list)
         )
@@ -686,78 +666,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
 
         return x
 
-    def get_cell_communication_module(
-        self,
-        name,
-        output_transform="softplus",
-        n_out: int = 1,
-        average_distance_prior: float = 50.0,
-    ):
-        # create module if it doesn't exist
-        if getattr(self.weights, name, None) is None:
-            deep_setattr(
-                self.weights,
-                name,
-                CellCommunicationToTfActivityNN(
-                    name=name,
-                    mode="signal_receptor_tf_effect_spatial",
-                    output_transform=output_transform,
-                    n_tfs=self.n_factors,
-                    n_signals=len(self.signal_bool),
-                    n_receptors=len(self.receptor_bool),
-                    n_out=n_out,
-                    n_pathways=self.n_pathways,
-                    signal_receptor_mask=self.signal_receptor_mask,  # tells which receptors can bind which ligands
-                    receptor_tf_mask=self.receptor_tf_mask,  # tells which receptors can influence which TF (eg nuclear receptor = TF)
-                    dropout_rate=self.dropout_rate,
-                    use_horseshoe_prior=True,
-                    use_gamma_horseshoe_prior=False,
-                    weights_prior_tau=0.1,
-                    use_pathway_interaction_effect=self.use_pathway_interaction_effect,
-                    average_distance_prior=average_distance_prior,
-                    use_non_negative_weights=self.use_non_negative_weights,
-                ),
-            )
-        # get module
-        return deep_getattr(self.weights, name)
-
-    def get_lr_abundance(self, d_sg, m_g, y_s):
-        # get lr abundance
-        signal_abundance = d_sg[:, self.signal_bool] / y_s
-        receptor_abundance = torch.minimum(
-            (self.cell_state * m_g)[:, self.receptor_bool], (self.cell_state * m_g)[:, self.receptor_bool_b]
-        )
-
-        return signal_abundance.detach(), receptor_abundance.detach()
-
-    def cell_comm_effect(
-        self,
-        signal_abundance,
-        receptor_abundance,
-        distances,
-        obs_plate,
-        average_distance_prior=50.0,
-    ):
-        # get module
-        module = self.get_cell_communication_module(
-            name="lr2abundance",
-            output_transform="softplus",
-            n_out=1,
-            average_distance_prior=average_distance_prior,
-        )
-        # compute LR occupancy
-        bound_receptor_abundance_src = module.signal_receptor_occupancy_spatial(
-            signal_abundance,
-            receptor_abundance,
-            distances,
-            obs_plate,
-        )
-        # compute cell abundance prediction
-        w_sf_mu = module.signal_receptor_tf_effect_spatial(
-            bound_receptor_abundance_src,
-        )
-        return w_sf_mu
-
     def n_cells_per_location_prior(self, obs_plate):
         if len(self.N_cells_per_location) == self.n_obs:
             with obs_plate as ind:
@@ -1044,17 +952,6 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         if in_tissue is None:
             in_tissue = self.ones_1d.expand((x_data.shape[0], 1)).bool()
 
-        if getattr(self, "distances", None) is not None:
-            distances = self.distances
-        elif positions is not None:
-            # compute distance using positions [observations, 2]
-            distances = (
-                (positions.unsqueeze(1) - positions.unsqueeze(0))  # [observations, 1, 2]  # [1, observations, 2]
-                .pow(2)
-                .sum(-1)
-                .sqrt()
-            ) + torch.tensor(25.0, device=positions.device)
-
         # =====================Gene expression level scaling m_g======================= #
         # Explains difference in sensitivity for each gene between single cell and spatial technology
         m_g_mean = pyro.sample(
@@ -1131,7 +1028,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         #    pyro.deterministic("aggregated_detection_y_s", detection_y_s)
 
         # =====================Cell abundances w_sf======================= #
-        if not (self.use_cell_comm_prior_on_w_sf or self.use_independent_prior_on_w_sf):
+        if not self.use_independent_prior_on_w_sf:
             n_s_cells_per_location = None
             if self.use_proportion_factorisation_prior_on_w_sf:
                 w_sf_mu, n_s_cells_per_location = self.proportion_factorisation_prior_on_w_sf(obs_plate)
@@ -1174,91 +1071,11 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
                             w_sf_mean_var_ratio,
                         ),
                     )  # (self.n_obs, self.n_factors)
-        elif self.use_cell_comm_prior_on_w_sf:
-            w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
-            # get lr abundance
-            signal_abundance, receptor_abundance = self.get_lr_abundance(
-                x_data,
-                m_g,
-                detection_y_s,
-            )
-            w_sf_mu_cell_comm = self.cell_comm_effect(
-                signal_abundance=signal_abundance,
-                receptor_abundance=receptor_abundance,
-                distances=distances,
-                average_distance_prior=self.average_distance_prior,
-                obs_plate=obs_plate,
-            )
-            w_sf_mean_var_ratio_hyp = pyro.sample(
-                "w_sf_mean_var_ratio_hyp",
-                dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
-            )
-            w_sf_mean_var_ratio = pyro.sample(
-                "w_sf_mean_var_ratio",
-                dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
-            )  # (1, self.n_vars)
-            w_sf_mean_var_ratio = self.ones / (
-                w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
-            )
-            if tiles_unexpanded is not None:
-                x_data = x_data[obs_in_use]
-                w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
-            with obs_plate:
-                k = "w_sf"
-                pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
-                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
-                w_sf = pyro.sample(
-                    f"{k}_obs",
-                    dist.Gamma(
-                        w_sf_mu_cell_comm * w_sf_mean_var_ratio,
-                        w_sf_mean_var_ratio,
-                    ),
-                    obs=w_sf_mu,
-                )  # (self.n_obs, self.n_factors)
         elif self.use_independent_prior_on_w_sf:
             w_sf_mu = self.independent_prior_on_w_sf(obs_plate)
             with obs_plate:
                 k = "w_sf"
                 w_sf = pyro.deterministic(k, w_sf_mu)  # (self.n_obs, self.n_factors)
-
-        if self.use_cell_comm_likelihood_w_sf:
-            signal_abundance, receptor_abundance = self.get_lr_abundance(
-                x_data,
-                m_g,
-                detection_y_s,
-            )
-            w_sf_mu_cell_comm = self.cell_comm_effect(
-                signal_abundance=signal_abundance,
-                receptor_abundance=receptor_abundance,
-                distances=distances,
-                average_distance_prior=self.average_distance_prior,
-                obs_plate=obs_plate,
-            )
-            w_sf_mean_var_ratio_hyp = pyro.sample(
-                "w_sf_mean_var_ratio_hyp_lik",
-                dist.Gamma(self.w_sf_mean_var_ratio_tensor, self.ones).expand([1, 1]).to_event(2),
-            )
-            w_sf_mean_var_ratio = pyro.sample(
-                "w_sf_mean_var_ratio_lik",
-                dist.Exponential(w_sf_mean_var_ratio_hyp).expand([1, self.n_factors]).to_event(2),
-            )  # (self.n_batch, self.n_vars)
-            w_sf_mean_var_ratio = self.ones / (
-                w_sf_mean_var_ratio + torch.tensor(1.0 / 20.0, device=w_sf_mean_var_ratio.device)
-            )
-            if tiles_unexpanded is not None:
-                x_data = x_data[obs_in_use]
-                w_sf_mu_cell_comm = w_sf_mu_cell_comm[obs_in_use]
-            with obs_plate:
-                k = "w_sf"
-                pyro.deterministic(f"{k}_cell_comm", w_sf_mu_cell_comm)  # (self.n_obs, self.n_factors)
-                pyro.sample(
-                    f"{k}_obs",
-                    dist.Gamma(
-                        w_sf_mu_cell_comm * w_sf_mean_var_ratio,
-                        w_sf_mean_var_ratio,
-                    ),
-                    obs=w_sf.detach(),
-                )  # (self.n_obs, self.n_factors)
 
         if self.use_cell_compartments:
             with obs_plate:
