@@ -1,10 +1,15 @@
-import dask
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
 
-def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
+def compute_cluster_averages(
+    adata,
+    labels,
+    use_raw=True,
+    layer=None,
+    use_dask=False,
+):
     """
     Compute average expression of each gene in each cluster
 
@@ -45,10 +50,16 @@ def compute_cluster_averages(adata, labels, use_raw=True, layer=None):
     averages_mat = np.zeros((1, x.shape[1]))
 
     for c in all_clusters:
-        with dask.config.set(**{"array.slicing.split_large_chunks": False}):
+        if use_dask:
+            from dask import config
+            from dask.array.core import Array
+
+            with config.set(**{"array.slicing.split_large_chunks": False}):
+                cur_data = x[np.isin(adata.obs[labels], c), :]
+                if isinstance(cur_data, Array):
+                    cur_data = cur_data.compute()
+        else:
             cur_data = x[np.isin(adata.obs[labels], c), :]
-            if isinstance(cur_data, dask.array.core.Array):
-                cur_data = cur_data.compute()
         sparse_subset = csr_matrix(cur_data)
         aver = sparse_subset.mean(0)
         averages_mat = np.concatenate((averages_mat, aver))
