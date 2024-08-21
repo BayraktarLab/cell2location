@@ -118,7 +118,7 @@ def compute_weighted_average_around_target(
             source_cell_type_data,
             index=adata.obs_names,
             columns=source_names,
-        )
+        ).astype("float32")
         # get normalising quantile values
         source_normalisation_quantile = source_cell_type_data.quantile(normalisation_quantile, axis=0)
         # compute average abundance above this quantile
@@ -151,7 +151,7 @@ def compute_weighted_average_around_target(
             # to account for locations with no neighbours within a bin (sum == 0)
             data_[np.isnan(data_)] = 0
             # complete the average for a given sample
-            source_cell_type_data.loc[sample_ind, :] = data_
+            source_cell_type_data.loc[sample_ind, :] = data_.astype("float32")
     # normalise data by normalising quantile (global value across distance bins)
     source_cell_type_data = source_cell_type_data / source_normalisation_quantile
     # account for cases of undetected signal
@@ -183,8 +183,9 @@ def compute_weighted_average_around_target(
 
         weighted_avg_ = pd.Series(weighted_avg_, name=ct, index=source_names)
 
-        # hack to make self interactions less apparent
-        weighted_avg_[ct] = weighted_avg_[~weighted_avg_.index.isin([ct])].max() + 0.02
+        if genes_to_use_as_source is None:
+            # hack to make self interactions less apparent
+            weighted_avg_[ct] = (weighted_avg_[~weighted_avg_.index.isin([ct])].max() + 0.02).astype("float32")
         # complete the results dataframe
         weighted_avg.loc[f"target {ct}", :] = weighted_avg_
 

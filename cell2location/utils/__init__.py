@@ -2,7 +2,12 @@ import sys
 
 import numpy as np
 
-from ._spatial_knn import spatial_neighbours, sum_neighbours
+from ._spatial_knn import (
+    from_c2l_get_lr_abundance,
+    make_spatial_neighbours,
+    spatial_neighbours,
+    sum_neighbours,
+)
 from .filtering import filter_genes
 
 
@@ -14,11 +19,15 @@ def select_slide(adata, s, batch_key="sample"):
     :param batch_key: column in adata.obs listing experiment name for each location
     """
 
-    slide = adata[adata.obs[batch_key].isin([s]), :].copy()
+    slide = adata[adata.obs[batch_key].isin([s]), :]
     s_keys = list(slide.uns["spatial"].keys())
     s_spatial = np.array(s_keys)[[s in k for k in s_keys]][0]
 
-    slide.uns["spatial"] = {s_spatial: slide.uns["spatial"][s_spatial]}
+    spatial = {s_spatial: slide.uns["spatial"][s_spatial]}
+    del slide.uns["spatial"]
+
+    slide = slide.copy()
+    slide.uns["spatial"] = spatial
 
     return slide
 
@@ -46,4 +55,6 @@ __all__ = [
     "spatial_neighbours",
     "sum_neighbours",
     "list_imported_modules",
+    "make_spatial_neighbours",
+    "from_c2l_get_lr_abundance",
 ]

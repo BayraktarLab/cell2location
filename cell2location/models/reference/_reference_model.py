@@ -33,8 +33,6 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
     ----------
     adata
         single-cell AnnData object that has been registered via :func:`~scvi.data.setup_anndata`.
-    use_gpu
-        Use the GPU?
     **model_kwargs
         Keyword args for :class:`~scvi.external.LocationModelLinearDependentWMultiExperimentModel`
 

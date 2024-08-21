@@ -1,6 +1,8 @@
 from copy import deepcopy
-from typing import Callable, Literal, Optional, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
+import numpy as np
+import pyro
 import pyro.distributions as dist
 import torch
 from pyro.distributions.distribution import Distribution
@@ -348,6 +350,21 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 linear_scale_encoder = deep_getattr(self.hidden2scales, f"{name}.encoder")
                 loc = linear_loc(linear_loc_encoder(*x_in))
                 scale = self.softplus(linear_scale(linear_scale_encoder(*x_in)) + self._init_scale_unconstrained)
+            # determine parameter dimensions
+            out_dim = self.amortised_plate_sites["sites"][name]
+            if isinstance(out_dim, tuple):
+                from string import ascii_lowercase
+
+                from einops import rearrange
+
+                variables = [ascii_lowercase[i] for i in range(len(out_dim))]
+                variables_str = " ".join(variables)
+                loc = rearrange(
+                    loc, f"z ({variables_str}) -> z {variables_str}", **{v: dim for v, dim in zip(variables, out_dim)}
+                )
+                scale = rearrange(
+                    scale, f"z ({variables_str}) -> z {variables_str}", **{v: dim for v, dim in zip(variables, out_dim)}
+                )
             if (self._hierarchical_sites is None) or (name in self._hierarchical_sites):
                 if self.weight_type == "element-wise":
                     # weight is element-wise
@@ -358,6 +375,12 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                         linear_weight_encoder = deep_getattr(self.hidden2weights, f"{name}.encoder")
                         weight = self.softplus(
                             linear_weight(linear_weight_encoder(hidden)) + self._init_weight_unconstrained
+                        )
+                    if isinstance(out_dim, tuple):
+                        weight = rearrange(
+                            weight,
+                            f"z ({variables_str}) -> z {variables_str}",
+                            **{v: dim for v, dim in zip(variables, out_dim)},
                         )
                 if self.weight_type == "scalar":
                     # weight is a single value parameter
@@ -385,6 +408,8 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
                 n_hidden = self.n_hidden["single"]
             # determine parameter dimensions
             out_dim = self.amortised_plate_sites["sites"][name]
+            if isinstance(out_dim, tuple):
+                out_dim = np.product(out_dim)
 
         deep_setattr(
             self,
@@ -566,3 +591,56 @@ class AutoAmortisedHierarchicalNormalMessenger(AutoHierarchicalNormalMessenger):
         log_qz = log_sum_exp(log_density, dim=1) - torch.log(x_batch)
 
         return (neg_entropy - log_qz.mean(-1)).item()
+
+
+class AutoNormalMessenger(pyro.infer.autoguide.AutoNormalMessenger):
+    def __init__(
+        self,
+        model: Callable,
+        *,
+        init_loc_fn: Callable = init_to_mean(fallback=init_to_feasible),
+        init_scale: float = 0.1,
+        amortized_plates: Tuple[str, ...] = (),
+    ):
+        if not isinstance(init_scale, float) or not (init_scale > 0):
+            raise ValueError("Expected init_scale > 0. but got {}".format(init_scale))
+        super().__init__(model, amortized_plates=amortized_plates)
+        self.init_loc_fn = init_loc_fn
+        self._init_scale = init_scale
+        self._computing_median = False
+        self._computing_quantiles = False
+
+    def get_posterior(
+        self,
+        name: str,
+        prior: Distribution,
+    ) -> Union[Distribution, torch.Tensor]:
+        if self._computing_quantiles:
+            return self._get_posterior_quantiles(name, prior)
+        if self._computing_median:
+            return self._get_posterior_median(name, prior)
+
+        with helpful_support_errors({"name": name, "fn": prior}):
+            transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        posterior = dist.TransformedDistribution(
+            dist.Normal(loc, scale).to_event(transform.domain.event_dim),
+            transform.with_cache(),
+        )
+        return posterior
+
+    def quantiles(self, quantiles, *args, **kwargs):
+        self._computing_quantiles = True
+        self._quantile_values = quantiles
+        try:
+            return self(*args, **kwargs)
+        finally:
+            self._computing_quantiles = False
+
+    @torch.no_grad()
+    def _get_posterior_quantiles(self, name, prior):
+        transform = biject_to(prior.support)
+        loc, scale = self._get_params(name, prior)
+        site_quantiles = torch.tensor(self._quantile_values, dtype=loc.dtype, device=loc.device)
+        site_quantiles_values = dist.Normal(loc, scale).icdf(site_quantiles)
+        return transform(site_quantiles_values)

@@ -1,8 +1,114 @@
 import numpy as np
+import pandas as pd
+import scanpy as sc
 from scipy.sparse import coo_matrix
 from scipy.spatial import cKDTree
 from sklearn.neighbors import KDTree
 from umap.umap_ import fuzzy_simplicial_set
+
+
+def from_c2l_get_lr_abundance(
+    adata_vis,
+    cell_state,
+    signal_bool,
+    receptor_bool,
+    receptor_bool_b,
+    signal_receptor_mask,
+    top_n: int = 20,
+    scale_receptor_abundance_by_m_g: bool = False,
+    post_sample_name: str = "post_sample_q05",
+    use_normalisation_by_y_s: bool = False,
+    use_normalisation_by_total: bool = False,
+    use_normalisation_per_signal: bool = False,
+    use_normalisation_per_receptor: bool = False,
+):
+    if np.all(adata_vis.obs_names == adata_vis.uns["mod"]["obs_names"]):
+        obs_bool = np.ones_like(adata_vis.obs_names, dtype=bool)
+        obs_names = adata_vis.obs_names
+    else:
+        obs_names = np.intersect1d(adata_vis.obs_names, adata_vis.uns["mod"]["obs_names"])
+        obs_bool = np.isin(adata_vis.uns["mod"]["obs_names"], obs_names)
+        assert np.all(adata_vis.uns["mod"]["obs_names"][obs_bool] == obs_names)
+    assert np.all(adata_vis.var_names.values.astype("str") == adata_vis.uns["mod"]["var_names"].astype("str"))
+    var_names = adata_vis.uns["mod"]["var_names"]
+    adata_vis = adata_vis[obs_names]
+    adata_vis = adata_vis[:, var_names]
+    cell_state = cell_state.loc[var_names, :]
+    adata_vis.obsm["w_sf"] = adata_vis.uns["mod"][post_sample_name]["w_sf"][obs_bool, :]
+    # normalisation
+    if use_normalisation_by_y_s:
+        normalisation = adata_vis.uns["mod"][post_sample_name]["detection_y_s"][obs_bool, :]
+    elif use_normalisation_by_total:
+        normalisation = np.asarray(adata_vis.X.sum(1)) / 10000.0
+    else:
+        normalisation = 1.0
+    adata_vis.obsm["signal_abundance"] = adata_vis.X[:, signal_bool].toarray() / normalisation
+    # normalise signal abundance
+    if use_normalisation_per_signal:
+        for i in range(adata_vis.obsm["signal_abundance"].shape[1]):
+            top_n_vals = np.sort(adata_vis.obsm["signal_abundance"][:, i])[::-1][:top_n]
+            adata_vis.obsm["signal_abundance"][:, i] = adata_vis.obsm["signal_abundance"][:, i] / top_n_vals.mean()
+            adata_vis.obsm["signal_abundance"][np.isnan(adata_vis.obsm["signal_abundance"])] = 0.0
+    adata_vis.obsm["signal_abundance"] = pd.DataFrame(
+        adata_vis.obsm["signal_abundance"],
+        index=adata_vis.obs_names,
+        columns=signal_receptor_mask.index,
+    )
+    if scale_receptor_abundance_by_m_g:
+        m_g = adata_vis.uns["mod"][post_sample_name]["m_g"].T
+        cell_state = cell_state * m_g
+    # get minimum of the two receptor subunits
+    receptor_abundance = np.minimum(
+        (cell_state).iloc[receptor_bool, :].values, (cell_state).iloc[receptor_bool_b, :].values
+    )
+    receptor_abundance = pd.DataFrame(
+        receptor_abundance,
+        index=signal_receptor_mask.columns,
+        columns=adata_vis.uns["mod"]["factor_names"],
+    )
+    # normalise receptor abundance
+    if not scale_receptor_abundance_by_m_g and use_normalisation_per_receptor:
+        receptor_abundance = (receptor_abundance.T / receptor_abundance.max(1)).T
+
+    per_cell_type_normalisation = (
+        1.0
+        / np.array(
+            [np.sort(adata_vis.obsm["w_sf"][:, i])[::-1][:top_n].mean() for i in range(adata_vis.obsm["w_sf"].shape[1])]
+        )
+    ).astype("float32")
+
+    return adata_vis, receptor_abundance, per_cell_type_normalisation
+
+
+def get_lr_abundance(cell_state, d_sg, m_g, y_s, signal_bool, receptor_bool, receptor_bool_b):
+    # get lr abundance
+    signal_abundance = d_sg[:, signal_bool] / y_s
+    receptor_abundance = np.minimum((cell_state * m_g)[:, receptor_bool], (cell_state * m_g)[:, receptor_bool_b])
+
+    return signal_abundance, receptor_abundance
+
+
+def make_spatial_neighbours(
+    adata_vis,
+    batch_key: str = "sample",
+    spatial_key: str = "spatial",
+    n_neighbors: int = 200,
+):
+    # compute KNN using the coordinates stored in adata.obsm
+    sc.pp.neighbors(adata_vis, use_rep=spatial_key, metric="euclidean", n_neighbors=n_neighbors)
+
+    from scipy.sparse import csr_matrix
+
+    batch_id = csr_matrix(pd.get_dummies(adata_vis.obs[batch_key]))
+    batch_id = batch_id @ batch_id.T
+
+    adata_vis.obsp["distances"] = csr_matrix(
+        adata_vis.obsp["distances"].astype("float32").multiply(batch_id.astype("float32"))
+    )
+    adata_vis.obsp["connectivities"] = csr_matrix(
+        adata_vis.obsp["connectivities"].astype("float32").multiply(batch_id.astype("float32"))
+    )
+    return adata_vis
 
 
 def get_sparse_matrix_from_indices_distances_umap(knn_indices, knn_dists, n_obs, n_neighbors):

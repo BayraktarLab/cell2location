@@ -2,7 +2,7 @@ import collections
 from typing import Iterable
 
 import torch
-from scvi.nn._utils import one_hot
+from scvi.nn import one_hot
 from torch import nn as nn
 
 
