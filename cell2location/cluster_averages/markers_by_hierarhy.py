@@ -86,8 +86,8 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
                         ch_names = hierarhy_df.index[ind]
                     else:
                         ch_names = hierarhy_df.loc[ind, :].iloc[:, plev + 1]
-                    results[f"level_{p_level-1}"][ch_names] = (
-                        results[f"level_{p_level-1}"][ch_names].T + results[f"level_{p_level}"][p].values
+                    results[f"level_{p_level - 1}"][ch_names] = (
+                        results[f"level_{p_level - 1}"][ch_names].T + results[f"level_{p_level}"][p].values
                     ).T
 
         # concatenate to produce a general summary
@@ -130,10 +130,10 @@ def markers_by_hierarhy(inf_aver, var_names, hierarhy_df, quantile=[0.05, 0.1, 0
                         ch_names = hierarhy_df.index[ind]
                     else:
                         ch_names = hierarhy_df.loc[ind, :].iloc[:, plev + 1]
-                    ind = np.isin(names[f"level_{p_level-1}"], ch_names)
+                    ind = np.isin(names[f"level_{p_level - 1}"], ch_names)
                     p_ind = np.isin(p_names, p)
 
-                    results[f"level_{p_level-1}"][:, ind, :] = results[f"level_{p_level-1}"][:, ind, :] + results[
+                    results[f"level_{p_level - 1}"][:, ind, :] = results[f"level_{p_level - 1}"][:, ind, :] + results[
                         f"level_{p_level}"
                     ][:, p_ind, :].reshape((n_genes, 1, n_samples))
 
