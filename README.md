@@ -40,7 +40,7 @@ We suggest using a separate conda environment for installing cell2location.
 Create conda environment and install `cell2location` package
 
 ```bash
-conda create -y -n cell2loc_env python=3.9
+conda create -y -n cell2loc_env python=3.10
 
 conda activate cell2loc_env
 pip install cell2location[tutorials]
@@ -94,15 +94,16 @@ Future developments of cell2location are focused on 1) scalability to 100k-mln+ 
 ### Conda environment for A100 GPUs
 
 ```bash
-export PYTHONNOUSERSITE="literallyanyletters"
-conda create -y -n test_scvi16_cuda113 python=3.9
-conda activate test_scvi16_cuda113
-conda install -y -c anaconda hdf5 pytables git
-pip install scvi-tools
-pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials]
-pip3 install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 -f https://download.pytorch.org/whl/torch_stable.html
-conda activate test_scvi16_cuda113
-python -m ipykernel install --user --name=test_scvi16_cuda113 --display-name='Environment (test_scvi16_cuda113)'
+export PYTHONNOUSERSITE="True"
+conda create -y -n cell2location_cuda118_torch22 python=3.10
+conda activate cell2location_cuda118_torch22
+
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+pip3 install scvi-tools==1.1.2
+
+pip install git+https://github.com/BayraktarLab/cell2location.git#egg=cell2location[tutorials,dev]
+python -m ipykernel install --user --name=cell2location_cuda118_torch22 --display-name='Environment (cell2location_cuda118_torch22)'
 ```
 
 ### Issues with package version mismatches often originate from python user site rather than conda environment being used to install a subset of packages
@@ -110,7 +111,7 @@ python -m ipykernel install --user --name=test_scvi16_cuda113 --display-name='En
 Before installing cell2location and it's dependencies, it could be necessary to make sure that you are creating a fully isolated conda environment by telling python to NOT use user site for installing packages by running this line before creating conda environment and every time before activatin conda environment in a new terminal session:
 
 ```bash
-export PYTHONNOUSERSITE="literallyanyletters"
+export PYTHONNOUSERSITE="True"
 ```
 
 ### Useful code for reading and combining multiple Visium sections
