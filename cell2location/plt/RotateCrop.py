@@ -1,4 +1,5 @@
 r"""Class for rotating and cropping images."""
+
 import cv2 as cv
 import numpy as np
 
