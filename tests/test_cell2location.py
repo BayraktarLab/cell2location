@@ -17,6 +17,7 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
 
 def export_posterior(model, dataset):
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_obsm=["q50", "q001"])  # quantile 0.50
+    assert "data_target" not in dataset.uns["mod"]["post_sample_q50"].keys()
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_obsm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
@@ -26,6 +27,7 @@ def export_posterior(model, dataset):
 
 def export_posterior_sc(model, dataset):
     dataset = model.export_posterior(dataset, use_quantiles=True, add_to_varm=["q50", "q001"])  # quantile 0.50
+    assert "data_target" not in dataset.uns["mod"]["post_sample_q50"].keys()
     dataset = model.export_posterior(
         dataset, use_quantiles=True, add_to_varm=["q50"], sample_kwargs={"batch_size": 10}
     )  # quantile 0.50
@@ -53,6 +55,8 @@ def test_cell2location():
     sc_model.train(max_epochs=1, batch_size=1000, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     dataset = sc_model.export_posterior(dataset, sample_kwargs={"num_samples": 10})
+    # test exclusion of observed variables from posterior sampling
+    assert "data_target" not in dataset.uns["mod"]["post_sample_means"].keys()
     # test plot_QC
     sc_model.plot_QC()
     # test quantile export
@@ -79,6 +83,8 @@ def test_cell2location():
     # export the estimated cell abundance (summary of the posterior distribution)
     # full data
     dataset = st_model.export_posterior(dataset, sample_kwargs={"num_samples": 10, "batch_size": st_model.adata.n_obs})
+    # test exclusion of observed variables from posterior sampling
+    assert "data_target" not in dataset.uns["mod"]["post_sample_means"].keys()
     # test quantile export
     export_posterior(st_model, dataset)
     st_model.plot_QC(summary_name="q05")
