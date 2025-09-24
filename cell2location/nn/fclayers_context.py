@@ -2,8 +2,8 @@ import collections
 from typing import Iterable
 
 import torch
-from scvi.nn._utils import one_hot
 from torch import nn as nn
+from torch.nn.functional import one_hot
 
 
 class FCLayers(nn.Module):

@@ -130,6 +130,7 @@ def compute_weighted_average_around_target(
 
     # [optional] compute average source_cell_type_data across closes locations (concentric circles)
     if distance_bin is not None:
+        source_cell_type_data = source_cell_type_data.astype("float32")
         # iterate over samples of connected location from the same sections
         # or independent chunks registered 3D data
         for s in adata.obs[sample_key].unique():
@@ -141,17 +142,19 @@ def compute_weighted_average_around_target(
 
             distances = cdist(adata[sample_ind, :].obsm[obsm_spatial_key], adata[sample_ind, :].obsm[obsm_spatial_key])
             # select locations in distance bin
-            binary_distance = csr_matrix((distances > distance_bin[0]) & (distances <= distance_bin[1]))
+            binary_distance = csr_matrix((distances > distance_bin[0]) & (distances <= distance_bin[1])).astype(
+                "float32"
+            )
             # compute average abundance across locations within a bin
             data_ = (
                 (binary_distance @ csr_matrix(source_cell_type_data.loc[sample_ind, :].values))
-                .multiply(1 / binary_distance.sum(1))
+                .multiply(1.0 / binary_distance.sum(1))
                 .toarray()
             )
             # to account for locations with no neighbours within a bin (sum == 0)
-            data_[np.isnan(data_)] = 0
+            data_[np.isnan(data_)] = 0.0
             # complete the average for a given sample
-            source_cell_type_data.loc[sample_ind, :] = data_
+            source_cell_type_data.loc[sample_ind, :] = data_.astype("float32")
     # normalise data by normalising quantile (global value across distance bins)
     source_cell_type_data = source_cell_type_data / source_normalisation_quantile
     # account for cases of undetected signal
