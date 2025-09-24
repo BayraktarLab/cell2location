@@ -104,6 +104,7 @@ class NegativeBinomial(Distribution):
     one parameterization to another.
 
     """
+
     arg_constraints = {
         "mu": constraints.greater_than_eq(0),
         "theta": constraints.greater_than_eq(0),
