@@ -16,7 +16,7 @@ def plot_genes_per_cell_type(slide, genes, ctypes):
         # limit color scale at 99.2% quantile of gene expression (computed across cell types)
         quantile_across_ct = np.array(
             [
-                np.quantile(slide.layers[n][:, slide.var["SYMBOL"] == genes[j]].toarray(), 0.992)
+                np.quantile(slide.layers[n][:, (slide.var["SYMBOL"] == genes[j]).values].toarray(), 0.992)
                 for n in slide.uns["mod"]["factor_names"]
             ]
         )
