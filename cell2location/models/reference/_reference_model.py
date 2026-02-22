@@ -11,7 +11,6 @@ from scvi.data.fields import (
     CategoricalJointObsField,
     CategoricalObsField,
     LayerField,
-    NumericalJointObsField,
     NumericalObsField,
 )
 from scvi.model.base import BaseModelClass, PyroSampleMixin, PyroSviTrainMixin
@@ -92,7 +91,6 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
         batch_key: Optional[str] = None,
         labels_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
-        continuous_covariate_keys: Optional[List[str]] = None,
         **kwargs,
     ):
         """
@@ -104,7 +102,6 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
         %(param_batch_key)s
         %(param_labels_key)s
         %(param_cat_cov_keys)s
-        %(param_cont_cov_keys)s
         """
         setup_method_args = cls._get_setup_method_args(**locals())
         adata.obs["_indices"] = np.arange(adata.n_obs).astype("int64")
@@ -113,7 +110,6 @@ class RegressionModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExpo
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
             CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
             CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
-            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
         ]
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)

@@ -512,7 +512,7 @@ class CellCommunicationToTfActivityNN(
             name=name_,
             weights_shape=weights_shape,
             prior_alpha=2.0,
-            prior_beta=2.0 / average_distance_prior,
+            prior_beta=2.0 / (1.0 / average_distance_prior),
             prior_fun=pyro.distributions.Gamma,
         )
         name_ = f"{name}DistanceBias"
@@ -550,7 +550,7 @@ class CellCommunicationToTfActivityNN(
             concentration=gamma_concentration,
             rate=gamma_concentration / gamma_distance,
             scaling=torch.tensor(1.0, device=distances.device) - scaling,
-        )
+        ) * torch.tensor(average_distance_prior * 1.5, device=distances.device)
 
         return sigmoid_distance_function + gamma_distance_function
 

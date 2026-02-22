@@ -15,7 +15,6 @@ from scvi.data.fields import (
     CategoricalJointObsField,
     CategoricalObsField,
     LayerField,
-    NumericalJointObsField,
     NumericalObsField,
     ObsmField,
 )
@@ -163,7 +162,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
         in_tissue_key: Optional[str] = None,
         normalising_factor_y_s_key: Optional[str] = None,
         categorical_covariate_keys: Optional[List[str]] = None,
-        continuous_covariate_keys: Optional[List[str]] = None,
         **kwargs,
     ):
         """
@@ -184,7 +182,6 @@ class Cell2location(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin, PltExport
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
             CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
             CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
-            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             NumericalObsField(REGISTRY_KEYS.INDICES_KEY, "_indices"),
         ]
         if layer_normalised is not None:
