@@ -376,7 +376,7 @@ def run_colocation(
                 if sc_spatial_present:
                     sc.settings.figdir = fig_path
 
-                    s_ind = sp_data.obs[train_args["sample_name_col"]] == s
+                    s_ind = (sp_data.obs[train_args["sample_name_col"]] == s).values
                     s_keys = list(sp_data.uns["spatial"].keys())
                     s_spatial = np.array(s_keys)[[s in i for i in s_keys]][0]
 
