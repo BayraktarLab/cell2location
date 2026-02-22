@@ -22,8 +22,12 @@ def plot_expected_vs_obs(
     # extract from anndata and convert to numpy if needed
     x = data[:, gene1].X
     y = data[:, gene2].X
-    x_mu = mu[:, np.where(data.var_names == gene1)][mu[:, np.where(data.var_names == gene1)] > 0].flatten()
-    y_mu = mu[:, np.where(data.var_names == gene2)][mu[:, np.where(data.var_names == gene2)] > 0].flatten()
+    x_mu = mu[:, np.where(np.array(data.var_names == gene1))][
+        mu[:, np.where(np.array(data.var_names == gene1))] > 0
+    ].flatten()
+    y_mu = mu[:, np.where(np.array(data.var_names == gene2))][
+        mu[:, np.where(np.array(data.var_names == gene2))] > 0
+    ].flatten()
 
     from anndata._core.views import SparseCSRView
     from scipy.sparse.csr import csr_matrix
