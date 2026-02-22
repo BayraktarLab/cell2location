@@ -39,4 +39,34 @@ samples_*.p
 *.h5ad
 histo_W_*.png
 docs/notebooks/results
+docs/notebooks/notebook_results/
+docs/notebooks/data/
+docs/notebooks/None-requirements.txt
 ./notebooks/
+
+# Test/experiment notebooks (local only)
+docs/notebooks/cell2location_tutorial_LR_model.ipynb
+docs/notebooks/cell2location_tutorial_LR_model_likelihood.ipynb
+docs/notebooks/cell2location_tutorial_LR_positive_only_model.ipynb
+docs/notebooks/cell2location_tutorial_LowLevelTrainingPlan.ipynb
+docs/notebooks/cell2location_tutorial_distance.ipynb
+docs/notebooks/cell2location_tutorial_distance_*.ipynb
+docs/notebooks/cell2location_tutorial_mean_var_prior.ipynb
+docs/notebooks/cell2location_tutorial_residual.ipynb
+docs/notebooks/cell2location_tutorial_residual_*.ipynb
+docs/notebooks/cell2location_tutorial_short.ipynb
+docs/notebooks/cell2location_tutorial_signal.ipynb
+docs/notebooks/cell2location_tutorial_workshop.ipynb
+docs/notebooks/cell2location_tutorial_workshop_test.ipynb
+docs/notebooks/cell2location_estimating_signatures-cpu.ipynb
+docs/notebooks/cell2location_short_demo_cpu.ipynb
+docs/notebooks/cell2location_short_demo_downstream_video.ipynb
+docs/notebooks/cell2location_test_torch*.ipynb
+docs/notebooks/cell2location_analysis_*.ipynb
+docs/notebooks/cell2location\(1\).ipynb
+
+# Local test artifacts
+cell2location_model_test/
+cell2location/dataloaders/_draft_tile_assignment.txt
+=0.4.1
+tatus:
