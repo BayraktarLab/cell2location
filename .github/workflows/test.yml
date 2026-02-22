@@ -18,22 +18,22 @@ jobs:
         shell: bash -l {0}
     strategy:
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10", "3.11"]
       fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Cache pip
       uses: actions/cache@v4
       with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v1-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v1-py${{ matrix.python-version }}-${{ hashFiles('**/setup.cfg') }}
           restore-keys: |
-            ${{ runner.os }}-pip-v1-
+            ${{ runner.os }}-pip-v1-py${{ matrix.python-version }}-
     - name: Install dependencies
       run: |
         pip install .[dev]
@@ -43,6 +43,7 @@ jobs:
       if: always()
     - name: Format with black
       run: |
+        pip uninstall -y uvloop
         black --check --line-length 120 .
       if: always()
     - name: Import sort
