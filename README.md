@@ -4,12 +4,18 @@
 
 ### Comprehensive mapping of tissue cell architecture via integrated single cell and spatial transcriptomics (cell2location model)
 
+***Spatial mapping / spatial deconvolution of cell types onto spatial transcriptomics data (Visium, Visium-HD, Cytassist, Slide-seq, Stereo-seq, Nanostring WTA).***
+
 [![Stars](https://img.shields.io/github/stars/BayraktarLab/cell2location?logo=GitHub&color=yellow)](https://github.com/BayraktarLab/cell2location/stargazers)
 ![Build Status](https://github.com/BayraktarLab/cell2location/actions/workflows/test.yml/badge.svg?event=push)
 [![Documentation Status](https://readthedocs.org/projects/cell2location/badge/?version=latest)](https://cell2location.readthedocs.io/en/stable/?badge=latest)
 [![Downloads](https://pepy.tech/badge/cell2location)](https://pepy.tech/project/cell2location)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BayraktarLab/cell2location/blob/master/docs/notebooks/cell2location_tutorial.ipynb)
 [![Docker image on quay.io](https://img.shields.io/badge/container-quay.io/vitkl/cell2location-brightgreen "Docker image on quay.io")](https://quay.io/vitkl/cell2location) 
+
+## For coding agents (Claude / Cursor / Copilot / Aider)
+
+Load [AGENTS.md](AGENTS.md) first, then the bundled skill at [.claude/skills/spatial-mapping/SKILL.md](.claude/skills/spatial-mapping/SKILL.md) before writing any cell2location code. The skill forces explicit decisions on `N_cells_per_location`, `detection_alpha`, reference signature source, and chunking — and supports both interactive and autonomous-agent modes. A companion troubleshooting skill at [.claude/skills/cell2location-troubleshooting/SKILL.md](.claude/skills/cell2location-troubleshooting/SKILL.md) helps draft `gh issue create` bodies and routes to recurring answers from the issue tracker.
 
 If you use cell2location please cite our paper: 
 
