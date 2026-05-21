@@ -14,8 +14,6 @@ Usage:
     python download_mouse_brain.py --output-dir ./data --components visium
 """
 import argparse
-import hashlib
-import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -126,7 +124,7 @@ def main() -> int:
     print("Usage from the spatial-mapping skill:")
     print(f"  spatial_h5ad_path = (build adata from {out / 'visium/rawdata/'} via sc.read_visium)")
     print(f"  ref_h5ad_path     = '{out / 'snrna/all_cells.h5ad'}'")
-    print(f"  signatures_csv    = (run step1_reference_signatures.ipynb on the reference)")
+    print("  signatures_csv    = (run step1_reference_signatures.ipynb on the reference)")
     print("")
     print("Reference paper: Kleshchevnikov et al. 2022. doi:10.1038/s41587-021-01139-4")
     return 0
