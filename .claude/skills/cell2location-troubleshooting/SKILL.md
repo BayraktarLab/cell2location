@@ -10,6 +10,24 @@ This skill helps when something goes wrong with cell2location, or when a user ha
 
 **Convention**: when the main `spatial-mapping` skill loads, this skill should be loaded too. But this skill is also usable **standalone** — invoke `/cell2location-troubleshooting` from any project.
 
+## Phase −1 — Load the project context FIRST (if present)
+
+**Before** classifying the symptom, check whether the project has a `SPATIAL_MAPPING_CONTEXT.md` (owned by [../cell2location-context/SKILL.md](../cell2location-context/SKILL.md)). Candidate paths (first hit wins):
+
+1. `$CWD/SPATIAL_MAPPING_CONTEXT.md`
+2. `$CWD/.claude/SPATIAL_MAPPING_CONTEXT.md`
+3. `~/.claude/plans/SPATIAL_MAPPING_CONTEXT_*.md`
+
+If found, **read it and use both blocks**:
+
+- **`## Scientific scope`** — especially the `### Failure criteria` list. The user has already declared what specific outcomes are unacceptable. Match the reported symptom against this list BEFORE going to the generic corpus. If the symptom is "all cell types appear everywhere" and the user listed exactly that as failure #1, the diagnostic context is already half-written.
+- **`## Technical decisions`** — every hyperparameter the user chose, with the rationale stored alongside. Use this to pre-fill the diagnostic template in Phase 3 instead of re-asking the user.
+- **`## Outstanding gaps`** — flags from the technical-completeness cross-check (e.g. "detection_alpha=200 but failure criterion #3 requires 20"). A reported symptom that matches a flagged gap is very likely caused by that gap; jump there first.
+
+If no context file is found, suggest the user create one once the immediate problem is resolved: "Long-term: run `/cell2location-context --science` so future diagnostics have your goals and failure criteria for context."
+
+The context file is read-only here; do not modify it. If a diagnostic conclusion adds to `## Outstanding gaps`, ask the user whether to invoke `/cell2location-context --technical` to persist it.
+
 ## What this skill does
 
 1. **Phase 1 — Match the user's symptom** against the harvested issue corpus at [../spatial-mapping/reference/issue_corpus.md](../spatial-mapping/reference/issue_corpus.md). The corpus paraphrases ~25 recurring vitkl answers across the GitHub tracker. Most user-reported problems already have a documented answer.
@@ -85,7 +103,7 @@ Present the top 3 matches to the user as a numbered list with titles + URLs. Ask
 
 ## Phase 3 — Issue draft
 
-Compose a `gh issue create` body with the diagnostic metadata vitkl normally has to request. Use this template:
+Compose a `gh issue create` body with the diagnostic metadata vitkl normally has to request. **If `SPATIAL_MAPPING_CONTEXT.md` was loaded in Phase −1, pre-fill the Hyperparameters block from `## Technical decisions` and the Symptom block from `## Scientific scope → ### Failure criteria`** rather than re-asking the user. Use this template:
 
 ```markdown
 ## Environment
@@ -188,5 +206,7 @@ These are NOT auto-loaded. Use the `Read` tool when needed:
 - [../spatial-mapping/reference/issue_corpus.md](../spatial-mapping/reference/issue_corpus.md) — full corpus, by topic.
 - [../spatial-mapping/reference/hyperparameters_extract.md](../spatial-mapping/reference/hyperparameters_extract.md) — supplement §1.2-§1.4 + §2 paraphrase. *Read when:* the user's problem points at a hyperparameter choice and you need the canonical default rationale.
 - [../spatial-mapping/SKILL.md](../spatial-mapping/SKILL.md) — main skill's anti-patterns block. *Read when:* you suspect the user is hitting a known anti-pattern.
+- [../cell2location-context/SKILL.md](../cell2location-context/SKILL.md) — owner of `SPATIAL_MAPPING_CONTEXT.md`. *Read when:* the user has no context file and you need to walk them through creating one, or when they want to add a diagnostic conclusion to `## Outstanding gaps`.
+- [../cell2location-context/reference/technical_completeness_rubric.md](../cell2location-context/reference/technical_completeness_rubric.md) — the cross-check matrix that maps scope-elements ↔ technical-decisions ↔ likely failure modes. *Read when:* you need to explain WHY a chosen hyperparameter would cause the reported symptom.
 
 </reference>

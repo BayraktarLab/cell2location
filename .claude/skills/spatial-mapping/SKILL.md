@@ -8,7 +8,10 @@ user-invocable: true
 
 This skill is the operating manual for running cell2location on the user's own data. It is **single-skill, format-plan-style** (instructions + `<reference>` tag), **dual-mode** (interactive `AskUserQuestion` / autonomous data-driven), and it **forces decisions** the maintainer (vitkl) routinely answers on the issue tracker.
 
-Companion skill: [cell2location-troubleshooting/SKILL.md](../cell2location-troubleshooting/SKILL.md). When this skill is loaded, you should ALSO load the troubleshooting skill (it consults the same issue corpus and helps file `gh issue create` drafts when this skill cannot resolve a problem).
+Companion skills (when this skill is loaded, also load both):
+
+- [cell2location-context/SKILL.md](../cell2location-context/SKILL.md) — owns the persistent `SPATIAL_MAPPING_CONTEXT.md` (project goals, reference, target populations, success/failure criteria + technical decisions). Invoked automatically by this skill at **Phase 0a** (`--science`) and **Phase 8.5** (`--technical`). Standalone-invocable via `/cell2location-context` to update goals between runs.
+- [cell2location-troubleshooting/SKILL.md](../cell2location-troubleshooting/SKILL.md) — consults the same issue corpus AND the `SPATIAL_MAPPING_CONTEXT.md` (especially the failure criteria + technical decisions) to match symptoms; helps file `gh issue create` drafts when this skill cannot resolve a problem.
 
 ## How this skill works
 
@@ -22,6 +25,47 @@ You walk the user through ten phases, in order. Each phase has TWO branches:
 **Hard rule for both modes**: NEVER silently default. In interactive mode, ask. In autonomous mode, document the choice and the inference rule that produced it.
 
 The output of the skill is a **set of generated artifacts**: customised parameter values for the [template notebooks](templates/), a launcher invocation, and a markdown explanation of what was chosen and why. The user can either submit the job via papermill OR open the notebook in Jupyter for interactive use.
+
+---
+
+# Phase 0a — Scientific-scope interview (FIRST STEP)
+
+## Goal
+Capture or load the user's scientific scope **before any technical decision is made**: why are they running cell2location, what reference, which target populations, what counts as success, what must not happen. All downstream phases consult this context.
+
+## Action
+Invoke the [cell2location-context](../cell2location-context/SKILL.md) skill with `--science`:
+
+```
+/cell2location-context --science
+```
+
+(Or call its `SKILL.md` directly when the slash-command channel is not available — read the file, follow its instructions.)
+
+The context skill will:
+
+1. **Auto-discover** `SPATIAL_MAPPING_CONTEXT.md` (candidate paths: `$CWD/`, `$CWD/.claude/`, `~/.claude/plans/SPATIAL_MAPPING_CONTEXT_<dataset>.md`).
+2. **If found**: show the user a summary of the `## Scientific scope` block and ask: **Use** the existing context / **Re-interview** to update / **Skip** for this run.
+3. **If not found**: ask the user: **Run the interview now (recommended)** _"Answering these questions can substantially improve the results from this analysis, get a more useful single-cell reference and spatial map, and lead to new discoveries."_ / **Point me at an existing handoff document** (imports its content as free-form scope) / **Skip — proceed with defaults**.
+4. **Return** either a file path or the string `"skipped"`.
+
+## How to consume the result
+
+- **If a path was returned**: read the file's `## Scientific scope` block. Carry it forward as context for every subsequent phase. In each phase that has a scope-relevant rule (Phase 1 granularity, Phase 3 N̂ choice, Phase 4 detection_alpha, Phase 6 branch), explicitly cite the scope entry that argued for the chosen value.
+- **If `"skipped"` was returned**: continue, but emit a markdown cell into the generated step1 and step2 notebooks:
+  ```markdown
+  # ⚠️ No SPATIAL_MAPPING_CONTEXT.md captured
+  This run proceeded with autonomous defaults because the user skipped the scientific-
+  scope interview. Hyperparameter choices, warnings, and refusals were not grounded in
+  user-declared success/failure criteria. To improve future runs, invoke
+  `/cell2location-context --science` and re-launch the workflow.
+  ```
+
+## Autonomous mode
+If no `AskUserQuestion` channel is exposed, the context skill auto-skips both branches and returns `"skipped"`. This phase records the skip in the notebook (markdown cell above) and proceeds.
+
+## Output
+Either the loaded `## Scientific scope` block (passed forward as context to all phases) or a recorded skip.
 
 ---
 
@@ -424,6 +468,38 @@ Use the tier from Phase 5's `n_chunks` × `chunk_size`. Emit markdown cell with 
 
 ## Output
 `max_epochs`, posterior-export sample_kwargs for [templates/step2_spatial_mapping.ipynb](templates/step2_spatial_mapping.ipynb).
+
+---
+
+# Phase 8.5 — Implementation-completeness check (BEFORE LAUNCH)
+
+## Goal
+Sweep every technical decision made in Phases 1–8, confirm all slots are filled, persist them into `SPATIAL_MAPPING_CONTEXT.md`, and **cross-check them against the user's `## Scientific scope`** (especially failure criteria). Block the launch in Phase 9 if any cross-check fires a hard violation that the user has not acknowledged.
+
+## Action
+Invoke the [cell2location-context](../cell2location-context/SKILL.md) skill with `--technical`:
+
+```
+/cell2location-context --technical
+```
+
+Pass it the current notebook parameter dict (or, if running through the formal workflow-state markdown, the per-phase summary the skill has been emitting).
+
+The context skill will:
+
+1. **Sweep each slot** in the Phase 1–8 decision table (see [reference/technical_completeness_rubric.md](../cell2location-context/reference/technical_completeness_rubric.md)). Fill any EMPTY slot with the defensible default OR ask the user when no default is sensible.
+2. **Cross-check** the chosen decisions against the user's failure criteria. Example fires:
+   - Failure criterion "abundance varies 10× across visually similar regions" + `detection_alpha=200` chosen → flag.
+   - Failure criterion "subtype mixing" + per-location segmentation hinted in scope + Phase 6 chose `master` → flag.
+   - Target population lumped in chosen `labels_key` → flag, route to issue #395.
+3. **Persist** the `## Technical decisions` and `## Outstanding gaps` blocks.
+4. **Return** the file path AND a boolean `safe_to_launch`. If `False`, ask the user: "N cross-checks flagged. Launch anyway / fix and re-run / abort?" Default to **fix and re-run**.
+
+## Autonomous mode
+Cross-checks still run; defaults are applied silently. `safe_to_launch=False` becomes a warning markdown cell in the launcher invocation log; the workflow proceeds (autonomous runs cannot block on user input).
+
+## Output
+Updated `SPATIAL_MAPPING_CONTEXT.md` with the technical decisions; a go/no-go signal for Phase 9.
 
 ---
 
