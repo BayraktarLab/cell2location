@@ -3,6 +3,9 @@ doc
 # Resilio Sync
 .sync
 
+# Build-time mirror of .claude/skills/ -- see setup.py:_mirror_bundled_skills
+cell2location/_bundled_skills/
+
 # MAC
 *Icon*
 .DS_Store

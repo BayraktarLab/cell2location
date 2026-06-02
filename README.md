@@ -15,7 +15,9 @@
 
 ## For coding agents (Claude / Cursor / Copilot / Aider)
 
-Load [AGENTS.md](AGENTS.md) first, then the bundled skill at [.claude/skills/spatial-mapping/SKILL.md](.claude/skills/spatial-mapping/SKILL.md) before writing any cell2location code. The skill forces explicit decisions on `N_cells_per_location`, `detection_alpha`, reference signature source, and chunking — and supports both interactive and autonomous-agent modes. A companion troubleshooting skill at [.claude/skills/cell2location-troubleshooting/SKILL.md](.claude/skills/cell2location-troubleshooting/SKILL.md) helps draft `gh issue create` bodies and routes to recurring answers from the issue tracker.
+Load [AGENTS.md](AGENTS.md) first, then the bundled skill at [.claude/skills/spatial-mapping/SKILL.md](.claude/skills/spatial-mapping/SKILL.md) before writing any cell2location code. The skill forces explicit decisions on `N_cells_per_location`, `detection_alpha`, reference signature source, and chunking — and supports both interactive and autonomous-agent modes. Two companion skills are also bundled: [.claude/skills/cell2location-context/SKILL.md](.claude/skills/cell2location-context/SKILL.md) captures the user's scientific scope (goals, target populations, success/failure criteria) and persists technical decisions in a `SPATIAL_MAPPING_CONTEXT.md` that future runs auto-discover; [.claude/skills/cell2location-troubleshooting/SKILL.md](.claude/skills/cell2location-troubleshooting/SKILL.md) drafts `gh issue create` bodies and routes to recurring answers from the issue tracker.
+
+After `pip install cell2location`, run `cell2location install-skills` once to copy the bundled skills into `~/.claude/skills/` so `/spatial-mapping`, `/cell2location-context`, and `/cell2location-troubleshooting` appear as slash commands across all your projects. Use `--symlink` if you want skill updates to flow through `pip install -U cell2location`. See [AGENTS.md](AGENTS.md#installing-the-skills-into-your-agent) for the full installer reference.
 
 If you use cell2location please cite our paper: 
 

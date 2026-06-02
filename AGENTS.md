@@ -30,12 +30,28 @@ Reach for cell2location when the user's request includes any of these phrases:
 
 ## The skills
 
-cell2location ships two bundled Claude Code skills (also readable by Cursor / Aider / other agents that respect `.claude/skills/`):
+cell2location ships three bundled Claude Code skills (also readable by Cursor / Aider / other agents that respect `.claude/skills/`):
 
 - **Operating manual**: [.claude/skills/spatial-mapping/SKILL.md](.claude/skills/spatial-mapping/SKILL.md) — load BEFORE writing any code. Single skill that walks the user through reference signatures, spatial QC, hyperparameter choice (Fig S27 decision tree), chunking, branch selection (master vs `hires_sliding_window`), training, posterior export, aggregation. Supports both interactive (`AskUserQuestion`) and autonomous (data-driven defaults from supplementary methods §1.2 + Fig S27) modes.
-- **Troubleshooting**: [.claude/skills/cell2location-troubleshooting/SKILL.md](.claude/skills/cell2location-troubleshooting/SKILL.md) — load when (a) the main skill instructed you to, (b) the user is dumping an error or unexpected result, or (c) the question is heavy on biological interpretation. Drafts `gh issue create` bodies with the diagnostic checklist the maintainer normally asks for.
+- **Project context (scope + technical decisions)**: [.claude/skills/cell2location-context/SKILL.md](.claude/skills/cell2location-context/SKILL.md) — owns the persistent `SPATIAL_MAPPING_CONTEXT.md` file. Called automatically by the operating manual at **Phase 0a** (`--science`: scientific goal, reference, target populations, success/failure criteria) and **Phase 8.5** (`--technical`: Phase 1–8 decision sweep + scope↔decision cross-check). Standalone-invocable via `/cell2location-context` to update goals between runs. The file is auto-discovered on each run so future sessions inherit the goals.
+- **Troubleshooting**: [.claude/skills/cell2location-troubleshooting/SKILL.md](.claude/skills/cell2location-troubleshooting/SKILL.md) — load when (a) the main skill instructed you to, (b) the user is dumping an error or unexpected result, or (c) the question is heavy on biological interpretation. Reads the user's declared failure criteria from `SPATIAL_MAPPING_CONTEXT.md` to match symptoms; drafts `gh issue create` bodies with the diagnostic checklist the maintainer normally asks for.
 
-**Convention**: when the main skill loads, both should be read by the agent. Troubleshooting is also usable standalone.
+**Convention**: when the main skill loads, all three should be read by the agent. Context and troubleshooting are also usable standalone.
+
+### Installing the skills into your agent
+
+If you `pip install cell2location`, the skills are shipped inside the wheel but not auto-registered with Claude Code / Cursor / Aider — the agents only auto-discover `.claude/skills/` in your **current working directory** or in `~/.claude/skills/`. Run once:
+
+```bash
+cell2location install-skills           # copy to ~/.claude/skills/
+cell2location install-skills --symlink # symlink instead (updates flow through pip upgrade)
+cell2location list-skills              # see what's bundled and where it would go
+cell2location uninstall-skills         # remove the copies/symlinks
+```
+
+After install, `/spatial-mapping`, `/cell2location-context`, and `/cell2location-troubleshooting` appear in the slash-command menu across all your projects. Default mode is **copy** (re-run `install-skills` to refresh after a cell2location upgrade). `--symlink` makes upgrades flow through automatically — pick that if you trust cell2location's release cadence not to surprise you mid-analysis.
+
+If you're working inside a clone of this repo, the skills auto-load from `.claude/skills/` — no install step needed.
 
 ## Quick API map
 
