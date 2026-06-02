@@ -1,0 +1,3 @@
+recursive-include cell2location/_bundled_skills *
+include AGENTS.md
+include CITATION.cff

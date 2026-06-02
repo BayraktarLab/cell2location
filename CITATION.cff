@@ -1,0 +1,99 @@
+cff-version: 1.2.0
+message: "If you use cell2location, please cite the following paper."
+title: "cell2location: Cell2location maps fine-grained cell types in spatial transcriptomics"
+authors:
+  - family-names: Kleshchevnikov
+    given-names: Vitalii
+  - family-names: Shmatko
+    given-names: Artem
+  - family-names: Dann
+    given-names: Emma
+  - family-names: Aivazidis
+    given-names: Alexander
+  - family-names: King
+    given-names: Hamish W.
+  - family-names: Li
+    given-names: Tong
+  - family-names: Elmentaite
+    given-names: Rasa
+  - family-names: Lomakin
+    given-names: Artem
+  - family-names: Kedlian
+    given-names: Veronika
+  - family-names: Gayoso
+    given-names: Adam
+  - family-names: Sarkin Jain
+    given-names: Mika
+  - family-names: Park
+    given-names: Jun Sung
+  - family-names: Ramona
+    given-names: Lauma
+  - family-names: Tuck
+    given-names: Elizabeth
+  - family-names: Arutyunyan
+    given-names: Anna
+  - family-names: Vento-Tormo
+    given-names: Roser
+  - family-names: Gerstung
+    given-names: Moritz
+  - family-names: James
+    given-names: Louisa
+  - family-names: Stegle
+    given-names: Oliver
+  - family-names: Bayraktar
+    given-names: Omer Ali
+repository-code: "https://github.com/BayraktarLab/cell2location"
+url: "https://cell2location.readthedocs.io/"
+license: Apache-2.0
+preferred-citation:
+  type: article
+  title: "Cell2location maps fine-grained cell types in spatial transcriptomics"
+  authors:
+    - family-names: Kleshchevnikov
+      given-names: Vitalii
+    - family-names: Shmatko
+      given-names: Artem
+    - family-names: Dann
+      given-names: Emma
+    - family-names: Aivazidis
+      given-names: Alexander
+    - family-names: King
+      given-names: Hamish W.
+    - family-names: Li
+      given-names: Tong
+    - family-names: Elmentaite
+      given-names: Rasa
+    - family-names: Lomakin
+      given-names: Artem
+    - family-names: Kedlian
+      given-names: Veronika
+    - family-names: Gayoso
+      given-names: Adam
+    - family-names: Sarkin Jain
+      given-names: Mika
+    - family-names: Park
+      given-names: Jun Sung
+    - family-names: Ramona
+      given-names: Lauma
+    - family-names: Tuck
+      given-names: Elizabeth
+    - family-names: Arutyunyan
+      given-names: Anna
+    - family-names: Vento-Tormo
+      given-names: Roser
+    - family-names: Gerstung
+      given-names: Moritz
+    - family-names: James
+      given-names: Louisa
+    - family-names: Stegle
+      given-names: Oliver
+    - family-names: Bayraktar
+      given-names: Omer Ali
+  journal: "Nature Biotechnology"
+  year: 2022
+  volume: 40
+  issue: 5
+  start: 661
+  end: 671
+  doi: "10.1038/s41587-021-01139-4"
+  url: "https://www.nature.com/articles/s41587-021-01139-4"
