@@ -480,7 +480,7 @@ class LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGen
         # =====================Compute mRNA count from each factor in locations  ======================= #
         with obs_plate:
             mRNA = w_sf * (self.cell_state * m_g).sum(-1)
-            pyro.deterministic("u_sf_mRNA_factors", mRNA)
+            pyro.deterministic("u_sf_mRNA_factors", mRNA, event_dim=0)
 
     def compute_expected(
         self,
