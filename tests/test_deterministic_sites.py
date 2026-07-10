@@ -17,7 +17,6 @@ from cell2location.models.simplified._cell2location_v3_no_mg_module import (
     LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelNoMGPyroModel,
 )
 
-
 SITE_NAME = "u_sf_mRNA_factors"
 
 
