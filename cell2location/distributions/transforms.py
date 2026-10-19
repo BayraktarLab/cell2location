@@ -6,6 +6,7 @@ class SoftplusTransform(Transform):
     r"""
     Transform via the mapping :math:`\text{Softplus}(x) = \log(1 + \exp(x))`.
     """
+
     domain = constraints.real_vector
     codomain = constraints.positive
 
